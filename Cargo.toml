@@ -1,0 +1,32 @@
+[package]
+name = "gitkyl"
+version = "0.1.0"
+edition = "2024"
+authors = ["Glenn Miao (lemorage) <one.lemorage@gmail.com>"]
+license = "BSD-3-Clause"
+description = "Generate static HTML sites from git repositories"
+repository = "https://github.com/lemorage/gitkyl"
+readme = "README.md"
+keywords = ["git", "static-site", "code-viewer"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+gix = { version = "0.64", default-features = false, features = ["max-performance"] }
+anyhow = { version = "1.0", default-features = false, features = ["std"] }
+clap = { version = "4.5", default-features = false, features = ["std", "derive", "help"] }
+maud = "0.27.0"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[[bin]]
+name = "gitkyl"
+path = "src/main.rs"

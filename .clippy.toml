@@ -1,0 +1,4 @@
+# Gitkyl clippy configuration
+
+# Deny these lints
+warn-on-all-wildcard-imports = true
