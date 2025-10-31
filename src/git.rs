@@ -1,8 +1,34 @@
 //! Git repository operations.
 
 use anyhow::{Context, Result};
-use gix::bstr::ByteSlice;
+use gix::bstr::{BString, ByteSlice};
 use std::path::Path;
+
+/// File entry in repository tree.
+#[derive(Debug, Clone)]
+pub struct FileEntry {
+    path: BString,
+    oid: gix::ObjectId,
+}
+
+impl FileEntry {
+    /// File path relative to repository root.
+    pub fn path(&self) -> &Path {
+        self.path
+            .to_path()
+            .expect("Git paths must be valid for the platform")
+    }
+
+    /// Git object ID.
+    pub fn oid(&self) -> gix::ObjectId {
+        self.oid
+    }
+
+    /// Git object ID as hexadecimal string.
+    pub fn oid_hex(&self) -> String {
+        self.oid.to_hex().to_string()
+    }
+}
 
 /// Repository metadata.
 #[derive(Debug, Clone)]
@@ -107,6 +133,79 @@ pub fn analyze_repository(path: impl AsRef<Path>, owner: Option<String>) -> Resu
     })
 }
 
+/// Lists all files in repository at given reference.
+///
+/// Traverses the tree at the specified reference using breadth-first order,
+/// returning all blob entries (regular files). Excludes directories, symlinks,
+/// and submodules.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Reference name (branch/tag/commit), defaults to HEAD if None
+///
+/// # Returns
+///
+/// Vector of FileEntry containing path and object ID for each blob
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Reference cannot be resolved
+/// - Tree cannot be traversed
+///
+/// # Examples
+///
+/// ```no_run
+/// use gitkyl::list_files;
+/// use std::path::Path;
+///
+/// let files = list_files(Path::new("."), None)?;
+/// for entry in files {
+///     println!("{}: {}", entry.path().display(), entry.oid_hex());
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn list_files(repo_path: impl AsRef<Path>, ref_name: Option<&str>) -> Result<Vec<FileEntry>> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit = match ref_name {
+        Some(ref_str) => repo
+            .find_reference(ref_str)
+            .with_context(|| format!("Failed to find reference: {}", ref_str))?
+            .into_fully_peeled_id()
+            .with_context(|| format!("Failed to peel reference '{}'", ref_str))?
+            .object()
+            .context("Failed to resolve object")?
+            .try_into_commit()
+            .map_err(|_| anyhow::anyhow!("Reference '{}' does not point to a commit", ref_str))?,
+        None => repo.head_commit().context("Failed to read HEAD commit")?,
+    };
+
+    let tree = commit.tree().context("Failed to read commit tree")?;
+
+    // Traverse tree in breadth-first order for consistent output
+    let files = tree
+        .traverse()
+        .breadthfirst
+        .files()
+        .context("Failed to traverse tree")?
+        .into_iter()
+        .map(|entry| FileEntry {
+            path: entry.filepath,
+            oid: entry.oid,
+        })
+        .collect();
+
+    Ok(files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,47 +262,60 @@ mod tests {
     }
 
     #[test]
-    fn test_analyze_tmp_test_repo() {
-        // Arrange: Use the test repo at /tmp/test_repo if it exists
-        let path = PathBuf::from("/tmp/test_repo");
-
-        // Skip test if repo doesn't exist
-        if !path.exists() {
-            eprintln!("Skipping: /tmp/test_repo doesn't exist");
-            return;
-        }
+    fn test_list_files_default_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
         // Act
-        let result = analyze_repository(&path, None);
+        let files = list_files(&repo_path, None).expect("Should list files from HEAD");
 
         // Assert
-        if let Ok(info) = result {
-            assert!(info.commit_count() > 0, "Should have at least one commit");
-            assert!(
-                !info.default_branch().is_empty(),
-                "Should have a default branch"
-            );
-            assert_eq!(info.name(), "test_repo");
-        }
+        assert!(!files.is_empty(), "Repository should contain files");
+        assert!(
+            files.iter().any(|entry| {
+                entry
+                    .path()
+                    .to_str()
+                    .map_or(false, |s| s.contains("Cargo.toml"))
+            }),
+            "Should find Cargo.toml in repository"
+        );
+        assert!(
+            files.iter().all(|entry| !entry.oid_hex().is_empty()),
+            "All entries should have valid OIDs"
+        );
     }
 
     #[test]
-    fn test_analyze_repo_with_complex_path() {
-        // Arrange: Path with ".." components that needs canonicalization
-        let path = PathBuf::from("/tmp/test_repo/../test_repo");
-
-        // Skip test if repo doesn't exist
-        if !PathBuf::from("/tmp/test_repo").exists() {
-            eprintln!("Skipping: /tmp/test_repo doesn't exist");
-            return;
-        }
+    fn test_list_files_specific_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
         // Act
-        let result = analyze_repository(&path, None);
+        let files =
+            list_files(&repo_path, Some("HEAD")).expect("Should list files from HEAD reference");
 
         // Assert
-        if let Ok(info) = result {
-            assert_eq!(info.name(), "test_repo");
-        }
+        assert!(!files.is_empty(), "Branch should contain files");
+        assert!(
+            files.iter().all(|entry| entry.path().is_relative()),
+            "All paths should be relative to repository root"
+        );
+    }
+
+    #[test]
+    fn test_list_files_invalid_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let invalid_ref = "refs/heads/this_branch_definitely_does_not_exist_12345";
+
+        // Act
+        let result = list_files(&repo_path, Some(invalid_ref));
+
+        // Assert
+        assert!(
+            result.is_err(),
+            "Should return error for nonexistent reference"
+        );
     }
 }
