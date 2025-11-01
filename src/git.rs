@@ -13,10 +13,10 @@ pub struct FileEntry {
 
 impl FileEntry {
     /// File path relative to repository root.
-    pub fn path(&self) -> &Path {
-        self.path
-            .to_path()
-            .expect("Git paths must be valid for the platform")
+    ///
+    /// Returns None if path contains platform-incompatible characters.
+    pub fn path(&self) -> Option<&Path> {
+        self.path.to_path().ok()
     }
 
     /// Git object ID.
@@ -133,6 +133,76 @@ pub fn analyze_repository(path: impl AsRef<Path>, owner: Option<String>) -> Resu
     })
 }
 
+/// Resolves reference to commit object.
+fn resolve_commit<'a>(
+    repo: &'a gix::Repository,
+    ref_name: Option<&str>,
+) -> Result<gix::Commit<'a>> {
+    match ref_name {
+        Some(ref_str) => repo
+            .find_reference(ref_str)
+            .with_context(|| format!("Failed to find reference: {}", ref_str))?
+            .into_fully_peeled_id()
+            .with_context(|| format!("Failed to peel reference '{}'", ref_str))?
+            .object()
+            .context("Failed to resolve object")?
+            .try_into_commit()
+            .map_err(|_| anyhow::anyhow!("Reference '{}' does not point to a commit", ref_str)),
+        None => repo.head_commit().context("Failed to read HEAD commit"),
+    }
+}
+
+/// Reads blob content from repository at given reference and path.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Reference name (branch/tag/commit), defaults to HEAD if None
+/// * `file_path`: Path to file within repository tree
+///
+/// # Returns
+///
+/// Blob content as bytes
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Reference cannot be resolved
+/// - File does not exist in tree
+/// - Blob cannot be read
+pub fn read_blob(
+    repo_path: impl AsRef<Path>,
+    ref_name: Option<&str>,
+    file_path: impl AsRef<Path>,
+) -> Result<Vec<u8>> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit = resolve_commit(&repo, ref_name)?;
+
+    let mut tree = commit.tree().context("Failed to read commit tree")?;
+
+    let entry = tree
+        .peel_to_entry_by_path(file_path.as_ref())
+        .context("Failed to traverse tree to path")?
+        .ok_or_else(|| {
+            anyhow::anyhow!("File not found in tree: {}", file_path.as_ref().display())
+        })?;
+
+    let object = entry.object().context("Failed to read tree entry object")?;
+
+    let blob = object
+        .try_into_blob()
+        .map_err(|_| anyhow::anyhow!("Path is not a blob: {}", file_path.as_ref().display()))?;
+
+    Ok(blob.data.to_vec())
+}
+
 /// Lists all files in repository at given reference.
 ///
 /// Traverses the tree at the specified reference using breadth-first order,
@@ -163,7 +233,9 @@ pub fn analyze_repository(path: impl AsRef<Path>, owner: Option<String>) -> Resu
 ///
 /// let files = list_files(Path::new("."), None)?;
 /// for entry in files {
-///     println!("{}: {}", entry.path().display(), entry.oid_hex());
+///     if let Some(path) = entry.path() {
+///         println!("{}: {}", path.display(), entry.oid_hex());
+///     }
 /// }
 /// # Ok::<(), anyhow::Error>(())
 /// ```
@@ -175,18 +247,7 @@ pub fn list_files(repo_path: impl AsRef<Path>, ref_name: Option<&str>) -> Result
         )
     })?;
 
-    let commit = match ref_name {
-        Some(ref_str) => repo
-            .find_reference(ref_str)
-            .with_context(|| format!("Failed to find reference: {}", ref_str))?
-            .into_fully_peeled_id()
-            .with_context(|| format!("Failed to peel reference '{}'", ref_str))?
-            .object()
-            .context("Failed to resolve object")?
-            .try_into_commit()
-            .map_err(|_| anyhow::anyhow!("Reference '{}' does not point to a commit", ref_str))?,
-        None => repo.head_commit().context("Failed to read HEAD commit")?,
-    };
+    let commit = resolve_commit(&repo, ref_name)?;
 
     let tree = commit.tree().context("Failed to read commit tree")?;
 
@@ -209,7 +270,7 @@ pub fn list_files(repo_path: impl AsRef<Path>, ref_name: Option<&str>) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_repo_info_accessors_direct() {
@@ -275,7 +336,7 @@ mod tests {
             files.iter().any(|entry| {
                 entry
                     .path()
-                    .to_str()
+                    .and_then(|p| p.to_str())
                     .map_or(false, |s| s.contains("Cargo.toml"))
             }),
             "Should find Cargo.toml in repository"
@@ -298,7 +359,9 @@ mod tests {
         // Assert
         assert!(!files.is_empty(), "Branch should contain files");
         assert!(
-            files.iter().all(|entry| entry.path().is_relative()),
+            files
+                .iter()
+                .all(|entry| entry.path().map_or(false, |p| p.is_relative())),
             "All paths should be relative to repository root"
         );
     }
@@ -316,6 +379,71 @@ mod tests {
         assert!(
             result.is_err(),
             "Should return error for nonexistent reference"
+        );
+    }
+
+    #[test]
+    fn test_read_blob_default_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let file_path = Path::new("Cargo.toml");
+
+        // Act
+        let content =
+            read_blob(&repo_path, None, file_path).expect("Should read Cargo.toml from HEAD");
+
+        // Assert
+        let content_str = String::from_utf8_lossy(&content);
+        assert!(
+            content_str.contains("[package]"),
+            "Should contain package section"
+        );
+        assert!(
+            content_str.contains("gitkyl"),
+            "Should contain package name"
+        );
+    }
+
+    #[test]
+    fn test_read_blob_specific_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let file_path = Path::new("Cargo.toml");
+
+        // Act
+        let content = read_blob(&repo_path, Some("HEAD"), file_path)
+            .expect("Should read file from HEAD reference");
+
+        // Assert
+        assert!(!content.is_empty(), "File content should not be empty");
+    }
+
+    #[test]
+    fn test_read_blob_nonexistent_file() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let file_path = Path::new("this_file_does_not_exist_12345.txt");
+
+        // Act
+        let result = read_blob(&repo_path, None, file_path);
+
+        // Assert
+        assert!(result.is_err(), "Should return error for nonexistent file");
+    }
+
+    #[test]
+    fn test_read_blob_directory_path() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let dir_path = Path::new("src");
+
+        // Act
+        let result = read_blob(&repo_path, None, dir_path);
+
+        // Assert
+        assert!(
+            result.is_err(),
+            "Should return error when path is directory"
         );
     }
 }
