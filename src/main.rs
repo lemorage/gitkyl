@@ -113,6 +113,52 @@ fn main() -> Result<()> {
 
     println!("Generated: {}", index_path.display());
 
+    let files = gitkyl::list_files(&config.repo, Some(repo_info.default_branch()))
+        .context("Failed to list repository files")?;
+
+    let mut generated_count = 0;
+    for entry in &files {
+        if let Some(path) = entry.path() {
+            let Some(path_str) = path.to_str() else {
+                eprintln!(
+                    "Warning: Skipping file with invalid UTF-8 path: {}",
+                    path.display()
+                );
+                continue;
+            };
+
+            match gitkyl::generate_blob_page(&config.repo, repo_info.default_branch(), path) {
+                Ok(html) => {
+                    let blob_dir = config.output.join("blob");
+
+                    let safe_path = path_str.replace('/', "_");
+                    let blob_path = blob_dir.join(format!("{}.html", safe_path));
+
+                    if let Some(parent) = blob_path.parent() {
+                        fs::create_dir_all(parent).context("Failed to create blob directory")?;
+                    }
+
+                    fs::write(&blob_path, html.into_string()).with_context(|| {
+                        format!("Failed to write blob page {}", blob_path.display())
+                    })?;
+
+                    generated_count += 1;
+                }
+                Err(e) => {
+                    let err_msg = e.to_string();
+                    if err_msg.contains("not a blob") || err_msg.contains("invalid UTF8") {
+                        continue;
+                    }
+                    return Err(e).with_context(|| {
+                        format!("Failed to generate blob page for {}", path.display())
+                    });
+                }
+            }
+        }
+    }
+
+    println!("Generated {} file pages", generated_count);
+
     Ok(())
 }
 
