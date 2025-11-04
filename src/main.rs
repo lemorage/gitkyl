@@ -119,20 +119,22 @@ fn main() -> Result<()> {
     let mut generated_count = 0;
     for entry in &files {
         if let Some(path) = entry.path() {
-            let Some(path_str) = path.to_str() else {
+            if path.to_str().is_none() {
                 eprintln!(
                     "Warning: Skipping file with invalid UTF-8 path: {}",
                     path.display()
                 );
                 continue;
-            };
+            }
 
             match gitkyl::generate_blob_page(&config.repo, repo_info.default_branch(), path) {
                 Ok(html) => {
-                    let blob_dir = config.output.join("blob");
-
-                    let safe_path = path_str.replace('/', "_");
-                    let blob_path = blob_dir.join(format!("{}.html", safe_path));
+                    let blob_path = config
+                        .output
+                        .join("blob")
+                        .join(repo_info.default_branch())
+                        .join(path)
+                        .with_extension("html");
 
                     if let Some(parent) = blob_path.parent() {
                         fs::create_dir_all(parent).context("Failed to create blob directory")?;
@@ -145,7 +147,7 @@ fn main() -> Result<()> {
                     generated_count += 1;
                 }
                 Err(e) => {
-                    let err_msg = e.to_string();
+                    let err_msg = format!("{:?}", e);
                     if err_msg.contains("not a blob") || err_msg.contains("invalid UTF8") {
                         continue;
                     }

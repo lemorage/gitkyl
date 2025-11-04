@@ -20,8 +20,8 @@ impl FileEntry {
     }
 
     /// Git object ID.
-    pub fn oid(&self) -> gix::ObjectId {
-        self.oid
+    pub fn oid(&self) -> &gix::ObjectId {
+        &self.oid
     }
 
     /// Git object ID as hexadecimal string.
