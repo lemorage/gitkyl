@@ -144,40 +144,7 @@ fn blob_page_markup(
 
 /// CSS styles for blob page.
 fn style_blob_page() -> &'static str {
-    r#"
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292f; background: #ffffff; }
-.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
-header { border-bottom: 1px solid #d0d7de; padding-bottom: 1rem; margin-bottom: 2rem; }
-.breadcrumb { font-size: 1rem; margin-bottom: 0.5rem; }
-.breadcrumb-link { color: #0969da; text-decoration: none; }
-.breadcrumb-link:hover { text-decoration: underline; }
-.breadcrumb-separator { color: #57606a; margin: 0 0.25rem; }
-.breadcrumb-current { font-weight: 600; color: #24292f; }
-.ref-info { font-size: 0.875rem; color: #57606a; }
-.ref-label { font-weight: 400; }
-.ref-name { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; background: #f6f8fa; padding: 0.125rem 0.5rem; border-radius: 3px; color: #24292f; }
-.blob-container { display: flex; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; background: #ffffff; }
-.line-numbers { background: #f6f8fa; padding: 0.75rem 0.5rem; text-align: right; user-select: none; border-right: 1px solid #d0d7de; min-width: 3.5rem; }
-.line-number { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.875rem; line-height: 1.5; color: #57606a; }
-.code-content { flex: 1; overflow-x: auto; }
-pre { margin: 0; padding: 0.75rem 1rem; }
-code { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.875rem; line-height: 1.5; display: block; }
-.code-line { min-height: 1.5em; }
-.hl-comment { color: #6e7781; }
-.hl-string { color: #0a3069; }
-.hl-number { color: #0550ae; }
-.hl-keyword { color: #cf222e; }
-.hl-type { color: #8250df; }
-.hl-function { color: #8250df; }
-.hl-variable { color: #24292f; }
-.hl-property { color: #24292f; }
-.hl-operator { color: #cf222e; }
-.hl-punctuation { color: #24292f; }
-footer { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #d0d7de; text-align: center; color: #57606a; font-size: 0.875rem; }
-footer a { color: #0969da; text-decoration: none; }
-footer a:hover { text-decoration: underline; }
-"#
+    include_str!("../assets/blob.css")
 }
 
 #[cfg(test)]

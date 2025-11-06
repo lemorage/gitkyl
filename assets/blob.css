@@ -1,0 +1,36 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292f; background: #ffffff; }
+.container { max-width: 1280px; margin: 0 auto; padding: 1rem 2rem; }
+header { border-bottom: 1px solid #d0d7de; padding-bottom: 1rem; margin-bottom: 2rem; }
+.breadcrumb { font-size: 1rem; margin-bottom: 0.5rem; }
+.breadcrumb-link { color: #0969da; text-decoration: none; }
+.breadcrumb-link:hover { text-decoration: underline; }
+.breadcrumb-link:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; border-radius: 3px; }
+.breadcrumb-separator { color: #57606a; margin: 0 0.25rem; }
+.breadcrumb-current { font-weight: 600; color: #24292f; }
+.ref-info { font-size: 0.875rem; color: #57606a; }
+.ref-label { font-weight: 400; }
+.ref-name { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; background: #f6f8fa; padding: 0.125rem 0.5rem; border-radius: 3px; color: #24292f; }
+.blob-container { display: flex; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; background: #ffffff; }
+.line-numbers { background: #f6f8fa; padding: 0.75rem 0.5rem; text-align: right; user-select: none; border-right: 1px solid #d0d7de; min-width: 3.5rem; }
+.line-number { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; line-height: 20px; color: #57606a; }
+.line-number:hover { color: #0969da; cursor: pointer; }
+.code-content { flex: 1; overflow-x: auto; }
+pre { margin: 0; padding: 0.75rem 1rem; }
+code { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; line-height: 20px; display: block; }
+.code-line { min-height: 20px; }
+.hl-comment { color: #6e7781; }
+.hl-string { color: #032f62; }
+.hl-number { color: #005cc5; }
+.hl-keyword { color: #d73a49; }
+.hl-type { color: #6f42c1; }
+.hl-function { color: #6f42c1; }
+.hl-variable { color: #24292f; }
+.hl-property { color: #005cc5; }
+.hl-operator { color: #d73a49; }
+.hl-punctuation { color: #24292f; }
+::selection { background: rgba(9, 105, 218, 0.3); }
+footer { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #d0d7de; text-align: center; color: #57606a; font-size: 0.875rem; }
+footer a { color: #0969da; text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+footer a:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; border-radius: 3px; }

@@ -19,27 +19,7 @@ fn index_page(
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { (name) " - Gitkyl" }
                 style {
-                    "* { margin: 0; padding: 0; box-sizing: border-box; }"
-                    "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292f; background: #ffffff; padding: 2rem; }"
-                    ".container { max-width: 1200px; margin: 0 auto; }"
-                    "header { border-bottom: 1px solid #d0d7de; padding-bottom: 1rem; margin-bottom: 2rem; }"
-                    "h1 { font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem; }"
-                    ".owner { color: #57606a; font-size: 1.25rem; }"
-                    ".stats { display: flex; gap: 2rem; margin: 2rem 0; padding: 1rem; background: #f6f8fa; border-radius: 6px; }"
-                    ".stat { display: flex; flex-direction: column; }"
-                    ".stat-label { font-size: 0.875rem; color: #57606a; }"
-                    ".stat-value { font-size: 1.5rem; font-weight: 600; color: #24292f; }"
-                    ".branches { margin-top: 2rem; }"
-                    ".branches h2 { font-size: 1.5rem; margin-bottom: 1rem; }"
-                    ".branch-list { list-style: none; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; }"
-                    ".branch-item { padding: 0.75rem 1rem; border-bottom: 1px solid #d0d7de; }"
-                    ".branch-item:last-child { border-bottom: none; }"
-                    ".branch-item.default { background: #ddf4ff; font-weight: 600; }"
-                    ".branch-name { color: #0969da; }"
-                    ".default-badge { display: inline-block; padding: 0.125rem 0.5rem; background: #1f883d; color: white; font-size: 0.75rem; border-radius: 12px; margin-left: 0.5rem; }"
-                    "footer { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #d0d7de; text-align: center; color: #57606a; font-size: 0.875rem; }"
-                    "footer a { color: #0969da; text-decoration: none; }"
-                    "footer a:hover { text-decoration: underline; }"
+                    (include_str!("../assets/index.css"))
                 }
             }
             body {
