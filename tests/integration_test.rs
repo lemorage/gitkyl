@@ -1,4 +1,6 @@
 //! Integration tests for Gitkyl.
+//!
+//! Tests repository analysis, configuration, and basic operations.
 
 use anyhow::Result;
 use gitkyl::{Config, analyze_repository};
@@ -236,7 +238,7 @@ fn test_analyze_repository_with_dot_path() -> Result<()> {
     match result {
         Ok(repo_info) => {
             assert!(!repo_info.name().is_empty());
-            assert!(repo_info.branches().len() > 0);
+            assert!(!repo_info.branches().is_empty());
         }
         Err(e) => {
             let err_msg = format!("{:?}", e);
@@ -263,7 +265,7 @@ fn test_analyze_repository_branch_count() -> Result<()> {
     // Assert
     if let Ok(repo_info) = result {
         assert!(
-            repo_info.branches().len() >= 1,
+            !repo_info.branches().is_empty(),
             "Repository should have at least one branch"
         );
         assert!(
