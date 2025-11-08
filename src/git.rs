@@ -67,6 +67,61 @@ impl RepoInfo {
     }
 }
 
+/// Commit metadata.
+#[derive(Debug, Clone)]
+pub struct CommitInfo {
+    oid: String,
+    short_oid: String,
+    author: String,
+    author_email: String,
+    committer: String,
+    date: i64,
+    message: String,
+    message_full: String,
+}
+
+impl CommitInfo {
+    /// Full commit hash.
+    pub fn oid(&self) -> &str {
+        &self.oid
+    }
+
+    /// Short commit hash (7 characters).
+    pub fn short_oid(&self) -> &str {
+        &self.short_oid
+    }
+
+    /// Author name.
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+
+    /// Author email.
+    pub fn author_email(&self) -> &str {
+        &self.author_email
+    }
+
+    /// Committer name.
+    pub fn committer(&self) -> &str {
+        &self.committer
+    }
+
+    /// Commit timestamp (Unix seconds).
+    pub fn date(&self) -> i64 {
+        self.date
+    }
+
+    /// First line of commit message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Full commit message.
+    pub fn message_full(&self) -> &str {
+        &self.message_full
+    }
+}
+
 /// Analyzes a git repository and extracts metadata.
 ///
 /// # Arguments
@@ -267,6 +322,96 @@ pub fn list_files(repo_path: impl AsRef<Path>, ref_name: Option<&str>) -> Result
     Ok(files)
 }
 
+/// Lists commits for a given reference in reverse chronological order.
+///
+/// Traverses commit history from the specified reference, extracting metadata
+/// for each commit including hash, author, date, and message. Returns commits
+/// in reverse chronological order (newest first).
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Reference name (branch/tag/commit), defaults to HEAD if None
+/// * `limit`: Optional limit on number of commits to retrieve
+///
+/// # Returns
+///
+/// Vector of CommitInfo structs with metadata for each commit
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Reference cannot be resolved
+/// - Commit traversal fails
+///
+/// # Examples
+///
+/// ```no_run
+/// use gitkyl::list_commits;
+/// use std::path::Path;
+///
+/// let commits = list_commits(Path::new("."), None, Some(10))?;
+/// for commit in commits {
+///     println!("{}: {}", commit.short_oid(), commit.message());
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn list_commits(
+    repo_path: impl AsRef<Path>,
+    ref_name: Option<&str>,
+    limit: Option<usize>,
+) -> Result<Vec<CommitInfo>> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit = resolve_commit(&repo, ref_name)?;
+
+    let mut commits = Vec::new();
+    let walker = commit
+        .ancestors()
+        .all()
+        .context("Failed to create commit ancestor iterator")?;
+
+    for (idx, result) in walker.enumerate() {
+        if let Some(max) = limit
+            && idx >= max
+        {
+            break;
+        }
+
+        let commit_info = result.context("Failed to traverse commit ancestor")?;
+        let commit_obj = commit_info
+            .object()
+            .context("Failed to read commit object")?;
+
+        let author = commit_obj.author().context("Failed to read author")?;
+        let committer = commit_obj.committer().context("Failed to read committer")?;
+        let message_bytes = commit_obj
+            .message_raw()
+            .context("Failed to read commit message")?;
+        let message_full = message_bytes.to_str_lossy().to_string();
+        let first_line = message_full.lines().next().unwrap_or("").to_string();
+
+        commits.push(CommitInfo {
+            oid: commit_obj.id.to_hex().to_string(),
+            short_oid: commit_obj.id.to_hex_with_len(7).to_string(),
+            author: author.name.to_str_lossy().to_string(),
+            author_email: author.email.to_str_lossy().to_string(),
+            committer: committer.name.to_str_lossy().to_string(),
+            date: author.time.seconds,
+            message: first_line,
+            message_full,
+        });
+    }
+
+    Ok(commits)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -445,5 +590,151 @@ mod tests {
             result.is_err(),
             "Should return error when path is directory"
         );
+    }
+
+    #[test]
+    fn test_list_commits_default_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let commits =
+            list_commits(&repo_path, None, Some(10)).expect("Should list commits from HEAD");
+
+        // Assert
+        assert!(!commits.is_empty(), "Repository should have commits");
+        assert!(commits.len() <= 10, "Should respect limit of 10 commits");
+        assert_eq!(
+            commits[0].oid().len(),
+            40,
+            "Full hash should be 40 characters"
+        );
+        assert_eq!(
+            commits[0].short_oid().len(),
+            7,
+            "Short hash should be 7 characters"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_with_branch() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let branch = "master";
+
+        // Act
+        let commits = list_commits(&repo_path, Some(branch), Some(5))
+            .expect("Should list commits from master branch");
+
+        // Assert
+        assert!(!commits.is_empty(), "Branch should have commits");
+        assert!(commits.len() <= 5, "Should respect limit of 5 commits");
+        assert!(commits[0].date() > 0, "Should have valid timestamp");
+        assert!(!commits[0].author().is_empty(), "Should have author name");
+        assert!(
+            !commits[0].author_email().is_empty(),
+            "Should have author email"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_invalid_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let invalid_ref = "refs/heads/nonexistent_branch_12345";
+
+        // Act
+        let result = list_commits(&repo_path, Some(invalid_ref), None);
+
+        // Assert
+        assert!(result.is_err(), "Should return error for invalid reference");
+    }
+
+    #[test]
+    fn test_commit_info_message_parsing() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let commits =
+            list_commits(&repo_path, None, Some(1)).expect("Should retrieve at least one commit");
+
+        // Assert
+        assert!(!commits.is_empty(), "Should have at least one commit");
+        let commit = &commits[0];
+        assert!(
+            !commit.message().contains('\n'),
+            "First line should not contain newlines"
+        );
+        assert!(
+            commit.message_full().len() >= commit.message().len(),
+            "Full message should contain first line"
+        );
+    }
+
+    #[test]
+    fn test_commit_info_accessors() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let commits = list_commits(&repo_path, None, Some(1)).expect("Should retrieve commit");
+
+        // Assert
+        let commit = &commits[0];
+        assert!(!commit.oid().is_empty(), "Should have OID");
+        assert!(!commit.short_oid().is_empty(), "Should have short OID");
+        assert!(!commit.author().is_empty(), "Should have author");
+        assert!(!commit.author_email().is_empty(), "Should have email");
+        assert!(!commit.committer().is_empty(), "Should have committer");
+        assert!(commit.date() > 0, "Should have positive timestamp");
+        assert!(!commit.message().is_empty(), "Should have message");
+        assert!(
+            !commit.message_full().is_empty(),
+            "Should have full message"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_no_limit() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let commits_limited =
+            list_commits(&repo_path, None, Some(3)).expect("Should list limited commits");
+        let commits_unlimited =
+            list_commits(&repo_path, None, None).expect("Should list all commits without limit");
+
+        // Assert
+        assert!(
+            !commits_unlimited.is_empty(),
+            "Repository should have commits"
+        );
+        assert!(
+            commits_unlimited.len() >= commits_limited.len(),
+            "Unlimited query should return at least as many commits as limited query"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_ordering() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let commits = list_commits(&repo_path, None, Some(5)).expect("Should list commits");
+
+        // Assert
+        assert!(
+            commits.len() >= 2,
+            "Need at least 2 commits to test ordering"
+        );
+        for i in 0..commits.len() - 1 {
+            assert!(
+                commits[i].date() >= commits[i + 1].date(),
+                "Commits should be in reverse chronological order (newest first)"
+            );
+        }
     }
 }
