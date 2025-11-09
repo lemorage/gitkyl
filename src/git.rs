@@ -738,3 +738,33 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+impl CommitInfo {
+    /// Creates a new CommitInfo instance for testing.
+    ///
+    /// This constructor is only available in test builds.
+    /// Production code should use list_commits() to retrieve commit data.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_for_test(
+        oid: String,
+        short_oid: String,
+        author: String,
+        author_email: String,
+        committer: String,
+        date: i64,
+        message: String,
+        message_full: String,
+    ) -> Self {
+        Self {
+            oid,
+            short_oid,
+            author,
+            author_email,
+            committer,
+            date,
+            message,
+            message_full,
+        }
+    }
+}
