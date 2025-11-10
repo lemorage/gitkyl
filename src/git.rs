@@ -737,6 +737,133 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_list_commits_limit_exceeds_total() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Get actual commit count first
+        let all_commits = list_commits(&repo_path, None, None).expect("Should list all commits");
+        let actual_count = all_commits.len();
+
+        // Act: Request way more commits than exist
+        let commits = list_commits(&repo_path, None, Some(actual_count * 10))
+            .expect("Should list commits without error");
+
+        // Assert
+        assert_eq!(
+            commits.len(),
+            actual_count,
+            "Should return all available commits when limit exceeds total"
+        );
+        assert!(
+            commits.len() > 0,
+            "Repository should have at least one commit"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_zero_limit() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act: Request zero commits
+        let commits =
+            list_commits(&repo_path, None, Some(0)).expect("Should handle zero limit gracefully");
+
+        // Assert
+        assert_eq!(
+            commits.len(),
+            0,
+            "Should return empty list when limit is zero"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_no_limit_ordering() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act: Request all commits (no limit)
+        let commits = list_commits(&repo_path, None, None).expect("Should list all commits");
+
+        // Assert
+        assert!(
+            commits.len() > 0,
+            "Repository should have at least one commit"
+        );
+        // Verify ordering: first commit should be most recent
+        if commits.len() >= 2 {
+            assert!(
+                commits[0].date() >= commits[1].date(),
+                "Commits should be in reverse chronological order"
+            );
+        }
+    }
+
+    #[test]
+    fn test_list_files_invalid_repository_path() {
+        // Arrange: Use a path that is definitely not a git repository
+        let invalid_path = PathBuf::from("/tmp/definitely-not-a-git-repo-12345");
+
+        // Act
+        let result = list_files(&invalid_path, None);
+
+        // Assert
+        assert!(
+            result.is_err(),
+            "Should return error for invalid repository path"
+        );
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_msg.contains("Failed to open repository at"),
+            "Error should mention failed repository opening"
+        );
+    }
+
+    #[test]
+    fn test_analyze_repository_invalid_path_name() {
+        // Arrange: Use root path which has no valid file name
+        let root_path = PathBuf::from("/");
+
+        // Act
+        let result = analyze_repository(&root_path, None);
+
+        // Assert
+        assert!(
+            result.is_err(),
+            "Should return error for path with no valid name"
+        );
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_msg.contains("Cannot determine repository name from path")
+                || err_msg.contains("Failed to open repository"),
+            "Error should mention repository name determination or opening failure"
+        );
+    }
+
+    #[test]
+    fn test_file_entry_oid_accessor() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act: List files and access their OIDs
+        let files = list_files(&repo_path, None).expect("Should list files");
+
+        // Assert
+        assert!(!files.is_empty(), "Should have at least one file");
+
+        for file in &files {
+            // Call the oid() method to ensure it's covered
+            let oid = file.oid();
+            assert_eq!(
+                oid.as_bytes().len(),
+                20,
+                "Git OID should be 20 bytes (SHA-1)"
+            );
+        }
+    }
 }
 
 #[cfg(test)]

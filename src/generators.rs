@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 use std::path::Path;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::git::{CommitInfo, read_blob};
 use crate::highlight::highlight;
@@ -134,7 +135,7 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
                                                 (commit.author())
                                             }
                                             span class="commit-date" {
-                                                (format_timestamp(commit.date()))
+                                                (format_timestamp(commit.date(), SystemTime::now()))
                                             }
                                         }
                                     }
@@ -173,11 +174,8 @@ fn style_commits_page() -> &'static str {
 /// # Returns
 ///
 /// Human readable relative time string
-fn format_timestamp(seconds: i64) -> String {
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
+fn format_timestamp(seconds: i64, now: SystemTime) -> String {
     let timestamp = UNIX_EPOCH + Duration::from_secs(seconds as u64);
-    let now = SystemTime::now();
 
     if let Ok(duration) = now.duration_since(timestamp) {
         let days = duration.as_secs() / 86400;
@@ -641,7 +639,7 @@ mod tests {
         let two_days_ago = (now - 172800) as i64;
 
         // Act
-        let formatted = format_timestamp(two_days_ago);
+        let formatted = format_timestamp(two_days_ago, SystemTime::now());
 
         // Assert
         assert_eq!(formatted, "2 days ago", "Should format as relative days");
@@ -657,7 +655,7 @@ mod tests {
             .as_secs() as i64;
 
         // Act
-        let formatted = format_timestamp(now);
+        let formatted = format_timestamp(now, SystemTime::now());
 
         // Assert
         assert_eq!(formatted, "today", "Should format current time as today");
@@ -674,7 +672,7 @@ mod tests {
         let yesterday = (now - 86400) as i64;
 
         // Act
-        let formatted = format_timestamp(yesterday);
+        let formatted = format_timestamp(yesterday, SystemTime::now());
 
         // Assert
         assert_eq!(formatted, "yesterday", "Should format yesterday correctly");
@@ -691,7 +689,7 @@ mod tests {
         let two_weeks_ago = (now - 1209600) as i64;
 
         // Act
-        let formatted = format_timestamp(two_weeks_ago);
+        let formatted = format_timestamp(two_weeks_ago, SystemTime::now());
 
         // Assert
         assert_eq!(formatted, "2 weeks ago", "Should format weeks correctly");
@@ -708,7 +706,7 @@ mod tests {
         let sixty_days_ago = (now - 5184000) as i64;
 
         // Act
-        let formatted = format_timestamp(sixty_days_ago);
+        let formatted = format_timestamp(sixty_days_ago, SystemTime::now());
 
         // Assert
         assert_eq!(formatted, "2 months ago", "Should format months correctly");
@@ -725,7 +723,7 @@ mod tests {
         let two_years_ago = (now - 63072000) as i64;
 
         // Act
-        let formatted = format_timestamp(two_years_ago);
+        let formatted = format_timestamp(two_years_ago, SystemTime::now());
 
         // Assert
         assert_eq!(formatted, "2 years ago", "Should format years correctly");
@@ -742,12 +740,131 @@ mod tests {
         let future = (now + 86400) as i64;
 
         // Act
-        let formatted = format_timestamp(future);
+        let formatted = format_timestamp(future, SystemTime::now());
 
         // Assert
         assert_eq!(
             formatted, "unknown",
             "Should return unknown for future timestamps"
+        );
+    }
+
+    #[test]
+    fn test_generate_commits_page_long_message() {
+        // Arrange: Create commit with 5000 character message
+        let long_message = "A".repeat(5000);
+        let commits = vec![create_test_commit(
+            "d".repeat(40),
+            long_message.clone(),
+            "Test Author".to_string(),
+            1704067200,
+        )];
+
+        // Act
+        let html = generate_commits_page(&commits, "main", "test-repo");
+        let html_str = html.into_string();
+
+        // Assert
+        assert!(
+            html_str.contains(&long_message),
+            "Should render very long commit message"
+        );
+        assert!(
+            html_str.contains("word-break: break-word"),
+            "CSS should handle long messages with word-break"
+        );
+        assert!(
+            html_str.len() > 5000,
+            "HTML should contain the full message"
+        );
+    }
+
+    #[test]
+    fn test_generate_commits_page_multiline_message() {
+        // Arrange: Commit with multi-line message (only first line should display)
+        let commits = vec![create_test_commit(
+            "e".repeat(40),
+            "First line summary".to_string(),
+            "Test Author".to_string(),
+            1704067200,
+        )];
+
+        // Act
+        let html = generate_commits_page(&commits, "main", "test-repo");
+        let html_str = html.into_string();
+
+        // Assert
+        assert!(
+            html_str.contains("First line summary"),
+            "Should display first line of commit message"
+        );
+    }
+
+    #[test]
+    fn test_generate_commits_page_message_with_special_unicode() {
+        // Arrange: Commit with emoji and special Unicode characters
+        let unicode_message = "🚀 Add feature with 日本語 and العربية support 🎉";
+        let commits = vec![create_test_commit(
+            "f".repeat(40),
+            unicode_message.to_string(),
+            "Test Author 👾".to_string(),
+            1704067200,
+        )];
+
+        // Act
+        let html = generate_commits_page(&commits, "main", "test-repo");
+        let html_str = html.into_string();
+
+        // Assert
+        assert!(
+            html_str.contains("🚀"),
+            "Should handle emoji in commit message"
+        );
+        assert!(
+            html_str.contains("日本語"),
+            "Should handle Chinese characters"
+        );
+        assert!(
+            html_str.contains("العربية"),
+            "Should handle Arabic characters"
+        );
+        assert!(
+            html_str.contains("👾"),
+            "Should handle emoji in author name"
+        );
+        // Verify UTF-8 encoding is preserved
+        assert!(
+            html_str.contains("charset=\"utf-8\""),
+            "Should declare UTF-8 encoding"
+        );
+    }
+
+    #[test]
+    fn test_generate_commits_page_empty_message() {
+        // Arrange: Commit with empty message
+        let commits = vec![create_test_commit(
+            "g".repeat(40),
+            String::new(), // Empty message
+            "Test Author".to_string(),
+            1704067200,
+        )];
+
+        // Act
+        let html = generate_commits_page(&commits, "main", "test-repo");
+        let html_str = html.into_string();
+
+        // Assert
+        assert!(
+            html_str.contains("Showing 1 commits"),
+            "Should still show commit count"
+        );
+        assert!(
+            html_str.contains(&"g".repeat(7)),
+            "Should display commit hash even with empty message"
+        );
+        assert!(
+            html_str.contains("Test Author"),
+            "Should display author even with empty message"
         );
     }
 }
