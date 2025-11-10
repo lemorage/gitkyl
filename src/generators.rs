@@ -107,7 +107,7 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
                 div class="container" {
                     header {
                         div class="breadcrumb" {
-                            a href="/" class="breadcrumb-link" { "Repository" }
+                            a href="../../index.html" class="breadcrumb-link" { "Repository" }
                             span class="breadcrumb-separator" { "/" }
                             span class="breadcrumb-current" { "Commits" }
                             span class="ref-badge" { (ref_name) }
@@ -212,6 +212,11 @@ fn blob_page_markup(
     let lines: Vec<&str> = highlighted_code.lines().collect();
     let line_count = lines.len().max(1);
 
+    // Calculate relative path back to index.html based on depth
+    // Depth = blob/ + branch/ + path directories
+    let depth = breadcrumb_components.len() + 1;
+    let index_path = "../".repeat(depth) + "index.html";
+
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -227,7 +232,7 @@ fn blob_page_markup(
                 div class="container" {
                     header {
                         div class="breadcrumb" {
-                            a href="/" class="breadcrumb-link" { "Repository" }
+                            a href=(index_path) class="breadcrumb-link" { "Repository" }
                             @for (idx, component) in breadcrumb_components.iter().enumerate() {
                                 span class="breadcrumb-separator" { "/" }
                                 @if idx == breadcrumb_components.len() - 1 {
