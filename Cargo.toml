@@ -18,6 +18,9 @@ maud = "0.27.0"
 tree-sitter = { version = "0.25.10", default-features = false }
 tree-sitter-rust = { version = "0.24.0", default-features = false }
 
+[dev-dependencies]
+tempfile = { version = "3.12", default-features = false }
+
 [profile.dev]
 opt-level = 0
 debug = true

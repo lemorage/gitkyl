@@ -3,6 +3,13 @@ use gitkyl::Config;
 use maud::{DOCTYPE, Markup, html};
 use std::fs;
 
+/// Default limit for commits displayed on commit log page.
+///
+/// Limits display to 35 commits to balance page load time and commit
+/// visibility. Repositories with extensive history should implement
+/// pagination in future versions.
+const DEFAULT_COMMIT_LIMIT: usize = 35;
+
 /// Generates index page HTML.
 fn index_page(
     name: &str,
@@ -92,6 +99,39 @@ fn main() -> Result<()> {
     fs::write(&index_path, html.into_string()).context("Failed to write index.html")?;
 
     println!("Generated: {}", index_path.display());
+
+    // Generate commit log page for default branch
+    let commits = gitkyl::list_commits(
+        &config.repo,
+        Some(repo_info.default_branch()),
+        Some(DEFAULT_COMMIT_LIMIT),
+    )
+    .context("Failed to list commits")?;
+
+    let commits_html =
+        gitkyl::generate_commits_page(&commits, repo_info.default_branch(), repo_info.name());
+
+    let commits_dir = config
+        .output
+        .join("commits")
+        .join(repo_info.default_branch());
+
+    fs::create_dir_all(&commits_dir).with_context(|| {
+        format!(
+            "Failed to create commits directory: {}",
+            commits_dir.display()
+        )
+    })?;
+
+    let commits_path = commits_dir.join("index.html");
+    fs::write(&commits_path, commits_html.into_string())
+        .with_context(|| format!("Failed to write commits page to {}", commits_path.display()))?;
+
+    println!(
+        "Generated: {} ({} commits)",
+        commits_path.display(),
+        commits.len()
+    );
 
     let files = gitkyl::list_files(&config.repo, Some(repo_info.default_branch()))
         .context("Failed to list repository files")?;
@@ -231,5 +271,53 @@ mod tests {
         // Assert
         assert!(html_string.contains("develop"));
         assert!(html_string.contains("default-badge"));
+    }
+
+    #[test]
+    fn test_commits_page_generation_workflow() {
+        use std::path::PathBuf;
+
+        // Arrange
+        let temp_dir = tempfile::tempdir().expect("Should create temp dir");
+        let output = temp_dir.path();
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act: Simulate main workflow for commit page generation
+        let repo_info =
+            gitkyl::analyze_repository(&repo_path, None).expect("Should analyze repository");
+
+        let commits = gitkyl::list_commits(&repo_path, Some(repo_info.default_branch()), Some(10))
+            .expect("Should list commits");
+
+        let html =
+            gitkyl::generate_commits_page(&commits, repo_info.default_branch(), repo_info.name());
+
+        let commits_dir = output.join("commits").join(repo_info.default_branch());
+        fs::create_dir_all(&commits_dir).expect("Should create commits directory");
+
+        let commits_path = commits_dir.join("index.html");
+        fs::write(&commits_path, html.into_string()).expect("Should write commits page");
+
+        // Assert
+        assert!(
+            commits_path.exists(),
+            "Commits page should be created at expected path"
+        );
+
+        let content = fs::read_to_string(&commits_path).expect("Should read commits page");
+
+        assert!(
+            content.contains("Commit History"),
+            "Should contain commit log title"
+        );
+        assert!(
+            content.contains(repo_info.default_branch()),
+            "Should contain branch name in badge"
+        );
+        assert!(
+            content.contains(repo_info.name()),
+            "Should contain repository name in title"
+        );
+        assert!(commits.len() > 0, "Should have at least one commit");
     }
 }
