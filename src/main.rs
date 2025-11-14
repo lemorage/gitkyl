@@ -328,8 +328,7 @@ fn main() -> Result<()> {
                         .output
                         .join("blob")
                         .join(repo_info.default_branch())
-                        .join(path)
-                        .with_extension("html");
+                        .join(format!("{}.html", path.display()));
 
                     if let Some(parent) = blob_path.parent() {
                         fs::create_dir_all(parent).context("Failed to create blob directory")?;
