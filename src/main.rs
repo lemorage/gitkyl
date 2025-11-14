@@ -74,7 +74,7 @@ fn index_page(
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { (name) " - Gitkyl" }
                 script src="https://unpkg.com/@phosphor-icons/web" {}
-                style { (include_str!("../assets/index.css")) }
+                link rel="stylesheet" href="assets/index.css";
             }
             body {
                 div class="container" {
@@ -213,6 +213,25 @@ fn main() -> Result<()> {
         .context("Failed to analyze repository")?;
 
     fs::create_dir_all(&config.output).context("Failed to create output directory")?;
+
+    let assets_dir = config.output.join("assets");
+    fs::create_dir_all(&assets_dir).context("Failed to create assets directory")?;
+
+    fs::write(
+        assets_dir.join("index.css"),
+        include_str!("../assets/index.css"),
+    )
+    .context("Failed to write index.css")?;
+    fs::write(
+        assets_dir.join("blob.css"),
+        include_str!("../assets/blob.css"),
+    )
+    .context("Failed to write blob.css")?;
+    fs::write(
+        assets_dir.join("commits.css"),
+        include_str!("../assets/commits.css"),
+    )
+    .context("Failed to write commits.css")?;
 
     let latest_commit =
         gitkyl::list_commits(&config.repo, Some(repo_info.default_branch()), Some(1))

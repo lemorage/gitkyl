@@ -101,7 +101,7 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { "Commits - " (repo_name) " - Gitkyl" }
-                style { (style_commits_page()) }
+                link rel="stylesheet" href="../../assets/commits.css";
             }
             body {
                 div class="container" {
@@ -153,13 +153,6 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
             }
         }
     }
-}
-
-/// CSS styles for commit log page.
-///
-/// Loaded at compile time from assets directory for zero runtime dependencies.
-fn style_commits_page() -> &'static str {
-    include_str!("../assets/commits.css")
 }
 
 /// Formats Unix timestamp as human readable relative time.
@@ -224,9 +217,7 @@ fn blob_page_markup(
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { (file_path) " - Gitkyl" }
-                style {
-                    (style_blob_page())
-                }
+                link rel="stylesheet" href="../../assets/blob.css";
             }
             body {
                 div class="container" {
@@ -275,11 +266,6 @@ fn blob_page_markup(
             }
         }
     }
-}
-
-/// CSS styles for blob page.
-fn style_blob_page() -> &'static str {
-    include_str!("../assets/blob.css")
 }
 
 #[cfg(test)]
@@ -531,20 +517,6 @@ mod tests {
     }
 
     #[test]
-    fn test_style_blob_page_contains_classes() {
-        // Arrange & Act
-        let css = style_blob_page();
-
-        // Assert
-        assert!(css.contains(".blob-container"));
-        assert!(css.contains(".line-numbers"));
-        assert!(css.contains(".code-content"));
-        assert!(css.contains(".hl-keyword"));
-        assert!(css.contains(".hl-string"));
-        assert!(css.contains(".breadcrumb"));
-    }
-
-    #[test]
     fn test_generate_commits_page_structure() {
         // Arrange
         let commits = vec![
@@ -775,8 +747,8 @@ mod tests {
             "Should render very long commit message"
         );
         assert!(
-            html_str.contains("word-break: break-word"),
-            "CSS should handle long messages with word-break"
+            html_str.contains("commit-message"),
+            "Should use commit-message class for styling"
         );
         assert!(
             html_str.len() > 5000,
