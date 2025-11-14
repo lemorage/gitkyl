@@ -1,23 +1,373 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292f; background: #ffffff; padding: 1rem 2rem; }
-.container { max-width: 1280px; margin: 0 auto; }
-header { border-bottom: 1px solid #d0d7de; padding-bottom: 1rem; margin-bottom: 2rem; }
-h1 { font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem; }
-.owner { color: #57606a; font-size: 1.25rem; }
-.stats { display: flex; gap: 2rem; margin: 2rem 0; padding: 1rem; background: #f6f8fa; border-radius: 6px; }
-.stat { display: flex; flex-direction: column; }
-.stat-label { font-size: 0.875rem; color: #57606a; }
-.stat-value { font-size: 1.5rem; font-weight: 600; color: #24292f; }
-.branches { margin-top: 2rem; }
-.branches h2 { font-size: 1.5rem; margin-bottom: 1rem; }
-.branch-list { list-style: none; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; }
-.branch-item { padding: 0.75rem 1rem; border-bottom: 1px solid #d0d7de; }
-.branch-item:last-child { border-bottom: none; }
-.branch-item.default { background: #ddf4ff; font-weight: 600; }
-.branch-name { color: #0969da; }
-.default-badge { display: inline-block; padding: 0.125rem 0.5rem; background: #1f883d; color: white; font-size: 0.75rem; border-radius: 12px; margin-left: 0.5rem; }
-footer { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #d0d7de; text-align: center; color: #57606a; font-size: 0.875rem; }
-footer a { color: #0969da; text-decoration: none; }
-footer a:hover { text-decoration: underline; }
-footer a:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; border-radius: 3px; }
-::selection { background: rgba(9, 105, 218, 0.3); }
+:root {
+    --bg-body: #F5F5F7;
+    --bg-card: #FFFFFF;
+    --text-primary: #1D1D1F;
+    --text-secondary: #86868B;
+    --accent: #0071E3;
+    --accent-hover: #0077ED;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.04);
+    --radius-l: 18px;
+    --radius-m: 12px;
+    --radius-s: 6px;
+    --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    --icon-folder: #5AC8FA;
+    --icon-rust: #FF9500;
+    --icon-readme: #0071E3;
+    --icon-config: #86868B;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--bg-body);
+    padding: 2rem 1.5rem;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container {
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+/* Repository Header */
+.repo-header {
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.repo-name {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+
+.repo-owner {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* Repository Card */
+.repo-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+}
+
+/* Controls Area */
+.repo-controls {
+    padding: 16px 24px;
+    background: rgba(249, 249, 250, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(20px)) {
+    .repo-controls {
+        background: #f9f9fa;
+    }
+}
+
+.branch-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #E8E8ED;
+    color: var(--text-primary);
+    border-radius: 100px;
+    font-weight: 500;
+    font-size: 13px;
+    border: none;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    line-height: 20px;
+    flex-wrap: wrap;
+}
+
+.branch-selector:hover {
+    background: #D2D2D7;
+}
+
+.branch-name {
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.branch-name:hover {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.branch-active {
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+}
+
+.branch-active:hover {
+    background: var(--accent-hover);
+}
+
+.commit-info-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.avatar-placeholder {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.commit-message {
+    color: var(--text-primary);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+}
+
+.commit-info-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.commit-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.commit-meta {
+    color: var(--text-secondary);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 32px;
+}
+
+.branch-caret {
+    font-size: 10px;
+    margin-left: 2px;
+}
+
+.commit-hash {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.history-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    margin-left: auto;
+    margin-right: -8px;
+}
+
+.history-link:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-primary);
+}
+
+.history-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* File Table */
+.file-table {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.file-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+    align-items: center;
+    transition: background-color 0.15s ease;
+    text-decoration: none;
+}
+
+.file-row:last-child {
+    border-bottom: none;
+}
+
+.file-row:hover {
+    background-color: #FAFAFC;
+}
+
+.file-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.icon-box {
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.icon-folder {
+    color: var(--icon-folder);
+}
+
+.icon-rust {
+    color: var(--icon-rust);
+}
+
+.icon-readme {
+    color: var(--icon-readme);
+}
+
+.icon-config {
+    color: var(--icon-config);
+}
+
+.file-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.file-link .dir-path {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.file-meta {
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+/* Empty State */
+.empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    background-color: var(--bg-body);
+    border-radius: var(--radius-m);
+}
+
+/* Footer */
+footer {
+    margin-top: 3rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+footer a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+footer a:hover {
+    color: var(--accent);
+}
+
+footer a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+/* Selection */
+::selection {
+    background-color: rgba(0, 113, 227, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+    }
+
+    .repo-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .commit-info-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        width: 100%;
+    }
+
+    .commit-message {
+        max-width: 100%;
+    }
+
+    .history-link {
+        width: 100%;
+        justify-content: center;
+        background: var(--bg-body);
+        margin-top: 8px;
+    }
+
+    .file-row {
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        padding: 12px 16px;
+    }
+}
