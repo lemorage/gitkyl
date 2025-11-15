@@ -313,6 +313,7 @@ pub fn list_files(repo_path: impl AsRef<Path>, ref_name: Option<&str>) -> Result
         .files()
         .context("Failed to traverse tree")?
         .into_iter()
+        .filter(|entry| entry.mode.is_blob())
         .map(|entry| FileEntry {
             path: entry.filepath,
             oid: entry.oid,

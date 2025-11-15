@@ -5,7 +5,7 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::git::{CommitInfo, read_blob};
+use crate::git::{CommitInfo, FileEntry, read_blob};
 use crate::highlight::highlight;
 
 /// Generates HTML blob page with syntax highlighting.
@@ -94,6 +94,11 @@ pub fn generate_blob_page(
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: &str) -> Markup {
+    // Commits pages are always at depth 2: commits/<branch>/index.html
+    let depth = 2;
+    let css_path = format!("{}assets/commits.css", "../".repeat(depth));
+    let index_path = format!("{}index.html", "../".repeat(depth));
+
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -101,13 +106,13 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { "Commits - " (repo_name) " - Gitkyl" }
-                link rel="stylesheet" href="../../assets/commits.css";
+                link rel="stylesheet" href=(css_path);
             }
             body {
                 div class="container" {
                     header {
                         div class="breadcrumb" {
-                            a href="../../index.html" class="breadcrumb-link" { "Repository" }
+                            a href=(index_path) class="breadcrumb-link" { "Repository" }
                             span class="breadcrumb-separator" { "/" }
                             span class="breadcrumb-current" { "Commits" }
                             span class="ref-badge" { (ref_name) }
@@ -153,6 +158,204 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
             }
         }
     }
+}
+
+/// Represents an item in a directory tree view.
+///
+/// Distinguishes between regular files (git blobs) and directories (git trees)
+/// with proper semantic representation and commit metadata.
+#[derive(Debug, Clone)]
+pub enum TreeItem {
+    /// Regular file with its last modifying commit
+    File {
+        entry: FileEntry,
+        commit: CommitInfo,
+    },
+    /// Directory with its most recent commit
+    Directory {
+        name: String,
+        full_path: String,
+        commit: CommitInfo,
+    },
+}
+
+/// Generates HTML tree page for directory browsing.
+///
+/// Creates a hierarchical directory view showing files and subdirectories
+/// at the specified path. Displays file metadata and provides navigation
+/// links to nested trees and blob pages. Includes parent directory navigation
+/// when not at repository root.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Git reference (branch/tag/commit)
+/// * `tree_path`: Directory path within repository (empty for root)
+/// * `repo_name`: Repository name for page title
+/// * `items`: Tree items (files and directories) at this level
+///
+/// # Returns
+///
+/// HTML markup for the tree page
+///
+/// # Examples
+///
+/// ```no_run
+/// use gitkyl::{generate_tree_page, TreeItem};
+/// use std::path::Path;
+///
+/// let items = vec![]; // Populate with TreeItem instances
+/// let html = generate_tree_page(Path::new("."), "main", "", "my-repo", &items)?;
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn generate_tree_page(
+    _repo_path: impl AsRef<Path>,
+    ref_name: &str,
+    tree_path: &str,
+    repo_name: &str,
+    items: &[TreeItem],
+) -> Result<Markup> {
+    let path_components: Vec<&str> = if tree_path.is_empty() {
+        vec![]
+    } else {
+        tree_path.split('/').filter(|s| !s.is_empty()).collect()
+    };
+
+    let depth = path_components.len() + 1;
+    let index_path = "../".repeat(depth) + "index.html";
+
+    Ok(html! {
+        (DOCTYPE)
+        html lang="en" {
+            head {
+                meta charset="utf-8";
+                meta name="viewport" content="width=device-width, initial-scale=1.0";
+                title { (if tree_path.is_empty() { repo_name.to_string() } else { format!("{} - {}", tree_path, repo_name) }) " - Gitkyl" }
+                script src="https://unpkg.com/@phosphor-icons/web" {}
+                link rel="stylesheet" href=(format!("{}assets/tree.css", "../".repeat(depth)));
+            }
+            body {
+                div class="container" {
+                    header {
+                        div class="breadcrumb" {
+                            a href=(index_path) class="breadcrumb-link" { "Repository" }
+                            @if !path_components.is_empty() {
+                                span class="breadcrumb-separator" { "/" }
+                                @for (idx, component) in path_components.iter().enumerate() {
+                                    @if idx == path_components.len() - 1 {
+                                        span class="breadcrumb-current" { (*component) }
+                                    } @else {
+                                        @let partial_path = path_components[..=idx].join("/");
+                                        a href=(format!("{}tree/{}/{}.html", "../".repeat(depth), ref_name, partial_path)) class="breadcrumb-link" {
+                                            (*component)
+                                        }
+                                        span class="breadcrumb-separator" { "/" }
+                                    }
+                                }
+                            }
+                        }
+                        div class="ref-info" {
+                            span class="ref-label" { "ref: " }
+                            span class="ref-name" { (ref_name) }
+                        }
+                    }
+                    main class="tree-container" {
+                        @if items.is_empty() && tree_path.is_empty() {
+                            p class="empty-state" { "Empty directory" }
+                        } @else {
+                            div class="file-table" {
+                                @if !tree_path.is_empty() {
+                                    @let parent_path = if path_components.len() > 1 {
+                                        path_components[..path_components.len() - 1].join("/")
+                                    } else {
+                                        String::new()
+                                    };
+                                    @let parent_href = if parent_path.is_empty() {
+                                        format!("{}index.html", "../".repeat(depth))
+                                    } else {
+                                        format!("{}tree/{}/{}.html", "../".repeat(depth), ref_name, parent_path)
+                                    };
+                                    a href=(parent_href) class="file-row" {
+                                        div class="icon-box" {
+                                            i class="ph ph-arrow-up icon-folder" {}
+                                        }
+                                        div class="file-link" { ".." }
+                                        div class="file-meta" { "" }
+                                    }
+                                }
+                                @for item in items {
+                                    @match item {
+                                        TreeItem::File { entry, commit } => {
+                                            @if let Some(path) = entry.path()
+                                                && let Some(path_str) = path.to_str() {
+                                                @let display_name = if tree_path.is_empty() {
+                                                    path_str.to_string()
+                                                } else if let Some(stripped) = path_str.strip_prefix(tree_path) {
+                                                    stripped.trim_start_matches('/').to_string()
+                                                } else {
+                                                    path_str.to_string()
+                                                };
+
+                                                @let href = format!("{}blob/{}/{}.html", "../".repeat(depth), ref_name, path_str);
+
+                                                @let icon_class = if display_name.to_lowercase().starts_with("readme") {
+                                                    "ph ph-info"
+                                                } else if display_name.ends_with(".rs") {
+                                                    "ph ph-file-rs"
+                                                } else if display_name.ends_with(".toml") || display_name.ends_with(".yaml") || display_name.ends_with(".yml") {
+                                                    "ph ph-gear"
+                                                } else {
+                                                    "ph ph-file"
+                                                };
+
+                                                @let icon_modifier = if display_name.to_lowercase().starts_with("readme") {
+                                                    Some("icon-readme")
+                                                } else if display_name.ends_with(".rs") {
+                                                    Some("icon-rust")
+                                                } else if display_name.ends_with(".toml") || display_name.ends_with(".yaml") || display_name.ends_with(".yml") {
+                                                    Some("icon-config")
+                                                } else {
+                                                    None
+                                                };
+
+                                                a href=(href) class="file-row" {
+                                                    div class="icon-box" {
+                                                        @if let Some(modifier) = icon_modifier {
+                                                            i class=(format!("{} {}", icon_class, modifier)) {}
+                                                        } @else {
+                                                            i class=(icon_class) {}
+                                                        }
+                                                    }
+                                                    div class="file-link" { (display_name) }
+                                                    div class="file-meta" { (format_timestamp(commit.date(), SystemTime::now())) }
+                                                }
+                                            }
+                                        },
+                                        TreeItem::Directory { name, full_path, commit } => {
+                                            @let href = format!("{}tree/{}/{}.html", "../".repeat(depth), ref_name, full_path);
+                                            a href=(href) class="file-row" {
+                                                div class="icon-box" {
+                                                    i class="ph-fill ph-folder icon-folder" {}
+                                                }
+                                                div class="file-link" { (name) }
+                                                div class="file-meta" { (format_timestamp(commit.date(), SystemTime::now())) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    footer {
+                        p {
+                            "Generated by "
+                            a href="https://github.com/lemorage/gitkyl" target="_blank" { "Gitkyl" }
+                        }
+                    }
+                }
+            }
+        }
+    })
 }
 
 /// Formats Unix timestamp as human readable relative time.
@@ -217,7 +420,7 @@ fn blob_page_markup(
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { (file_path) " - Gitkyl" }
-                link rel="stylesheet" href="../../assets/blob.css";
+                link rel="stylesheet" href=(format!("{}assets/blob.css", "../".repeat(depth)));
             }
             body {
                 div class="container" {
@@ -843,5 +1046,89 @@ mod tests {
             html_str.contains("Test Author"),
             "Should display author even with empty message"
         );
+    }
+
+    #[test]
+    fn test_generate_tree_page_structure() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let files = crate::git::list_files(&repo_path, None).expect("Should list files");
+        let file = files.first().expect("Should have at least one file");
+        let commit = create_test_commit(
+            "a".repeat(40),
+            "Test commit".to_string(),
+            "Test Author".to_string(),
+            1704067200,
+        );
+        let items = vec![TreeItem::File {
+            entry: file.clone(),
+            commit,
+        }];
+
+        // Act
+        let result = generate_tree_page(&repo_path, "main", "", "test-repo", &items);
+
+        // Assert
+        assert!(result.is_ok(), "Should generate tree page");
+        let html = result.unwrap().into_string();
+        assert!(
+            html.contains("tree-container"),
+            "Should have tree container"
+        );
+        assert!(html.contains("file-table"), "Should have file table");
+        assert!(html.contains("breadcrumb"), "Should have breadcrumb");
+    }
+
+    #[test]
+    fn test_generate_tree_page_empty() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let items = vec![];
+
+        // Act
+        let result = generate_tree_page(&repo_path, "main", "", "test-repo", &items);
+
+        // Assert
+        assert!(result.is_ok(), "Should handle empty directory");
+        let html = result.unwrap().into_string();
+        assert!(
+            html.contains("Empty directory"),
+            "Should show empty state message"
+        );
+    }
+
+    #[test]
+    fn test_generate_tree_page_nested_path() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let files = crate::git::list_files(&repo_path, None).expect("Should list files");
+        let file = files
+            .iter()
+            .find(|f| {
+                f.path()
+                    .and_then(|p| p.to_str())
+                    .map_or(false, |s| s.starts_with("src/"))
+            })
+            .expect("Should have src files");
+        let commit = create_test_commit(
+            "b".repeat(40),
+            "Test commit".to_string(),
+            "Test Author".to_string(),
+            1704067200,
+        );
+        let items = vec![TreeItem::File {
+            entry: file.clone(),
+            commit,
+        }];
+
+        // Act
+        let result = generate_tree_page(&repo_path, "main", "src", "test-repo", &items);
+
+        // Assert
+        assert!(result.is_ok(), "Should generate nested tree page");
+        let html = result.unwrap().into_string();
+        assert!(html.contains("src"), "Should show directory name");
+        assert!(html.contains("breadcrumb"), "Should have breadcrumb");
+        assert!(html.contains(".."), "Should have parent directory link");
     }
 }
