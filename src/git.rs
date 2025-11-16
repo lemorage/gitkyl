@@ -413,6 +413,171 @@ pub fn list_commits(
     Ok(commits)
 }
 
+/// Extracts CommitInfo from gix commit object.
+fn extract_commit_info(commit: &gix::Commit) -> Result<CommitInfo> {
+    let author = commit.author().context("Failed to read author")?;
+    let committer = commit.committer().context("Failed to read committer")?;
+    let message_bytes = commit
+        .message_raw()
+        .context("Failed to read commit message")?;
+    let message_full = message_bytes.to_str_lossy().to_string();
+    let first_line = message_full.lines().next().unwrap_or("").to_string();
+
+    Ok(CommitInfo {
+        oid: commit.id.to_hex().to_string(),
+        short_oid: commit.id.to_hex_with_len(7).to_string(),
+        author: author.name.to_str_lossy().to_string(),
+        author_email: author.email.to_str_lossy().to_string(),
+        committer: committer.name.to_str_lossy().to_string(),
+        date: author.time.seconds,
+        message: first_line,
+        message_full,
+    })
+}
+
+/// Batch lookup last commits for multiple files in single history walk.
+///
+/// Performs single history walk to find most recent commit that modified each
+/// file. Compares file OIDs between commit and parent trees to detect modifications.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Reference name (branch/tag/commit), defaults to HEAD if None
+/// * `file_paths`: Slice of file paths to lookup
+///
+/// # Returns
+///
+/// HashMap mapping file paths to their last CommitInfo
+///
+/// # Errors
+///
+/// Returns error if repository access or commit traversal fails
+///
+/// # Performance
+///
+/// Complexity: O(m × n) where m = commits walked, n = files tracked
+///
+/// Single repository open and history walk with early exit when all files found
+///
+/// # Examples
+///
+/// ```no_run
+/// use gitkyl::get_last_commits_batch;
+/// use std::path::Path;
+///
+/// let paths = &["src/lib.rs", "src/git.rs", "Cargo.toml"];
+/// let commits = get_last_commits_batch(Path::new("."), None, paths)?;
+/// for (path, commit) in commits {
+///     println!("{}: {}", path, commit.short_oid());
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn get_last_commits_batch(
+    repo_path: impl AsRef<Path>,
+    ref_name: Option<&str>,
+    file_paths: &[&str],
+) -> Result<std::collections::HashMap<String, CommitInfo>> {
+    use std::collections::{HashMap, HashSet};
+
+    if file_paths.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit = resolve_commit(&repo, ref_name)?;
+
+    let mut results: HashMap<String, CommitInfo> = HashMap::with_capacity(file_paths.len());
+    let mut remaining: HashSet<String> = file_paths.iter().map(|s| s.to_string()).collect();
+
+    let walker = commit
+        .ancestors()
+        .all()
+        .context("Failed to create commit ancestor iterator")?;
+
+    for result in walker {
+        if remaining.is_empty() {
+            break;
+        }
+
+        let commit_info = result.context("Failed to traverse commit ancestor")?;
+        let commit_obj = commit_info
+            .object()
+            .context("Failed to read commit object")?;
+
+        let parent_ids: Vec<_> = commit_obj.parent_ids().collect();
+
+        if parent_ids.is_empty() {
+            // Initial commit contains all files added in this commit
+            let mut tree = commit_obj.tree().context("Failed to read commit tree")?;
+            let commit_data = extract_commit_info(&commit_obj)?;
+
+            let remaining_snapshot: Vec<String> = remaining.iter().cloned().collect();
+            for file_path in remaining_snapshot {
+                if tree
+                    .peel_to_entry_by_path(&file_path)
+                    .context("Failed to traverse tree to path")?
+                    .is_some()
+                {
+                    results.insert(file_path.clone(), commit_data.clone());
+                    remaining.remove(&file_path);
+                }
+            }
+            break;
+        }
+
+        // Process each parent to handle merge commits
+        let commit_data = extract_commit_info(&commit_obj)?;
+        let mut current_tree = commit_obj.tree().context("Failed to read commit tree")?;
+
+        for parent_id in parent_ids {
+            if remaining.is_empty() {
+                break;
+            }
+
+            let parent = repo
+                .find_object(parent_id)
+                .context("Failed to find parent object")?
+                .try_into_commit()
+                .map_err(|_| anyhow::anyhow!("Parent object is not a commit"))?;
+
+            let mut parent_tree = parent.tree().context("Failed to read parent tree")?;
+
+            // Check each remaining file for modifications via OID comparison
+            let remaining_snapshot: Vec<String> = remaining.iter().cloned().collect();
+            for file_path in remaining_snapshot {
+                let current_entry = current_tree
+                    .peel_to_entry_by_path(&file_path)
+                    .context("Failed to traverse current tree")?;
+
+                let parent_entry = parent_tree
+                    .peel_to_entry_by_path(&file_path)
+                    .context("Failed to traverse parent tree")?;
+
+                // File modified if OID differs or file was added
+                let was_modified = match (current_entry, parent_entry) {
+                    (Some(_), None) => true,
+                    (Some(curr), Some(par)) => curr.oid() != par.oid(),
+                    _ => false,
+                };
+
+                if was_modified {
+                    results.insert(file_path.clone(), commit_data.clone());
+                    remaining.remove(&file_path);
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
 /// Retrieves the latest commit that modified a specific file path.
 ///
 /// Walks commit history from the given reference to find the most recent commit
@@ -479,24 +644,7 @@ pub fn get_file_last_commit(
             .context("Failed to traverse tree to path")?
             .is_some()
         {
-            let author = commit_obj.author().context("Failed to read author")?;
-            let committer = commit_obj.committer().context("Failed to read committer")?;
-            let message_bytes = commit_obj
-                .message_raw()
-                .context("Failed to read commit message")?;
-            let message_full = message_bytes.to_str_lossy().to_string();
-            let first_line = message_full.lines().next().unwrap_or("").to_string();
-
-            return Ok(CommitInfo {
-                oid: commit_obj.id.to_hex().to_string(),
-                short_oid: commit_obj.id.to_hex_with_len(7).to_string(),
-                author: author.name.to_str_lossy().to_string(),
-                author_email: author.email.to_str_lossy().to_string(),
-                committer: committer.name.to_str_lossy().to_string(),
-                date: author.time.seconds,
-                message: first_line,
-                message_full,
-            });
+            return extract_commit_info(&commit_obj);
         }
     }
 
@@ -1041,6 +1189,206 @@ mod tests {
         assert!(
             commit.message_full().len() >= commit.message().len(),
             "Full message should contain at least the first line"
+        );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_empty_input() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let empty_paths: &[&str] = &[];
+
+        // Act
+        let results = get_last_commits_batch(&repo_path, None, empty_paths)
+            .expect("Should handle empty input");
+
+        // Assert
+        assert!(
+            results.is_empty(),
+            "Empty input should return empty results"
+        );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_single_file() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let paths = &["Cargo.toml"];
+
+        // Act
+        let results = get_last_commits_batch(&repo_path, None, paths).expect("Should find commit");
+
+        // Assert
+        assert_eq!(results.len(), 1, "Should find one commit");
+        assert!(
+            results.contains_key("Cargo.toml"),
+            "Should contain Cargo.toml"
+        );
+
+        let commit = &results["Cargo.toml"];
+        assert!(!commit.oid().is_empty(), "Should have commit OID");
+        assert_eq!(commit.short_oid().len(), 7, "Short OID should be 7 chars");
+        assert!(!commit.author().is_empty(), "Should have author");
+        assert!(commit.date() > 0, "Should have positive timestamp");
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_multiple_files() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let paths = &["Cargo.toml", "src/lib.rs", "src/git.rs"];
+
+        // Act
+        let results = get_last_commits_batch(&repo_path, None, paths).expect("Should find commits");
+
+        // Assert
+        assert!(results.len() >= 2, "Should find commits for multiple files");
+
+        for path in paths {
+            if let Some(commit) = results.get(*path) {
+                assert!(!commit.oid().is_empty(), "Commit should have OID");
+                assert!(!commit.author().is_empty(), "Commit should have author");
+                assert!(commit.date() > 0, "Commit should have positive timestamp");
+                assert!(!commit.message().is_empty(), "Commit should have message");
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_nonexistent_files() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let paths = &["nonexistent_file_12345.txt", "another_missing_file.rs"];
+
+        // Act
+        let results =
+            get_last_commits_batch(&repo_path, None, paths).expect("Should handle gracefully");
+
+        // Assert
+        assert!(
+            results.is_empty() || results.len() < paths.len(),
+            "Should not find commits for nonexistent files"
+        );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_mixed_existing_nonexistent() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let paths = &["Cargo.toml", "nonexistent_12345.txt", "src/lib.rs"];
+
+        // Act
+        let results =
+            get_last_commits_batch(&repo_path, None, paths).expect("Should handle mixed files");
+
+        // Assert
+        assert!(
+            results.contains_key("Cargo.toml"),
+            "Should find existing Cargo.toml"
+        );
+        assert!(
+            results.contains_key("src/lib.rs"),
+            "Should find existing src/lib.rs"
+        );
+        assert!(
+            !results.contains_key("nonexistent_12345.txt"),
+            "Should not find nonexistent file"
+        );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_specific_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let paths = &["Cargo.toml"];
+
+        // Act
+        let results = get_last_commits_batch(&repo_path, Some("HEAD"), paths)
+            .expect("Should work with specific reference");
+
+        // Assert
+        assert!(
+            !results.is_empty(),
+            "Should find commit with HEAD reference"
+        );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_invalid_ref() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let invalid_ref = "refs/heads/nonexistent_branch_12345";
+        let paths = &["Cargo.toml"];
+
+        // Act
+        let result = get_last_commits_batch(&repo_path, Some(invalid_ref), paths);
+
+        // Assert
+        assert!(result.is_err(), "Should return error for invalid reference");
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_invalid_repo() {
+        // Arrange
+        let invalid_path = PathBuf::from("/tmp/definitely-not-a-repo-12345");
+        let paths = &["file.txt"];
+
+        // Act
+        let result = get_last_commits_batch(&invalid_path, None, paths);
+
+        // Assert
+        assert!(
+            result.is_err(),
+            "Should return error for invalid repository"
+        );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_finds_commits() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let file_path = "Cargo.toml";
+
+        // Act
+        let batch_results = get_last_commits_batch(&repo_path, None, &[file_path])
+            .expect("Should get batch results");
+
+        // Assert
+        assert!(
+            batch_results.contains_key(file_path),
+            "Batch should find commit for the file"
+        );
+        let batch_commit = &batch_results[file_path];
+        assert!(!batch_commit.oid().is_empty(), "Should have valid OID");
+        assert!(!batch_commit.author().is_empty(), "Should have author");
+        assert!(batch_commit.date() > 0, "Should have positive date");
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_commit_info_fields() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let paths = &["Cargo.toml"];
+
+        // Act
+        let results = get_last_commits_batch(&repo_path, None, paths).expect("Should find commit");
+
+        // Assert
+        let commit = &results["Cargo.toml"];
+        assert_eq!(commit.oid().len(), 40, "Full OID should be 40 chars");
+        assert_eq!(commit.short_oid().len(), 7, "Short OID should be 7 chars");
+        assert!(
+            !commit.author_email().is_empty(),
+            "Should have author email"
+        );
+        assert!(!commit.committer().is_empty(), "Should have committer");
+        assert!(
+            !commit.message().contains('\n'),
+            "Message should be single line"
+        );
+        assert!(
+            commit.message_full().len() >= commit.message().len(),
+            "Full message should contain at least first line"
         );
     }
 }
