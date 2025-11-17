@@ -1,8 +1,7 @@
 use anyhow::{Context, Result};
-use gitkyl::{CommitInfo, Config, FileEntry, TreeItem};
+use gitkyl::{CommitInfo, Config, TreeItem};
 use maud::{DOCTYPE, Markup, html};
 use std::fs;
-use std::path::Path;
 
 /// Default limit for commits displayed on commit log page.
 ///
@@ -189,253 +188,6 @@ fn index_page(
     }
 }
 
-/// Extracts unique directory paths from file list.
-///
-/// Traverses file entries and collects all unique directory paths by
-/// examining parent directories of each file. Used to determine which
-/// tree pages need to be generated.
-///
-/// # Arguments
-///
-/// * `files`: List of file entries from repository
-///
-/// # Returns
-///
-/// Sorted vector of unique directory paths relative to repository root
-///
-/// # Examples
-///
-/// ```no_run
-/// # use gitkyl::FileEntry;
-/// # use std::path::PathBuf;
-/// let repo_path = PathBuf::from(".");
-/// let files = gitkyl::list_files(&repo_path, None)?;
-/// let dirs = gitkyl_bin::extract_directories(&files);
-/// assert!(dirs.contains(&"src".to_string()));
-/// # Ok::<(), anyhow::Error>(())
-/// ```
-fn extract_directories(files: &[FileEntry]) -> Vec<String> {
-    use std::collections::HashSet;
-
-    let mut dirs = HashSet::new();
-
-    for file in files {
-        if let Some(path) = file.path()
-            && let Some(path_str) = path.to_str()
-        {
-            let components: Vec<&str> = path_str.split('/').collect();
-            for i in 0..components.len() - 1 {
-                let dir_path = components[..=i].join("/");
-                dirs.insert(dir_path);
-            }
-        }
-    }
-
-    let mut result: Vec<String> = dirs.into_iter().collect();
-    result.sort();
-    result
-}
-
-/// Groups files by their immediate parent directory.
-///
-/// Organizes file entries into a map keyed by directory path, where each
-/// entry contains only the files directly under that directory (not in
-/// subdirectories). Empty string key represents root level files.
-///
-/// # Arguments
-///
-/// * `files`: List of file entries to group
-/// * `dir_path`: Target directory path (empty for root)
-///
-/// # Returns
-///
-/// Vector of file entries that are direct children of the directory
-///
-/// # Examples
-///
-/// ```no_run
-/// # use gitkyl::FileEntry;
-/// # use std::path::PathBuf;
-/// let repo_path = PathBuf::from(".");
-/// let files = gitkyl::list_files(&repo_path, None)?;
-/// let root_entries = gitkyl_bin::get_entries_at_level(&files, "");
-/// assert!(root_entries.iter().all(|e| {
-///     e.path().and_then(|p| p.to_str()).map_or(false, |s| !s.contains('/'))
-/// }));
-/// # Ok::<(), anyhow::Error>(())
-/// ```
-fn get_entries_at_level(files: &[FileEntry], dir_path: &str) -> Vec<FileEntry> {
-    let mut result = Vec::new();
-    let prefix = if dir_path.is_empty() {
-        String::new()
-    } else {
-        format!("{}/", dir_path)
-    };
-
-    for file in files {
-        if let Some(path) = file.path()
-            && let Some(path_str) = path.to_str()
-        {
-            if dir_path.is_empty() {
-                if !path_str.contains('/') {
-                    result.push(file.clone());
-                }
-            } else if path_str.starts_with(&prefix) {
-                let remainder = &path_str[prefix.len()..];
-                if !remainder.contains('/') {
-                    result.push(file.clone());
-                }
-            }
-        }
-    }
-
-    result
-}
-
-/// Detects subdirectories at a given directory level.
-///
-/// Scans file paths to identify immediate subdirectories of the specified
-/// directory. Returns directory names without duplicates.
-///
-/// # Arguments
-///
-/// * `files`: List of file entries to scan
-/// * `dir_path`: Parent directory path (empty for root)
-///
-/// # Returns
-///
-/// Sorted vector of subdirectory names (not full paths)
-///
-/// # Examples
-///
-/// ```no_run
-/// # use gitkyl::FileEntry;
-/// # use std::path::PathBuf;
-/// let repo_path = PathBuf::from(".");
-/// let files = gitkyl::list_files(&repo_path, None)?;
-/// let subdirs = gitkyl_bin::get_subdirectories_at_level(&files, "");
-/// assert!(subdirs.contains(&"src".to_string()));
-/// assert!(subdirs.iter().all(|d| !d.contains('/')));
-/// # Ok::<(), anyhow::Error>(())
-/// ```
-fn get_subdirectories_at_level(files: &[FileEntry], dir_path: &str) -> Vec<String> {
-    use std::collections::HashSet;
-
-    let mut subdirs = HashSet::new();
-    let prefix = if dir_path.is_empty() {
-        String::new()
-    } else {
-        format!("{}/", dir_path)
-    };
-
-    for file in files {
-        if let Some(path) = file.path()
-            && let Some(path_str) = path.to_str()
-        {
-            if dir_path.is_empty() {
-                if let Some(slash_pos) = path_str.find('/') {
-                    subdirs.insert(path_str[..slash_pos].to_string());
-                }
-            } else if path_str.starts_with(&prefix) {
-                let remainder = &path_str[prefix.len()..];
-                if let Some(slash_pos) = remainder.find('/') {
-                    subdirs.insert(remainder[..slash_pos].to_string());
-                }
-            }
-        }
-    }
-
-    let mut result: Vec<String> = subdirs.into_iter().collect();
-    result.sort();
-    result
-}
-
-/// Gets the most recent commit that modified any file in a directory.
-///
-/// Scans all files within the directory (including subdirectories) and returns
-/// the commit with the latest timestamp. This matches GitHub's behavior of
-/// showing the most recent activity timestamp for directories.
-///
-/// # Arguments
-///
-/// * `repo`: Repository path
-/// * `branch`: Branch name to search
-/// * `dir_path`: Directory path (e.g., "src" or "src/generators")
-/// * `files`: Complete list of repository files
-///
-/// # Returns
-///
-/// Most recent commit touching any file in the directory
-///
-/// # Errors
-///
-/// Returns error if no files found in directory or commit lookup fails
-///
-/// # Examples
-///
-/// ```no_run
-/// # use gitkyl::FileEntry;
-/// # use std::path::PathBuf;
-/// let repo_path = PathBuf::from(".");
-/// let files = gitkyl::list_files(&repo_path, Some("main"))?;
-/// let commit = gitkyl_bin::get_directory_last_commit(
-///     &repo_path,
-///     "main",
-///     "src",
-///     &files
-/// )?;
-/// assert!(commit.date() > 0);
-/// # Ok::<(), anyhow::Error>(())
-/// ```
-fn get_directory_last_commit(
-    repo: &Path,
-    branch: &str,
-    dir_path: &str,
-    files: &[FileEntry],
-) -> Result<CommitInfo> {
-    let prefix = if dir_path.is_empty() {
-        String::new()
-    } else {
-        format!("{}/", dir_path)
-    };
-
-    let mut most_recent_commit: Option<CommitInfo> = None;
-
-    for file in files {
-        if let Some(path) = file.path()
-            && let Some(path_str) = path.to_str()
-        {
-            let is_in_dir = if dir_path.is_empty() {
-                !path_str.contains('/')
-            } else {
-                path_str.starts_with(&prefix)
-            };
-
-            if is_in_dir {
-                match gitkyl::get_file_last_commit(repo, Some(branch), path_str) {
-                    Ok(commit) => {
-                        most_recent_commit = Some(match most_recent_commit {
-                            None => commit,
-                            Some(existing) => {
-                                if commit.date() > existing.date() {
-                                    commit
-                                } else {
-                                    existing
-                                }
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        eprintln!("Warning: Failed to get commit for {}: {:#}", path_str, e);
-                    }
-                }
-            }
-        }
-    }
-
-    most_recent_commit.ok_or_else(|| anyhow::anyhow!("No files found in directory: {}", dir_path))
-}
-
 /// Validates tree path for security.
 ///
 /// Ensures path does not contain directory traversal attempts or
@@ -452,18 +204,6 @@ fn get_directory_last_commit(
 /// # Errors
 ///
 /// Returns error if path contains ".." or starts with "/"
-///
-/// # Examples
-///
-/// ```no_run
-/// # use anyhow::Result;
-/// let result = gitkyl_bin::validate_tree_path("src/main.rs");
-/// assert!(result.is_ok());
-///
-/// let result = gitkyl_bin::validate_tree_path("../etc/passwd");
-/// assert!(result.is_err());
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 fn validate_tree_path(path: &str) -> Result<()> {
     if path.contains("..") {
         anyhow::bail!("Path contains directory traversal: {}", path);
@@ -475,6 +215,14 @@ fn validate_tree_path(path: &str) -> Result<()> {
 }
 
 /// Formats Unix timestamp as human readable relative time.
+///
+/// # Arguments
+///
+/// * `seconds`: Unix timestamp in seconds since epoch
+///
+/// # Returns
+///
+/// Human readable relative time string (e.g., "2 days ago", "just now")
 fn format_relative_time(seconds: i64) -> String {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -551,47 +299,50 @@ fn main() -> Result<()> {
             vec![]
         });
 
-    let top_level_files = get_entries_at_level(&files, "");
-    let top_level_subdirs = get_subdirectories_at_level(&files, "");
+    // Build tree structure once for O(depth) queries
+    let tree = gitkyl::FileTree::from_files(files.clone());
+
+    let top_level_files = tree.files_at("");
+    let top_level_subdirs = tree.subdirs_at("");
 
     let mut tree_items = Vec::new();
 
+    // Batch lookup commits for all root-level files and directories
+    let mut all_paths: Vec<&str> = Vec::new();
+    all_paths.extend(top_level_subdirs.iter().copied());
+    all_paths.extend(top_level_files.iter().filter_map(|f| f.path()?.to_str()));
+
+    let commit_map =
+        gitkyl::get_last_commits_batch(&config.repo, Some(repo_info.default_branch()), &all_paths)
+            .unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to batch lookup commits: {:#}", e);
+                std::collections::HashMap::new()
+            });
+
+    // Build tree items with pre-fetched commits
     for subdir in &top_level_subdirs {
-        match get_directory_last_commit(&config.repo, repo_info.default_branch(), subdir, &files) {
-            Ok(commit) => {
-                tree_items.push(TreeItem::Directory {
-                    name: subdir.clone(),
-                    full_path: subdir.clone(),
-                    commit,
-                });
-            }
-            Err(e) => {
-                eprintln!(
-                    "Warning: Failed to get commit for directory {}: {:#}",
-                    subdir, e
-                );
-            }
+        if let Some(commit) = commit_map.get(*subdir) {
+            tree_items.push(TreeItem::Directory {
+                name: subdir.to_string(),
+                full_path: subdir.to_string(),
+                commit: commit.clone(),
+            });
+        } else {
+            eprintln!("Warning: No commit found for directory {}", subdir);
         }
     }
 
-    for file in &top_level_files {
+    for file in top_level_files {
         if let Some(path) = file.path()
             && let Some(path_str) = path.to_str()
         {
-            match gitkyl::get_file_last_commit(
-                &config.repo,
-                Some(repo_info.default_branch()),
-                path_str,
-            ) {
-                Ok(commit) => {
-                    tree_items.push(TreeItem::File {
-                        entry: file.clone(),
-                        commit,
-                    });
-                }
-                Err(e) => {
-                    eprintln!("Warning: Failed to get commit for {}: {:#}", path_str, e);
-                }
+            if let Some(commit) = commit_map.get(path_str) {
+                tree_items.push(TreeItem::File {
+                    entry: file.clone(),
+                    commit: commit.clone(),
+                });
+            } else {
+                eprintln!("Warning: No commit found for file {}", path_str);
             }
         }
     }
@@ -689,65 +440,83 @@ fn main() -> Result<()> {
 
     println!("Generating tree pages...");
 
-    let directories = extract_directories(&files);
+    let directories = tree.all_dirs();
     let mut tree_count = 0;
 
     for dir_path in directories {
         validate_tree_path(&dir_path)
             .with_context(|| format!("Invalid tree path: {}", dir_path))?;
 
-        let entries_at_this_level = get_entries_at_level(&files, &dir_path);
-        let subdirs_at_this_level = get_subdirectories_at_level(&files, &dir_path);
+        let entries_at_this_level = tree.files_at(&dir_path);
+        let subdirs_at_this_level = tree.subdirs_at(&dir_path);
+
+        // Batch lookup commits for this directory level
+        let mut level_paths: Vec<&str> = Vec::new();
+
+        // Collect subdir full paths
+        let full_subdir_paths: Vec<String> = subdirs_at_this_level
+            .iter()
+            .map(|subdir| {
+                if dir_path.is_empty() {
+                    subdir.to_string()
+                } else {
+                    format!("{}/{}", dir_path, subdir)
+                }
+            })
+            .collect();
+
+        level_paths.extend(full_subdir_paths.iter().map(|s| s.as_str()));
+        level_paths.extend(
+            entries_at_this_level
+                .iter()
+                .filter_map(|f| f.path()?.to_str()),
+        );
+
+        let level_commit_map = gitkyl::get_last_commits_batch(
+            &config.repo,
+            Some(repo_info.default_branch()),
+            &level_paths,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "Warning: Failed to batch lookup commits for {}: {:#}",
+                dir_path, e
+            );
+            std::collections::HashMap::new()
+        });
 
         let mut tree_items_for_page = Vec::new();
 
-        for subdir in &subdirs_at_this_level {
-            let full_subdir_path = if dir_path.is_empty() {
-                subdir.clone()
-            } else {
-                format!("{}/{}", dir_path, subdir)
-            };
+        // Build directory items with pre-fetched commits
+        for (i, subdir) in subdirs_at_this_level.iter().enumerate() {
+            let full_subdir_path = &full_subdir_paths[i];
 
-            match get_directory_last_commit(
-                &config.repo,
-                repo_info.default_branch(),
-                &full_subdir_path,
-                &files,
-            ) {
-                Ok(commit) => {
-                    tree_items_for_page.push(TreeItem::Directory {
-                        name: subdir.clone(),
-                        full_path: full_subdir_path,
-                        commit,
-                    });
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to get commit for directory {}: {:#}",
-                        full_subdir_path, e
-                    );
-                }
+            if let Some(commit) = level_commit_map.get(full_subdir_path.as_str()) {
+                tree_items_for_page.push(TreeItem::Directory {
+                    name: subdir.to_string(),
+                    full_path: full_subdir_path.clone(),
+                    commit: commit.clone(),
+                });
+            } else {
+                eprintln!(
+                    "Warning: No commit found for directory {}",
+                    full_subdir_path
+                );
             }
         }
 
-        for entry in &entries_at_this_level {
+        // Build file items with pre-fetched commits
+        for entry in entries_at_this_level {
             if let Some(path) = entry.path()
                 && let Some(path_str) = path.to_str()
             {
-                match gitkyl::get_file_last_commit(
-                    &config.repo,
-                    Some(repo_info.default_branch()),
-                    path_str,
-                ) {
-                    Ok(commit) => {
-                        tree_items_for_page.push(TreeItem::File {
-                            entry: entry.clone(),
-                            commit,
-                        });
-                    }
-                    Err(e) => {
-                        eprintln!("Warning: Failed to get commit for {}: {:#}", path_str, e);
-                    }
+                if let Some(commit) = level_commit_map.get(path_str) {
+                    tree_items_for_page.push(TreeItem::File {
+                        entry: entry.clone(),
+                        commit: commit.clone(),
+                    });
+                } else {
+                    eprintln!("Warning: No commit found for file {}", path_str);
                 }
             }
         }
@@ -1028,154 +797,6 @@ mod tests {
             html_string.contains("class=\"ph ") || html_string.contains("class=\"ph-"),
             "Should have Phosphor icon class"
         );
-    }
-
-    #[test]
-    fn test_extract_directories() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act
-        let directories = extract_directories(&files);
-
-        // Assert
-        assert!(!directories.is_empty(), "Should find directories");
-        assert!(
-            directories.contains(&"src".to_string()),
-            "Should find src directory"
-        );
-        assert!(
-            directories.iter().all(|d| !d.is_empty()),
-            "Directory paths should not be empty"
-        );
-    }
-
-    #[test]
-    fn test_get_entries_at_level_root() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act
-        let root_entries = get_entries_at_level(&files, "");
-
-        // Assert
-        assert!(!root_entries.is_empty(), "Should have root level files");
-        for entry in root_entries {
-            if let Some(path) = entry.path()
-                && let Some(path_str) = path.to_str()
-            {
-                assert!(
-                    !path_str.contains('/'),
-                    "Root entries should not contain slashes"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn test_get_entries_at_level_subdirectory() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act
-        let src_entries = get_entries_at_level(&files, "src");
-
-        // Assert
-        for entry in src_entries {
-            if let Some(path) = entry.path()
-                && let Some(path_str) = path.to_str()
-            {
-                assert!(
-                    path_str.starts_with("src/"),
-                    "Entries should be in src directory"
-                );
-                let remainder = &path_str[4..];
-                assert!(
-                    !remainder.contains('/'),
-                    "Should only contain immediate children"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn test_get_subdirectories_at_level_root() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act
-        let subdirs = get_subdirectories_at_level(&files, "");
-
-        // Assert
-        assert!(!subdirs.is_empty(), "Should find subdirectories at root");
-        assert!(
-            subdirs.contains(&"src".to_string()),
-            "Should find src subdirectory"
-        );
-        assert!(
-            subdirs.iter().all(|d| !d.contains('/')),
-            "Subdirectory names should not contain slashes"
-        );
-    }
-
-    #[test]
-    fn test_get_subdirectories_at_level_nested() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act
-        let subdirs = get_subdirectories_at_level(&files, "src");
-
-        // Assert
-        for subdir in subdirs {
-            assert!(
-                !subdir.contains('/'),
-                "Subdirectory names should be simple names"
-            );
-        }
-    }
-
-    #[test]
-    fn test_extract_directories_basic() {
-        // Arrange: Create test data using actual repository files
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act: Call extract_directories
-        let directories = extract_directories(&files);
-
-        // Assert: Verify correct unique directories returned
-        assert!(!directories.is_empty(), "Should find directories");
-        let dir_set: std::collections::HashSet<_> = directories.iter().collect();
-        assert_eq!(
-            dir_set.len(),
-            directories.len(),
-            "All directories should be unique"
-        );
-    }
-
-    #[test]
-    fn test_extract_directories_nested() {
-        // Arrange: Test deeply nested paths
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let files = gitkyl::list_files(&repo_path, None).expect("Should list files");
-
-        // Act
-        let directories = extract_directories(&files);
-
-        // Assert: Verify nested structure is captured
-        for dir in &directories {
-            assert!(
-                !dir.starts_with('/'),
-                "Directories should be relative paths"
-            );
-            assert!(!dir.is_empty(), "Directory paths should not be empty");
-        }
     }
 
     #[test]
