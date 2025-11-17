@@ -515,16 +515,12 @@ pub fn get_last_commits_batch(
 
         if parent_ids.is_empty() {
             // Initial commit contains all files added in this commit
-            let mut tree = commit_obj.tree().context("Failed to read commit tree")?;
             let commit_data = extract_commit_info(&commit_obj)?;
 
             let remaining_snapshot: Vec<String> = remaining.iter().cloned().collect();
             for file_path in remaining_snapshot {
-                if tree
-                    .peel_to_entry_by_path(&file_path)
-                    .context("Failed to traverse tree to path")?
-                    .is_some()
-                {
+                let mut tree = commit_obj.tree().context("Failed to read commit tree")?;
+                if let Ok(Some(_)) = tree.peel_to_entry_by_path(&file_path) {
                     results.insert(file_path.clone(), commit_data.clone());
                     remaining.remove(&file_path);
                 }
@@ -534,7 +530,6 @@ pub fn get_last_commits_batch(
 
         // Process each parent to handle merge commits
         let commit_data = extract_commit_info(&commit_obj)?;
-        let mut current_tree = commit_obj.tree().context("Failed to read commit tree")?;
 
         for parent_id in parent_ids {
             if remaining.is_empty() {
@@ -547,18 +542,21 @@ pub fn get_last_commits_batch(
                 .try_into_commit()
                 .map_err(|_| anyhow::anyhow!("Parent object is not a commit"))?;
 
-            let mut parent_tree = parent.tree().context("Failed to read parent tree")?;
-
             // Check each remaining file for modifications via OID comparison
             let remaining_snapshot: Vec<String> = remaining.iter().cloned().collect();
             for file_path in remaining_snapshot {
-                let current_entry = current_tree
-                    .peel_to_entry_by_path(&file_path)
-                    .context("Failed to traverse current tree")?;
+                let mut current_tree = commit_obj.tree().context("Failed to read commit tree")?;
+                let mut parent_tree = parent.tree().context("Failed to read parent tree")?;
 
-                let parent_entry = parent_tree
-                    .peel_to_entry_by_path(&file_path)
-                    .context("Failed to traverse parent tree")?;
+                let current_entry = match current_tree.peel_to_entry_by_path(&file_path) {
+                    Ok(entry) => entry,
+                    Err(_) => continue,
+                };
+
+                let parent_entry = match parent_tree.peel_to_entry_by_path(&file_path) {
+                    Ok(entry) => entry,
+                    Err(_) => continue,
+                };
 
                 // File modified if OID differs or file was added
                 let was_modified = match (current_entry, parent_entry) {
