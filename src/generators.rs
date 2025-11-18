@@ -327,7 +327,12 @@ pub fn generate_tree_page(
                                                         }
                                                     }
                                                     div class="file-link" { (display_name) }
-                                                    div class="file-meta" { (format_timestamp(commit.date(), SystemTime::now())) }
+                                                    div class="commit-message" title=(commit.message_full()) {
+                                                        (commit.message())
+                                                    }
+                                                    div class="commit-date" {
+                                                        (format_timestamp(commit.date(), SystemTime::now()))
+                                                    }
                                                 }
                                             }
                                         },
@@ -338,7 +343,12 @@ pub fn generate_tree_page(
                                                     i class="ph-fill ph-folder icon-folder" {}
                                                 }
                                                 div class="file-link" { (name) }
-                                                div class="file-meta" { (format_timestamp(commit.date(), SystemTime::now())) }
+                                                div class="commit-message" title=(commit.message_full()) {
+                                                    (commit.message())
+                                                }
+                                                div class="commit-date" {
+                                                    (format_timestamp(commit.date(), SystemTime::now()))
+                                                }
                                             }
                                         }
                                     }

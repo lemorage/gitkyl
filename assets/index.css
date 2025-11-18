@@ -148,8 +148,8 @@ body {
     flex-shrink: 0;
 }
 
-.commit-message {
-    color: var(--text-primary);
+.repo-commit-message {
+    color: var(--text-secondary);
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -226,7 +226,7 @@ body {
 
 .file-row {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(120px, 200px) 1fr auto;
     gap: 16px;
     padding: 14px 24px;
     border-bottom: 1px solid var(--border-subtle);
@@ -283,6 +283,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    margin-left: -12px;
 }
 
 .file-link .dir-path {
@@ -290,11 +291,24 @@ body {
     font-weight: 400;
 }
 
-.file-meta {
+.commit-message {
     color: var(--text-secondary);
     font-size: 13px;
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-left: 32px;
+}
+
+.commit-message:hover {
+    color: var(--text-primary);
+}
+
+.commit-date {
+    color: var(--text-secondary);
+    font-size: 13px;
+    white-space: nowrap;
+    text-align: right;
 }
 
 /* Empty State */
@@ -368,7 +382,15 @@ footer a:focus-visible {
 
     .file-row {
         grid-template-columns: auto 1fr auto;
-        gap: 12px;
+        gap: 8px;
         padding: 12px 16px;
+    }
+
+    .commit-message {
+        display: none;
+    }
+
+    .commit-date {
+        font-size: 11px;
     }
 }

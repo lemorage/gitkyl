@@ -120,10 +120,10 @@ header {
 
 .file-row {
     display: grid;
-    grid-template-columns: 40px 1fr auto;
+    grid-template-columns: auto minmax(120px, 200px) 1fr auto;
     align-items: center;
-    gap: 10px;
-    padding: 10px 20px;
+    gap: 16px;
+    padding: 14px 24px;
     text-decoration: none;
     color: var(--text-primary);
     border-bottom: 1px solid var(--border-subtle);
@@ -135,7 +135,7 @@ header {
 }
 
 .file-row:hover {
-    background-color: var(--bg-hover);
+    background-color: #FAFAFC;
 }
 
 .file-row:focus-visible {
@@ -145,16 +145,13 @@ header {
 }
 
 .icon-box {
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 18px;
     width: 24px;
-    height: 24px;
-}
-
-.icon-box i {
-    font-size: 20px;
-    color: var(--text-secondary);
+    flex-shrink: 0;
 }
 
 .icon-folder {
@@ -166,7 +163,7 @@ header {
 }
 
 .icon-rust {
-    color: #CE422B !important;
+    color: #FF9500 !important;
 }
 
 .icon-config {
@@ -180,11 +177,25 @@ header {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-left: -12px;
 }
 
-.file-meta {
-    font-size: 12px;
+.commit-message {
     color: var(--text-secondary);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-left: 32px;
+}
+
+.commit-message:hover {
+    color: var(--text-primary);
+}
+
+.commit-date {
+    color: var(--text-secondary);
+    font-size: 13px;
     white-space: nowrap;
     text-align: right;
 }
@@ -243,7 +254,11 @@ footer a:focus-visible {
         font-size: 12px;
     }
 
-    .file-meta {
+    .commit-message {
+        display: none;
+    }
+
+    .commit-date {
         font-size: 11px;
     }
 }

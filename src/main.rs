@@ -111,7 +111,7 @@ fn index_page(
                                     div class="commit-info-wrapper" {
                                         div class="commit-line" {
                                             span class="avatar-placeholder" {}
-                                            span class="commit-message" { (commit.message()) }
+                                            span class="repo-commit-message" { (commit.message()) }
                                         }
                                         div class="commit-meta" {
                                             span { (commit.author()) }
@@ -150,7 +150,12 @@ fn index_page(
                                                         }
                                                     }
                                                     div class="file-link" { (path_str) }
-                                                    div class="file-meta" { (format_relative_time(commit.date())) }
+                                                    div class="commit-message" title=(commit.message_full()) {
+                                                        (commit.message())
+                                                    }
+                                                    div class="commit-date" {
+                                                        (format_relative_time(commit.date()))
+                                                    }
                                                 }
                                             }
                                         },
@@ -167,7 +172,12 @@ fn index_page(
                                                     }
                                                 }
                                                 div class="file-link" { (name) }
-                                                div class="file-meta" { (format_relative_time(commit.date())) }
+                                                div class="commit-message" title=(commit.message_full()) {
+                                                    (commit.message())
+                                                }
+                                                div class="commit-date" {
+                                                    (format_relative_time(commit.date()))
+                                                }
                                             }
                                         }
                                     }
@@ -302,26 +312,42 @@ fn main() -> Result<()> {
     // Build tree structure once for O(depth) queries
     let tree = gitkyl::FileTree::from_files(files.clone());
 
+    // Batch lookup commits for ALL files once (reused for root and tree pages)
+    let all_file_paths: Vec<&str> = files.iter().filter_map(|f| f.path()?.to_str()).collect();
+
+    let commit_map = gitkyl::get_last_commits_batch(
+        &config.repo,
+        Some(repo_info.default_branch()),
+        &all_file_paths,
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("Warning: Failed to batch lookup commits: {:#}", e);
+        std::collections::HashMap::new()
+    });
+
     let top_level_files = tree.files_at("");
     let top_level_subdirs = tree.subdirs_at("");
 
     let mut tree_items = Vec::new();
 
-    // Batch lookup commits for all root-level files and directories
-    let mut all_paths: Vec<&str> = Vec::new();
-    all_paths.extend(top_level_subdirs.iter().copied());
-    all_paths.extend(top_level_files.iter().filter_map(|f| f.path()?.to_str()));
-
-    let commit_map =
-        gitkyl::get_last_commits_batch(&config.repo, Some(repo_info.default_branch()), &all_paths)
-            .unwrap_or_else(|e| {
-                eprintln!("Warning: Failed to batch lookup commits: {:#}", e);
-                std::collections::HashMap::new()
-            });
+    // Batch lookup for root level directories
+    let root_dir_commit_map = if !top_level_subdirs.is_empty() {
+        gitkyl::get_last_commits_batch(
+            &config.repo,
+            Some(repo_info.default_branch()),
+            &top_level_subdirs,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("Warning: Failed to batch lookup directory commits: {:#}", e);
+            std::collections::HashMap::new()
+        })
+    } else {
+        std::collections::HashMap::new()
+    };
 
     // Build tree items with pre-fetched commits
     for subdir in &top_level_subdirs {
-        if let Some(commit) = commit_map.get(*subdir) {
+        if let Some(commit) = root_dir_commit_map.get(*subdir) {
             tree_items.push(TreeItem::Directory {
                 name: subdir.to_string(),
                 full_path: subdir.to_string(),
@@ -450,10 +476,7 @@ fn main() -> Result<()> {
         let entries_at_this_level = tree.files_at(&dir_path);
         let subdirs_at_this_level = tree.subdirs_at(&dir_path);
 
-        // Batch lookup commits for this directory level
-        let mut level_paths: Vec<&str> = Vec::new();
-
-        // Collect subdir full paths
+        // Build full subdir paths for directory commit lookup
         let full_subdir_paths: Vec<String> = subdirs_at_this_level
             .iter()
             .map(|subdir| {
@@ -465,25 +488,24 @@ fn main() -> Result<()> {
             })
             .collect();
 
-        level_paths.extend(full_subdir_paths.iter().map(|s| s.as_str()));
-        level_paths.extend(
-            entries_at_this_level
-                .iter()
-                .filter_map(|f| f.path()?.to_str()),
-        );
-
-        let level_commit_map = gitkyl::get_last_commits_batch(
-            &config.repo,
-            Some(repo_info.default_branch()),
-            &level_paths,
-        )
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "Warning: Failed to batch lookup commits for {}: {:#}",
-                dir_path, e
-            );
+        // Batch lookup for directories at this level
+        let dir_paths_refs: Vec<&str> = full_subdir_paths.iter().map(|s| s.as_str()).collect();
+        let level_dir_commit_map = if !dir_paths_refs.is_empty() {
+            gitkyl::get_last_commits_batch(
+                &config.repo,
+                Some(repo_info.default_branch()),
+                &dir_paths_refs,
+            )
+            .unwrap_or_else(|e| {
+                eprintln!(
+                    "Warning: Failed to batch lookup directory commits for {}: {:#}",
+                    dir_path, e
+                );
+                std::collections::HashMap::new()
+            })
+        } else {
             std::collections::HashMap::new()
-        });
+        };
 
         let mut tree_items_for_page = Vec::new();
 
@@ -491,7 +513,7 @@ fn main() -> Result<()> {
         for (i, subdir) in subdirs_at_this_level.iter().enumerate() {
             let full_subdir_path = &full_subdir_paths[i];
 
-            if let Some(commit) = level_commit_map.get(full_subdir_path.as_str()) {
+            if let Some(commit) = level_dir_commit_map.get(full_subdir_path.as_str()) {
                 tree_items_for_page.push(TreeItem::Directory {
                     name: subdir.to_string(),
                     full_path: full_subdir_path.clone(),
@@ -510,7 +532,7 @@ fn main() -> Result<()> {
             if let Some(path) = entry.path()
                 && let Some(path_str) = path.to_str()
             {
-                if let Some(commit) = level_commit_map.get(path_str) {
+                if let Some(commit) = commit_map.get(path_str) {
                     tree_items_for_page.push(TreeItem::File {
                         entry: entry.clone(),
                         commit: commit.clone(),
@@ -744,8 +766,8 @@ mod tests {
             "Should contain file link"
         );
         assert!(
-            html_string.contains("file-meta"),
-            "Should contain file metadata"
+            html_string.contains("commit-date"),
+            "Should contain commit date"
         );
     }
 
@@ -786,8 +808,8 @@ mod tests {
         // Assert
         assert!(html_string.contains("file-link"), "Should have file link");
         assert!(
-            html_string.contains("file-meta"),
-            "Should have file metadata"
+            html_string.contains("commit-date"),
+            "Should have commit date"
         );
         assert!(
             html_string.contains("class=\"icon-box\""),
