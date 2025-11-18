@@ -431,7 +431,14 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            match gitkyl::generate_blob_page(&config.repo, repo_info.default_branch(), path) {
+            match gitkyl::generate_blob_page(
+                &config.repo,
+                repo_info.default_branch(),
+                path,
+                &config
+                    .project_name()
+                    .context("Failed to determine project name")?,
+            ) {
                 Ok(html) => {
                     let blob_path = config
                         .output

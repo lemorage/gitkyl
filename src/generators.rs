@@ -19,6 +19,7 @@ use crate::highlight::highlight;
 /// * `repo_path`: Path to git repository
 /// * `ref_name`: Git reference (branch/tag/commit)
 /// * `file_path`: File path within repository tree
+/// * `repo_name`: Repository name for breadcrumb navigation
 ///
 /// # Returns
 ///
@@ -40,7 +41,8 @@ use crate::highlight::highlight;
 /// let html = generate_blob_page(
 ///     Path::new("."),
 ///     "main",
-///     Path::new("src/lib.rs")
+///     Path::new("src/lib.rs"),
+///     "my-repo"
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
@@ -48,6 +50,7 @@ pub fn generate_blob_page(
     repo_path: impl AsRef<Path>,
     ref_name: &str,
     file_path: impl AsRef<Path>,
+    repo_name: &str,
 ) -> Result<Markup> {
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .context("Failed to read blob from repository")?;
@@ -64,6 +67,7 @@ pub fn generate_blob_page(
         &path_str,
         &path_components,
         ref_name,
+        repo_name,
         &highlighted,
     ))
 }
@@ -112,7 +116,7 @@ pub fn generate_commits_page(commits: &[CommitInfo], ref_name: &str, repo_name: 
                 div class="container" {
                     header {
                         div class="breadcrumb" {
-                            a href=(index_path) class="breadcrumb-link" { "Repository" }
+                            a href=(index_path) class="breadcrumb-link" { (repo_name) }
                             span class="breadcrumb-separator" { "/" }
                             span class="breadcrumb-current" { "Commits" }
                             span class="ref-badge" { (ref_name) }
@@ -238,7 +242,7 @@ pub fn generate_tree_page(
                 div class="container" {
                     header {
                         div class="breadcrumb" {
-                            a href=(index_path) class="breadcrumb-link" { "Repository" }
+                            a href=(index_path) class="breadcrumb-link" { (repo_name) }
                             @if !path_components.is_empty() {
                                 span class="breadcrumb-separator" { "/" }
                                 @for (idx, component) in path_components.iter().enumerate() {
@@ -413,6 +417,7 @@ fn blob_page_markup(
     file_path: &str,
     breadcrumb_components: &[&str],
     ref_name: &str,
+    repo_name: &str,
     highlighted_code: &str,
 ) -> Markup {
     let lines: Vec<&str> = highlighted_code.lines().collect();
@@ -436,7 +441,7 @@ fn blob_page_markup(
                 div class="container" {
                     header {
                         div class="breadcrumb" {
-                            a href=(index_path) class="breadcrumb-link" { "Repository" }
+                            a href=(index_path) class="breadcrumb-link" { (repo_name) }
                             @for (idx, component) in breadcrumb_components.iter().enumerate() {
                                 span class="breadcrumb-separator" { "/" }
                                 @if idx == breadcrumb_components.len() - 1 {
@@ -557,14 +562,14 @@ mod tests {
         let code = "<span class=\"hl-keyword\">fn</span> main() {}";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, code);
+        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
         let html_string = html.into_string();
 
         // Assert
         assert!(html_string.contains("src/lib.rs"));
         assert!(html_string.contains("main"));
         assert!(html_string.contains("hl-keyword"));
-        assert!(html_string.contains("Repository"));
+        assert!(html_string.contains("test-repo"));
         assert!(html_string.contains("Gitkyl"));
     }
 
@@ -577,13 +582,14 @@ mod tests {
         let code = "test code";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, code);
+        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
         let html_string = html.into_string();
 
         // Assert
         assert!(html_string.contains("tests"));
         assert!(html_string.contains("integration"));
         assert!(html_string.contains("test.rs"));
+        assert!(html_string.contains("test-repo"));
         assert!(html_string.contains("breadcrumb-separator"));
     }
 
@@ -596,10 +602,11 @@ mod tests {
         let code = "content";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, code);
+        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
         let html_string = html.into_string();
 
         // Assert
+        assert!(html_string.contains("test-repo"));
         assert!(html_string.contains("ref:"));
         assert!(html_string.contains("feature/new-parser"));
         assert!(html_string.contains("ref-name"));
@@ -614,10 +621,11 @@ mod tests {
         let code = "line 1\nline 2\nline 3";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, code);
+        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
         let html_string = html.into_string();
 
         // Assert
+        assert!(html_string.contains("test-repo"));
         assert!(html_string.contains("line-number"));
         assert!(html_string.contains("line 1"));
         assert!(html_string.contains("line 2"));
@@ -633,10 +641,11 @@ mod tests {
         let code = "";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, code);
+        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
         let html_string = html.into_string();
 
         // Assert
+        assert!(html_string.contains("test-repo"));
         assert!(html_string.contains("empty.txt"));
         assert!(html_string.contains("blob-container"));
     }
@@ -650,10 +659,11 @@ mod tests {
         let code = "single line";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, code);
+        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
         let html_string = html.into_string();
 
         // Assert
+        assert!(html_string.contains("test-repo"));
         assert!(html_string.contains("single line"));
         assert!(html_string.contains("line-number"));
     }
@@ -666,7 +676,7 @@ mod tests {
         let file_path = Path::new("Cargo.toml");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path);
+        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
 
         // Assert
         assert!(
@@ -675,6 +685,7 @@ mod tests {
         );
         let html = result.unwrap().into_string();
         assert!(html.contains("Cargo.toml"));
+        assert!(html.contains("test-repo"));
         assert!(html.contains("blob-container"));
     }
 
@@ -686,7 +697,7 @@ mod tests {
         let file_path = Path::new("src/lib.rs");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path);
+        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
 
         // Assert
         assert!(
@@ -695,6 +706,7 @@ mod tests {
         );
         let html = result.unwrap().into_string();
         assert!(html.contains("src/lib.rs"));
+        assert!(html.contains("test-repo"));
         assert!(
             html.contains("hl-") || html.contains("line-number"),
             "Should contain highlighting or line numbers"
@@ -709,7 +721,7 @@ mod tests {
         let file_path = Path::new("nonexistent_file_12345.txt");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path);
+        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
 
         // Assert
         assert!(result.is_err(), "Should fail for nonexistent file");
@@ -723,7 +735,7 @@ mod tests {
         let file_path = Path::new("Cargo.toml");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path);
+        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
 
         // Assert
         assert!(result.is_err(), "Should fail for invalid reference");

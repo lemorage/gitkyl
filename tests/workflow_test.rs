@@ -137,7 +137,7 @@ fn test_workflow_full_pipeline_rust_file() -> Result<()> {
     let file_path = rust_file.path().expect("File should have valid path");
 
     // Act: generate complete blob page
-    let blob_page = generate_blob_page(&repo_path, ref_name, file_path)?;
+    let blob_page = generate_blob_page(&repo_path, ref_name, file_path, "test-repo")?;
     let html = blob_page.into_string();
 
     // Assert: generated HTML contains expected elements
@@ -155,6 +155,10 @@ fn test_workflow_full_pipeline_rust_file() -> Result<()> {
         html.contains(file_path.to_str().unwrap()),
         "Should contain file path in breadcrumb"
     );
+    assert!(
+        html.contains("test-repo"),
+        "Should contain repository name in breadcrumb"
+    );
 
     Ok(())
 }
@@ -170,13 +174,18 @@ fn test_workflow_multiple_file_types() -> Result<()> {
     let ref_name = "HEAD";
 
     // Test Rust file (supported syntax highlighting)
-    let rust_result = generate_blob_page(&repo_path, ref_name, Path::new("src/lib.rs"));
+    let rust_result =
+        generate_blob_page(&repo_path, ref_name, Path::new("src/lib.rs"), "test-repo");
     match rust_result {
         Ok(html) => {
             let html_str = html.into_string();
             assert!(
                 html_str.contains("hl-keyword") || html_str.contains("line-number"),
                 "Rust file should have syntax highlighting or at minimum line numbers"
+            );
+            assert!(
+                html_str.contains("test-repo"),
+                "Should contain repository name in breadcrumb"
             );
         }
         Err(e) => {
@@ -189,7 +198,8 @@ fn test_workflow_multiple_file_types() -> Result<()> {
     }
 
     // Test TOML file (unsupported, should fallback to plain text)
-    let toml_result = generate_blob_page(&repo_path, ref_name, Path::new("Cargo.toml"));
+    let toml_result =
+        generate_blob_page(&repo_path, ref_name, Path::new("Cargo.toml"), "test-repo");
     match toml_result {
         Ok(html) => {
             let html_str = html.into_string();
@@ -197,6 +207,10 @@ fn test_workflow_multiple_file_types() -> Result<()> {
             assert!(
                 html_str.contains("blob-container"),
                 "Should have standard blob structure"
+            );
+            assert!(
+                html_str.contains("test-repo"),
+                "Should contain repository name in breadcrumb"
             );
         }
         Err(e) => {
@@ -221,7 +235,7 @@ fn test_workflow_error_nonexistent_file() {
     let invalid_path = Path::new("this/file/does/not/exist.rs");
 
     // Act
-    let result = generate_blob_page(&repo_path, ref_name, invalid_path);
+    let result = generate_blob_page(&repo_path, ref_name, invalid_path, "test-repo");
 
     // Assert
     assert!(result.is_err(), "Should return error for nonexistent file");
@@ -244,7 +258,7 @@ fn test_workflow_error_invalid_reference() {
     let file_path = Path::new("src/lib.rs");
 
     // Act
-    let result = generate_blob_page(&repo_path, invalid_ref, file_path);
+    let result = generate_blob_page(&repo_path, invalid_ref, file_path, "test-repo");
 
     // Assert
     assert!(result.is_err(), "Should return error for invalid reference");
@@ -266,7 +280,12 @@ fn test_workflow_html_escaping_in_code() -> Result<()> {
     let ref_name = "HEAD";
 
     // Act: find highlight.rs which contains HTML escaping logic
-    let result = generate_blob_page(&repo_path, ref_name, Path::new("src/highlight.rs"));
+    let result = generate_blob_page(
+        &repo_path,
+        ref_name,
+        Path::new("src/highlight.rs"),
+        "test-repo",
+    );
 
     match result {
         Ok(html) => {
@@ -286,6 +305,12 @@ fn test_workflow_html_escaping_in_code() -> Result<()> {
             assert!(
                 html_str.contains("<!DOCTYPE html>"),
                 "Should have valid HTML structure"
+            );
+
+            // Assert: repository name in breadcrumb
+            assert!(
+                html_str.contains("test-repo"),
+                "Should contain repository name in breadcrumb"
             );
         }
         Err(e) => {
@@ -312,7 +337,7 @@ fn test_workflow_breadcrumb_generation() -> Result<()> {
     let nested_path = Path::new("src/generators.rs");
 
     // Act
-    let result = generate_blob_page(&repo_path, ref_name, nested_path);
+    let result = generate_blob_page(&repo_path, ref_name, nested_path, "test-repo");
 
     match result {
         Ok(html) => {
@@ -331,6 +356,10 @@ fn test_workflow_breadcrumb_generation() -> Result<()> {
             assert!(
                 html_str.contains("breadcrumb-separator"),
                 "Should have path separators"
+            );
+            assert!(
+                html_str.contains("test-repo"),
+                "Should contain repository name in breadcrumb"
             );
         }
         Err(e) => {
