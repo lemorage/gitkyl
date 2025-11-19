@@ -15,8 +15,7 @@ gix = { version = "0.64", default-features = false, features = ["max-performance
 anyhow = { version = "1.0", default-features = false, features = ["std"] }
 clap = { version = "4.5", default-features = false, features = ["std", "derive", "help"] }
 maud = "0.27.0"
-tree-sitter = { version = "0.25.10", default-features = false }
-tree-sitter-rust = { version = "0.24.0", default-features = false }
+syntect = { version = "5.3", default-features = false, features = ["default-syntaxes", "default-themes", "html", "regex-onig"] }
 
 [dev-dependencies]
 tempfile = { version = "3.12", default-features = false }

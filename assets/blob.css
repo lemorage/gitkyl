@@ -164,50 +164,6 @@ code {
     min-height: 20px;
 }
 
-/* Syntax Highlighting */
-.hl-comment {
-    color: #86868B;
-    font-style: italic;
-}
-
-.hl-string {
-    color: #D03030;
-}
-
-.hl-number {
-    color: #5C2E91;
-}
-
-.hl-keyword {
-    color: #AD3DA4;
-    font-weight: 500;
-}
-
-.hl-type {
-    color: #4B21B0;
-    font-weight: 500;
-}
-
-.hl-function {
-    color: #3E8ED0;
-}
-
-.hl-variable {
-    color: var(--text-primary);
-}
-
-.hl-property {
-    color: #0971CE;
-}
-
-.hl-operator {
-    color: #AD3DA4;
-}
-
-.hl-punctuation {
-    color: var(--text-primary);
-}
-
 /* Selection */
 ::selection {
     background-color: rgba(0, 113, 227, 0.3);

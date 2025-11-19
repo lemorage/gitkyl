@@ -85,12 +85,13 @@ fn test_workflow_read_blob_to_highlight() -> Result<()> {
         String::from_utf8(blob_content).context("Blob content should be valid UTF8")?;
 
     // Act: apply syntax highlighting
-    let highlighted = highlight(&content_str, file_path)?;
+    let highlighted_lines = highlight(&content_str, file_path)?;
+    let highlighted = highlighted_lines.join("");
 
-    // Assert: highlighting produces HTML with syntax classes
+    // Assert: highlighting produces HTML with inline styles
     assert!(
-        highlighted.contains("hl-"),
-        "Highlighted output should contain syntax classes"
+        highlighted.contains("style="),
+        "Highlighted output should contain inline styles"
     );
     assert!(
         highlighted.len() >= content_str.len(),

@@ -12,5 +12,5 @@ pub use git::{
     CommitInfo, FileEntry, RepoInfo, analyze_repository, get_file_last_commit,
     get_last_commits_batch, list_commits, list_files, read_blob,
 };
-pub use highlight::{Language, highlight};
+pub use highlight::{Highlighter, highlight};
 pub use tree::FileTree;

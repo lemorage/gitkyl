@@ -57,7 +57,7 @@ pub fn generate_blob_page(
 
     let content = String::from_utf8(content_bytes).context("Blob contains invalid UTF8")?;
 
-    let highlighted =
+    let highlighted_lines =
         highlight(&content, file_path.as_ref()).context("Failed to apply syntax highlighting")?;
 
     let path_str = file_path.as_ref().display().to_string();
@@ -68,7 +68,7 @@ pub fn generate_blob_page(
         &path_components,
         ref_name,
         repo_name,
-        &highlighted,
+        &highlighted_lines,
     ))
 }
 
@@ -418,10 +418,9 @@ fn blob_page_markup(
     breadcrumb_components: &[&str],
     ref_name: &str,
     repo_name: &str,
-    highlighted_code: &str,
+    highlighted_lines: &[String],
 ) -> Markup {
-    let lines: Vec<&str> = highlighted_code.lines().collect();
-    let line_count = lines.len().max(1);
+    let line_count = highlighted_lines.len().max(1);
 
     // Calculate relative path back to index.html based on depth
     // Depth = blob/ + branch/ + path directories
@@ -465,7 +464,7 @@ fn blob_page_markup(
                         div class="code-content" {
                             pre {
                                 code {
-                                    @for line in lines {
+                                    @for line in highlighted_lines {
                                         div class="code-line" {
                                             (PreEscaped(line))
                                         }
@@ -562,7 +561,13 @@ mod tests {
         let code = "<span class=\"hl-keyword\">fn</span> main() {}";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
+        let html = blob_page_markup(
+            file_path,
+            &breadcrumb,
+            ref_name,
+            "test-repo",
+            &code.lines().map(|l| l.to_string()).collect::<Vec<_>>(),
+        );
         let html_string = html.into_string();
 
         // Assert
@@ -582,7 +587,13 @@ mod tests {
         let code = "test code";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
+        let html = blob_page_markup(
+            file_path,
+            &breadcrumb,
+            ref_name,
+            "test-repo",
+            &code.lines().map(|l| l.to_string()).collect::<Vec<_>>(),
+        );
         let html_string = html.into_string();
 
         // Assert
@@ -602,7 +613,13 @@ mod tests {
         let code = "content";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
+        let html = blob_page_markup(
+            file_path,
+            &breadcrumb,
+            ref_name,
+            "test-repo",
+            &code.lines().map(|l| l.to_string()).collect::<Vec<_>>(),
+        );
         let html_string = html.into_string();
 
         // Assert
@@ -621,7 +638,13 @@ mod tests {
         let code = "line 1\nline 2\nline 3";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
+        let html = blob_page_markup(
+            file_path,
+            &breadcrumb,
+            ref_name,
+            "test-repo",
+            &code.lines().map(|l| l.to_string()).collect::<Vec<_>>(),
+        );
         let html_string = html.into_string();
 
         // Assert
@@ -641,7 +664,13 @@ mod tests {
         let code = "";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
+        let html = blob_page_markup(
+            file_path,
+            &breadcrumb,
+            ref_name,
+            "test-repo",
+            &code.lines().map(|l| l.to_string()).collect::<Vec<_>>(),
+        );
         let html_string = html.into_string();
 
         // Assert
@@ -659,7 +688,13 @@ mod tests {
         let code = "single line";
 
         // Act
-        let html = blob_page_markup(file_path, &breadcrumb, ref_name, "test-repo", code);
+        let html = blob_page_markup(
+            file_path,
+            &breadcrumb,
+            ref_name,
+            "test-repo",
+            &code.lines().map(|l| l.to_string()).collect::<Vec<_>>(),
+        );
         let html_string = html.into_string();
 
         // Assert

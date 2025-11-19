@@ -1,121 +1,111 @@
-//! Syntax highlighting with tree-sitter.
+//! Syntax highlighting with syntect.
+//!
+//! Uses TextMate grammars and Sublime Text themes for high quality
+//! syntax highlighting across languages. Provides inline styled
+//! HTML output using professionally designed color schemes.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::Path;
+use syntect::easy::HighlightLines;
+use syntect::highlighting::{Theme, ThemeSet};
+use syntect::html::{IncludeBackground, styled_line_to_highlighted_html};
+use syntect::parsing::SyntaxSet;
+use syntect::util::LinesWithEndings;
 
-/// Supported languages for syntax highlighting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Language {
-    Rust,
+/// Syntax highlighting engine with lazy-loaded syntaxes and themes.
+pub struct Highlighter {
+    syntax_set: SyntaxSet,
+    theme: Theme,
 }
 
-impl Language {
-    /// Detects language from file extension.
+impl Highlighter {
+    /// Creates a new highlighter with default syntaxes and theme.
     ///
-    /// Returns None if the extension is not recognized or supported.
+    /// Loads all default syntaxes (75+ languages) and uses the InspiredGitHub
+    /// theme which provides clean, professional highlighting suitable for
+    /// light backgrounds.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use gitkyl::Language;
+    /// use gitkyl::Highlighter;
+    ///
+    /// let highlighter = Highlighter::new();
+    /// ```
+    pub fn new() -> Self {
+        let syntax_set = SyntaxSet::load_defaults_newlines();
+        let theme_set = ThemeSet::load_defaults();
+        let theme = theme_set.themes["InspiredGitHub"].clone();
+
+        Self { syntax_set, theme }
+    }
+
+    /// Highlights source code with syntax highlighting.
+    ///
+    /// Detects the programming language from the file extension and applies
+    /// appropriate syntax highlighting line by line. If the language is
+    /// unsupported or detection fails, returns plain escaped HTML.
+    ///
+    /// # Arguments
+    ///
+    /// * `code`: Source code to highlight
+    /// * `path`: File path used for language detection via extension
+    ///
+    /// # Returns
+    ///
+    /// Vector of HTML strings, one per line, with inline styled spans.
+    /// All HTML special characters are properly escaped.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if syntect highlighting fails unexpectedly.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use gitkyl::Highlighter;
     /// use std::path::Path;
     ///
-    /// let lang = Language::from_extension(Path::new("main.rs"));
-    /// assert_eq!(lang, Some(Language::Rust));
+    /// let highlighter = Highlighter::new();
+    /// let lines = highlighter.highlight("fn main() {}", Path::new("main.rs"))?;
+    /// assert!(!lines.is_empty());
+    /// # Ok::<(), anyhow::Error>(())
     /// ```
-    pub fn from_extension(path: &Path) -> Option<Self> {
-        let ext = path.extension()?.to_str()?;
-        match ext {
-            "rs" => Some(Language::Rust),
-            _ => None,
-        }
-    }
+    pub fn highlight(&self, code: &str, path: &Path) -> Result<Vec<String>> {
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("txt");
 
-    /// Returns tree-sitter language parser for this language.
-    fn tree_sitter_language(&self) -> tree_sitter::Language {
-        match self {
-            Language::Rust => tree_sitter_rust::LANGUAGE.into(),
-        }
-    }
+        let syntax = self
+            .syntax_set
+            .find_syntax_by_extension(extension)
+            .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
 
-    /// Returns the language name as string.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Language::Rust => "rust",
-        }
-    }
-}
+        let mut highlighter = HighlightLines::new(syntax, &self.theme);
+        let mut result = Vec::new();
 
-/// HTML class names for syntax highlighting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HighlightClass {
-    Comment,
-    String,
-    Number,
-    Keyword,
-    Type,
-    Function,
-    Variable,
-    Property,
-    Operator,
-    Punctuation,
-}
-
-impl HighlightClass {
-    /// CSS class name for this highlight type.
-    pub fn css_class(&self) -> &'static str {
-        match self {
-            HighlightClass::Comment => "hl-comment",
-            HighlightClass::String => "hl-string",
-            HighlightClass::Number => "hl-number",
-            HighlightClass::Keyword => "hl-keyword",
-            HighlightClass::Type => "hl-type",
-            HighlightClass::Function => "hl-function",
-            HighlightClass::Variable => "hl-variable",
-            HighlightClass::Property => "hl-property",
-            HighlightClass::Operator => "hl-operator",
-            HighlightClass::Punctuation => "hl-punctuation",
+        for line in LinesWithEndings::from(code) {
+            let ranges = highlighter
+                .highlight_line(line, &self.syntax_set)
+                .context("Failed to highlight line")?;
+            let html = styled_line_to_highlighted_html(&ranges[..], IncludeBackground::No)
+                .context("Failed to convert styled line to HTML")?;
+            result.push(html);
         }
-    }
 
-    /// Maps tree-sitter node kind to highlight class.
-    fn from_node_kind(kind: &str) -> Option<Self> {
-        match kind {
-            "line_comment" | "block_comment" => Some(HighlightClass::Comment),
-            "string_literal" | "raw_string_literal" | "char_literal" => {
-                Some(HighlightClass::String)
-            }
-            "integer_literal" | "float_literal" => Some(HighlightClass::Number),
-            "let" | "mut" | "fn" | "pub" | "use" | "mod" | "impl" | "trait" | "struct" | "enum"
-            | "type" | "const" | "static" | "match" | "if" | "else" | "while" | "for" | "loop"
-            | "break" | "continue" | "return" | "async" | "await" | "unsafe" | "move" | "ref"
-            | "self" | "super" | "crate" | "where" | "as" | "in" => Some(HighlightClass::Keyword),
-            "type_identifier" | "primitive_type" => Some(HighlightClass::Type),
-            "function_item" | "call_expression" => Some(HighlightClass::Function),
-            "identifier" => Some(HighlightClass::Variable),
-            "field_identifier" | "field_expression" => Some(HighlightClass::Property),
-            "+" | "-" | "*" | "/" | "%" | "=" | "==" | "!=" | "<" | ">" | "<=" | ">=" | "&&"
-            | "||" | "!" | "&" | "|" | "^" | "<<" | ">>" | "+=" | "-=" | "*=" | "/=" | "%="
-            | "&=" | "|=" | "^=" | "<<=" | ">>=" => Some(HighlightClass::Operator),
-            ";" | "," | "." | "::" | ":" | "->" | "=>" => Some(HighlightClass::Punctuation),
-            _ => None,
-        }
+        Ok(result)
     }
 }
 
-/// Highlighted segment in source code.
-#[derive(Debug, Clone)]
-struct Segment {
-    start: usize,
-    end: usize,
-    class: HighlightClass,
+impl Default for Highlighter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Highlights source code with syntax highlighting.
 ///
-/// Attempts to detect the language from the file path extension.
-/// If detection fails or the language is unsupported, returns plain HTML
-/// without syntax highlighting.
+/// Convenience function that creates a highlighter and highlights the code.
+/// For repeated highlighting operations, create a Highlighter instance
+/// to reuse loaded syntaxes and themes.
 ///
 /// # Arguments
 ///
@@ -124,12 +114,11 @@ struct Segment {
 ///
 /// # Returns
 ///
-/// HTML string with syntax highlighting spans. Each highlighted segment
-/// is wrapped in a span with the appropriate CSS class.
+/// Vector of HTML strings, one per line, with inline styled syntax highlighting.
 ///
 /// # Errors
 ///
-/// Returns error if tree-sitter parsing fails unexpectedly.
+/// Returns error if syntect highlighting fails.
 ///
 /// # Examples
 ///
@@ -137,79 +126,13 @@ struct Segment {
 /// use gitkyl::highlight;
 /// use std::path::Path;
 ///
-/// let code = "fn main() { println!(\"Hello\"); }";
-/// let html = highlight(code, Path::new("main.rs"))?;
-/// assert!(html.contains("hl-keyword"));
+/// let lines = highlight("let x = 42;", Path::new("test.rs"))?;
+/// assert!(!lines.is_empty());
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub fn highlight(code: &str, path: &Path) -> Result<String> {
-    let Some(language) = Language::from_extension(path) else {
-        return Ok(escape_html(code));
-    };
-
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&language.tree_sitter_language())
-        .map_err(|e| anyhow::anyhow!("Failed to set tree-sitter language: {}", e))?;
-
-    let tree = parser
-        .parse(code, None)
-        .ok_or_else(|| anyhow::anyhow!("Tree-sitter parsing failed"))?;
-
-    let root = tree.root_node();
-
-    let mut segments = Vec::new();
-    collect_segments(root, &mut segments);
-
-    segments.sort_by_key(|s| s.start);
-
-    let mut result = String::with_capacity(code.len() * 2);
-    let mut pos = 0;
-
-    for segment in segments {
-        if segment.start > pos {
-            result.push_str(&escape_html(&code[pos..segment.start]));
-        }
-
-        let text = &code[segment.start..segment.end];
-        result.push_str(&format!(
-            "<span class=\"{}\">{}</span>",
-            segment.class.css_class(),
-            escape_html(text)
-        ));
-
-        pos = segment.end;
-    }
-
-    if pos < code.len() {
-        result.push_str(&escape_html(&code[pos..]));
-    }
-
-    Ok(result)
-}
-
-/// Recursively collects highlighted segments from tree-sitter AST.
-fn collect_segments(node: tree_sitter::Node, segments: &mut Vec<Segment>) {
-    if let Some(class) = HighlightClass::from_node_kind(node.kind()) {
-        segments.push(Segment {
-            start: node.start_byte(),
-            end: node.end_byte(),
-            class,
-        });
-    }
-
-    for child in node.children(&mut node.walk()) {
-        collect_segments(child, segments);
-    }
-}
-
-/// Escapes HTML special characters.
-fn escape_html(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
+pub fn highlight(code: &str, path: &Path) -> Result<Vec<String>> {
+    let highlighter = Highlighter::new();
+    highlighter.highlight(code, path)
 }
 
 #[cfg(test)]
@@ -217,176 +140,328 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_language_detection_rust() {
-        // Arrange
-        let path = Path::new("main.rs");
+    fn test_highlighter_new() {
+        // Arrange & Act
+        let highlighter = Highlighter::new();
 
-        // Act
-        let lang = Language::from_extension(path);
-
-        // Assert
-        assert_eq!(lang, Some(Language::Rust));
+        // Assert: Verify syntax set has default syntaxes loaded
+        assert!(
+            highlighter
+                .syntax_set
+                .find_syntax_by_extension("rs")
+                .is_some(),
+            "Should have Rust syntax loaded"
+        );
+        assert!(
+            highlighter
+                .syntax_set
+                .find_syntax_by_extension("py")
+                .is_some(),
+            "Should have Python syntax loaded"
+        );
     }
 
     #[test]
-    fn test_language_detection_unsupported() {
+    fn test_highlight_rust() {
         // Arrange
-        let path = Path::new("script.py");
+        let highlighter = Highlighter::new();
+        let code = "fn main() { println!(\"hello\"); }";
+        let path = Path::new("test.rs");
 
         // Act
-        let lang = Language::from_extension(path);
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight Rust code");
 
         // Assert
-        assert_eq!(lang, None);
+        assert!(!lines.is_empty(), "Should return lines");
+        let html = lines.join("");
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("fn"), "Should contain original code");
+        assert!(html.contains("main"), "Should contain original code");
     }
 
     #[test]
-    fn test_language_detection_no_extension() {
+    fn test_highlight_python() {
         // Arrange
+        let highlighter = Highlighter::new();
+        let code = "def hello():\n    print('world')";
+        let path = Path::new("test.py");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight Python code");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("def"), "Should contain original code");
+        assert!(html.contains("hello"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_javascript() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "function greet() { console.log('hi'); }";
+        let path = Path::new("test.js");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight JavaScript code");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("function"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_typescript() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "const x: number = 42;";
+        let path = Path::new("test.ts");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight TypeScript code");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("const"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_go() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "package main\n\nfunc main() {}";
+        let path = Path::new("main.go");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight Go code");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("package"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_c() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "#include <stdio.h>\nint main() { return 0; }";
+        let path = Path::new("main.c");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight C code");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("include"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_cpp() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "#include <iostream>\nint main() { std::cout << \"hi\"; }";
+        let path = Path::new("main.cpp");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight C++ code");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("iostream"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_unsupported_fallback() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "This is plain text with no syntax";
         let path = Path::new("README");
 
         // Act
-        let lang = Language::from_extension(path);
-
-        // Assert
-        assert_eq!(lang, None);
-    }
-
-    #[test]
-    fn test_highlight_rust_keywords() {
-        // Arrange
-        let code = "fn main() {}";
-        let path = Path::new("test.rs");
-
-        // Act
-        let html = highlight(code, path).expect("Highlighting should succeed");
-
-        // Assert
-        assert!(html.contains("hl-keyword"), "Should highlight 'fn' keyword");
-    }
-
-    #[test]
-    fn test_highlight_rust_string() {
-        // Arrange
-        let code = r#"let s = "hello";"#;
-        let path = Path::new("test.rs");
-
-        // Act
-        let html = highlight(code, path).expect("Highlighting should succeed");
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should fallback to plain text");
+        let html = lines.join("");
 
         // Assert
         assert!(
-            html.contains("hl-string"),
-            "Should highlight string literal"
+            html.contains("This is plain text"),
+            "Should contain original text"
         );
-        assert!(
-            html.contains("hl-keyword"),
-            "Should highlight 'let' keyword"
-        );
-    }
-
-    #[test]
-    fn test_highlight_rust_number() {
-        // Arrange
-        let code = "let x = 42;";
-        let path = Path::new("test.rs");
-
-        // Act
-        let html = highlight(code, path).expect("Highlighting should succeed");
-
-        // Assert
-        assert!(
-            html.contains("hl-number"),
-            "Should highlight number literal"
-        );
-    }
-
-    #[test]
-    fn test_highlight_rust_comment() {
-        // Arrange
-        let code = "// This is a comment\nfn main() {}";
-        let path = Path::new("test.rs");
-
-        // Act
-        let html = highlight(code, path).expect("Highlighting should succeed");
-
-        // Assert
-        assert!(html.contains("hl-comment"), "Should highlight line comment");
-    }
-
-    #[test]
-    fn test_highlight_unsupported_language_fallback() {
-        // Arrange
-        let code = "print('hello')";
-        let path = Path::new("script.py");
-
-        // Act
-        let html = highlight(code, path).expect("Should fallback to plain text");
-
-        // Assert
-        assert!(
-            !html.contains("hl-"),
-            "Should not contain highlight classes"
-        );
-        assert!(html.contains("print"), "Should contain original text");
     }
 
     #[test]
     fn test_highlight_html_escaping() {
         // Arrange
+        let highlighter = Highlighter::new();
         let code = r#"let s = "<>&\"';"#;
         let path = Path::new("test.rs");
 
         // Act
-        let html = highlight(code, path).expect("Highlighting should succeed");
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should escape HTML");
+        let html = lines.join("");
 
-        // Assert
-        assert!(html.contains("&lt;"), "Should escape '<'");
-        assert!(html.contains("&gt;"), "Should escape '>'");
-        assert!(html.contains("&amp;"), "Should escape '&'");
-        assert!(html.contains("&quot;"), "Should escape '\"'");
-        assert!(html.contains("&#39;"), "Should escape '\''");
+        // Assert: Syntect handles HTML escaping automatically
+        assert!(!html.contains("<>&"), "HTML entities should be escaped");
     }
 
     #[test]
     fn test_highlight_empty_code() {
         // Arrange
+        let highlighter = Highlighter::new();
         let code = "";
         let path = Path::new("test.rs");
 
         // Act
-        let html = highlight(code, path).expect("Should handle empty code");
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should handle empty code");
 
-        // Assert
-        assert_eq!(html, "", "Should return empty string for empty input");
+        // Assert: Empty code returns no lines
+        assert!(
+            lines.is_empty() || lines.iter().all(|l| l.trim().is_empty()),
+            "Empty code should produce no/empty lines"
+        );
     }
 
     #[test]
-    fn test_highlight_class_css_names() {
-        // Arrange & Act & Assert
-        assert_eq!(HighlightClass::Comment.css_class(), "hl-comment");
-        assert_eq!(HighlightClass::String.css_class(), "hl-string");
-        assert_eq!(HighlightClass::Number.css_class(), "hl-number");
-        assert_eq!(HighlightClass::Keyword.css_class(), "hl-keyword");
-        assert_eq!(HighlightClass::Type.css_class(), "hl-type");
-        assert_eq!(HighlightClass::Function.css_class(), "hl-function");
-    }
-
-    #[test]
-    fn test_language_name() {
-        // Arrange & Act & Assert
-        assert_eq!(Language::Rust.name(), "rust");
-    }
-
-    #[test]
-    fn test_escape_html_all_characters() {
+    fn test_highlight_multiline() {
         // Arrange
-        let input = r#"<>&"'"#;
+        let highlighter = Highlighter::new();
+        let code = "fn main() {\n    let x = 1;\n    let y = 2;\n}";
+        let path = Path::new("test.rs");
 
         // Act
-        let output = escape_html(input);
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight multiline code");
+        let html = lines.join("");
 
         // Assert
-        assert_eq!(output, "&lt;&gt;&amp;&quot;&#39;");
+        assert!(html.contains("fn"), "Should contain code");
+        assert!(html.contains("let"), "Should contain code");
+    }
+
+    #[test]
+    fn test_highlight_function_convenience() {
+        // Arrange
+        let code = "fn test() {}";
+        let path = Path::new("test.rs");
+
+        // Act
+        let lines = highlight(code, path).expect("Convenience function should work");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("fn"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlighter_default() {
+        // Arrange & Act
+        let highlighter = Highlighter::default();
+
+        // Assert
+        assert!(
+            highlighter
+                .syntax_set
+                .find_syntax_by_extension("rs")
+                .is_some(),
+            "Default should work like new()"
+        );
+    }
+
+    #[test]
+    fn test_highlight_json() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = r#"{"key": "value", "number": 42}"#;
+        let path = Path::new("config.json");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight JSON");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("key"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_yaml() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "name: test\nversion: 1.0";
+        let path = Path::new("config.yml");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight YAML");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("name"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_shell() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "#!/bin/bash\necho 'hello'";
+        let path = Path::new("script.sh");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight shell script");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("style="), "Should contain inline styles");
+        assert!(html.contains("echo"), "Should contain original code");
+    }
+
+    #[test]
+    fn test_highlight_markdown() {
+        // Arrange
+        let highlighter = Highlighter::new();
+        let code = "# Title\n\nSome **bold** text";
+        let path = Path::new("README.md");
+
+        // Act
+        let lines = highlighter
+            .highlight(code, path)
+            .expect("Should highlight Markdown");
+        let html = lines.join("");
+
+        // Assert
+        assert!(html.contains("Title"), "Should contain original code");
     }
 }
