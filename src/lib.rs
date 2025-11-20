@@ -4,6 +4,7 @@ mod config;
 mod generators;
 mod git;
 mod highlight;
+mod markdown;
 mod tree;
 
 pub use config::Config;
@@ -13,4 +14,5 @@ pub use git::{
     get_last_commits_batch, list_commits, list_files, read_blob,
 };
 pub use highlight::{Highlighter, highlight};
+pub use markdown::{LinkResolver, MarkdownRenderer};
 pub use tree::FileTree;
