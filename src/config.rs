@@ -23,6 +23,10 @@ pub struct Config {
     /// Project owner
     #[arg(long)]
     pub owner: Option<String>,
+
+    /// Syntax highlighting theme (Catppuccin-Latte, Catppuccin-Mocha, etc.)
+    #[arg(long, default_value = "Catppuccin-Latte")]
+    pub theme: String,
 }
 
 impl Config {
@@ -78,6 +82,7 @@ mod tests {
             output: PathBuf::from("dist"),
             name: Some("ExplicitName".to_string()),
             owner: None,
+            theme: "Catppuccin-Latte".to_string(),
         };
 
         // Act
@@ -96,6 +101,7 @@ mod tests {
             output: PathBuf::from("output"),
             name: Some("test".to_string()),
             owner: Some("owner".to_string()),
+            theme: "Catppuccin-Mocha".to_string(),
         };
 
         // Act
@@ -106,6 +112,7 @@ mod tests {
         assert_eq!(cloned.output, original.output);
         assert_eq!(cloned.name, original.name);
         assert_eq!(cloned.owner, original.owner);
+        assert_eq!(cloned.theme, original.theme);
     }
 
     #[test]
@@ -116,6 +123,7 @@ mod tests {
             output: PathBuf::from("dist"),
             name: None,
             owner: None,
+            theme: "base16-ocean.light".to_string(),
         };
 
         // Act
@@ -123,6 +131,7 @@ mod tests {
 
         // Assert
         assert!(debug_str.contains("Config"));
+        assert!(debug_str.contains("theme"));
     }
 
     #[test]
@@ -133,6 +142,7 @@ mod tests {
             output: PathBuf::from("dist"),
             name: None,
             owner: None,
+            theme: "Catppuccin-Latte".to_string(),
         };
 
         // Act
@@ -140,5 +150,23 @@ mod tests {
 
         // Assert
         assert!(result.is_ok(), "Current directory should be valid");
+    }
+
+    #[test]
+    fn test_config_default_theme() {
+        // Arrange & Act
+        let config = Config {
+            repo: PathBuf::from("."),
+            output: PathBuf::from("dist"),
+            name: None,
+            owner: None,
+            theme: "Catppuccin-Latte".to_string(),
+        };
+
+        // Assert
+        assert_eq!(
+            config.theme, "Catppuccin-Latte",
+            "Default theme should be Catppuccin-Latte"
+        );
     }
 }

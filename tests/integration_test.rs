@@ -157,6 +157,7 @@ fn test_config_validation_valid() -> Result<()> {
         output: PathBuf::from("test-output"),
         name: Some("test".to_string()),
         owner: None,
+        theme: "Catppuccin-Latte".to_string(),
     };
 
     // Act
@@ -177,6 +178,7 @@ fn test_config_validation_invalid_repo() {
         output: PathBuf::from("test-output"),
         name: None,
         owner: None,
+        theme: "Catppuccin-Latte".to_string(),
     };
 
     // Act
@@ -198,6 +200,7 @@ fn test_project_name_custom() -> Result<()> {
         output: PathBuf::from("dist"),
         name: Some("Custom Name".to_string()),
         owner: None,
+        theme: "Catppuccin-Latte".to_string(),
     };
 
     // Act
@@ -218,6 +221,7 @@ fn test_project_name_fallback() -> Result<()> {
         output: PathBuf::from("dist"),
         name: None,
         owner: None,
+        theme: "Catppuccin-Latte".to_string(),
     };
 
     // Act
@@ -238,6 +242,7 @@ fn test_project_name_with_current_dir() -> Result<()> {
         output: PathBuf::from("dist"),
         name: None,
         owner: None,
+        theme: "Catppuccin-Latte".to_string(),
     };
 
     // Act
@@ -261,6 +266,7 @@ fn test_project_name_root_path() {
         output: PathBuf::from("dist"),
         name: None,
         owner: None,
+        theme: "Catppuccin-Latte".to_string(),
     };
 
     // Act

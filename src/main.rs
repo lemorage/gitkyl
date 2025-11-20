@@ -438,6 +438,7 @@ fn main() -> Result<()> {
                 &config
                     .project_name()
                     .context("Failed to determine project name")?,
+                &config.theme,
             ) {
                 Ok(html) => {
                     let blob_path = config

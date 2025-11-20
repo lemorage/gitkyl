@@ -138,7 +138,13 @@ fn test_workflow_full_pipeline_rust_file() -> Result<()> {
     let file_path = rust_file.path().expect("File should have valid path");
 
     // Act: generate complete blob page
-    let blob_page = generate_blob_page(&repo_path, ref_name, file_path, "test-repo")?;
+    let blob_page = generate_blob_page(
+        &repo_path,
+        ref_name,
+        file_path,
+        "test-repo",
+        "Catppuccin-Latte",
+    )?;
     let html = blob_page.into_string();
 
     // Assert: generated HTML contains expected elements
@@ -175,8 +181,13 @@ fn test_workflow_multiple_file_types() -> Result<()> {
     let ref_name = "HEAD";
 
     // Test Rust file (supported syntax highlighting)
-    let rust_result =
-        generate_blob_page(&repo_path, ref_name, Path::new("src/lib.rs"), "test-repo");
+    let rust_result = generate_blob_page(
+        &repo_path,
+        ref_name,
+        Path::new("src/lib.rs"),
+        "test-repo",
+        "Catppuccin-Latte",
+    );
     match rust_result {
         Ok(html) => {
             let html_str = html.into_string();
@@ -199,8 +210,13 @@ fn test_workflow_multiple_file_types() -> Result<()> {
     }
 
     // Test TOML file (unsupported, should fallback to plain text)
-    let toml_result =
-        generate_blob_page(&repo_path, ref_name, Path::new("Cargo.toml"), "test-repo");
+    let toml_result = generate_blob_page(
+        &repo_path,
+        ref_name,
+        Path::new("Cargo.toml"),
+        "test-repo",
+        "Catppuccin-Latte",
+    );
     match toml_result {
         Ok(html) => {
             let html_str = html.into_string();
@@ -236,7 +252,13 @@ fn test_workflow_error_nonexistent_file() {
     let invalid_path = Path::new("this/file/does/not/exist.rs");
 
     // Act
-    let result = generate_blob_page(&repo_path, ref_name, invalid_path, "test-repo");
+    let result = generate_blob_page(
+        &repo_path,
+        ref_name,
+        invalid_path,
+        "test-repo",
+        "Catppuccin-Latte",
+    );
 
     // Assert
     assert!(result.is_err(), "Should return error for nonexistent file");
@@ -259,7 +281,13 @@ fn test_workflow_error_invalid_reference() {
     let file_path = Path::new("src/lib.rs");
 
     // Act
-    let result = generate_blob_page(&repo_path, invalid_ref, file_path, "test-repo");
+    let result = generate_blob_page(
+        &repo_path,
+        invalid_ref,
+        file_path,
+        "test-repo",
+        "Catppuccin-Latte",
+    );
 
     // Assert
     assert!(result.is_err(), "Should return error for invalid reference");
@@ -286,6 +314,7 @@ fn test_workflow_html_escaping_in_code() -> Result<()> {
         ref_name,
         Path::new("src/highlight.rs"),
         "test-repo",
+        "Catppuccin-Latte",
     );
 
     match result {
@@ -338,7 +367,13 @@ fn test_workflow_breadcrumb_generation() -> Result<()> {
     let nested_path = Path::new("src/generators.rs");
 
     // Act
-    let result = generate_blob_page(&repo_path, ref_name, nested_path, "test-repo");
+    let result = generate_blob_page(
+        &repo_path,
+        ref_name,
+        nested_path,
+        "test-repo",
+        "Catppuccin-Latte",
+    );
 
     match result {
         Ok(html) => {

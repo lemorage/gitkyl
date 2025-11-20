@@ -6,12 +6,12 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::git::{CommitInfo, FileEntry, read_blob};
-use crate::highlight::highlight;
+use crate::highlight::Highlighter;
 
 /// Generates HTML blob page with syntax highlighting.
 ///
 /// Reads blob content from the repository at the specified reference and path,
-/// applies tree-sitter syntax highlighting, and renders as HTML with line numbers.
+/// applies syntect syntax highlighting, and renders as HTML with line numbers.
 /// The output follows GitHub's visual design patterns.
 ///
 /// # Arguments
@@ -20,6 +20,7 @@ use crate::highlight::highlight;
 /// * `ref_name`: Git reference (branch/tag/commit)
 /// * `file_path`: File path within repository tree
 /// * `repo_name`: Repository name for breadcrumb navigation
+/// * `theme`: Syntax highlighting theme name
 ///
 /// # Returns
 ///
@@ -31,6 +32,7 @@ use crate::highlight::highlight;
 /// - Blob cannot be read from repository
 /// - File content contains invalid UTF8
 /// - Syntax highlighting fails
+/// - Theme cannot be loaded
 ///
 /// # Examples
 ///
@@ -42,7 +44,8 @@ use crate::highlight::highlight;
 ///     Path::new("."),
 ///     "main",
 ///     Path::new("src/lib.rs"),
-///     "my-repo"
+///     "my-repo",
+///     "Catppuccin-Latte"
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
@@ -51,14 +54,19 @@ pub fn generate_blob_page(
     ref_name: &str,
     file_path: impl AsRef<Path>,
     repo_name: &str,
+    theme: &str,
 ) -> Result<Markup> {
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .context("Failed to read blob from repository")?;
 
     let content = String::from_utf8(content_bytes).context("Blob contains invalid UTF8")?;
 
-    let highlighted_lines =
-        highlight(&content, file_path.as_ref()).context("Failed to apply syntax highlighting")?;
+    let highlighter = Highlighter::with_theme(theme)
+        .context("Failed to create syntax highlighter with specified theme")?;
+
+    let highlighted_lines = highlighter
+        .highlight(&content, file_path.as_ref())
+        .context("Failed to apply syntax highlighting")?;
 
     let path_str = file_path.as_ref().display().to_string();
     let path_components = extract_breadcrumb_components(&path_str);
@@ -711,7 +719,13 @@ mod tests {
         let file_path = Path::new("Cargo.toml");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
+        let result = generate_blob_page(
+            &repo_path,
+            ref_name,
+            file_path,
+            "test-repo",
+            "Catppuccin-Latte",
+        );
 
         // Assert
         assert!(
@@ -732,7 +746,13 @@ mod tests {
         let file_path = Path::new("src/lib.rs");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
+        let result = generate_blob_page(
+            &repo_path,
+            ref_name,
+            file_path,
+            "test-repo",
+            "Catppuccin-Latte",
+        );
 
         // Assert
         assert!(
@@ -743,8 +763,8 @@ mod tests {
         assert!(html.contains("src/lib.rs"));
         assert!(html.contains("test-repo"));
         assert!(
-            html.contains("hl-") || html.contains("line-number"),
-            "Should contain highlighting or line numbers"
+            html.contains("style=") || html.contains("line-number"),
+            "Should contain inline styles or line numbers"
         );
     }
 
@@ -756,7 +776,13 @@ mod tests {
         let file_path = Path::new("nonexistent_file_12345.txt");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
+        let result = generate_blob_page(
+            &repo_path,
+            ref_name,
+            file_path,
+            "test-repo",
+            "Catppuccin-Latte",
+        );
 
         // Assert
         assert!(result.is_err(), "Should fail for nonexistent file");
@@ -770,7 +796,13 @@ mod tests {
         let file_path = Path::new("Cargo.toml");
 
         // Act
-        let result = generate_blob_page(&repo_path, ref_name, file_path, "test-repo");
+        let result = generate_blob_page(
+            &repo_path,
+            ref_name,
+            file_path,
+            "test-repo",
+            "Catppuccin-Latte",
+        );
 
         // Assert
         assert!(result.is_err(), "Should fail for invalid reference");
