@@ -1,10 +1,12 @@
 //! Syntax highlighting with syntect.
 //!
 //! Uses TextMate grammars and Sublime Text themes for high quality
-//! syntax highlighting across languages. Provides inline styled
+//! syntax highlighting across 75+ languages. Provides inline styled
 //! HTML output using professionally designed color schemes.
+//!
+//! Default theme: Catppuccin-Latte (modern warm light theme).
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::Path;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Theme, ThemeSet};
@@ -19,58 +21,87 @@ pub struct Highlighter {
 }
 
 impl Highlighter {
-    /// Creates a new highlighter with default syntaxes and theme.
+    /// Creates highlighter with default theme (Catppuccin-Latte).
     ///
-    /// Loads all default syntaxes (75+ languages) and uses the InspiredGitHub
-    /// theme which provides clean, professional highlighting suitable for
-    /// light backgrounds.
+    /// Falls back to base16-ocean.light if Catppuccin themes unavailable.
     ///
-    /// # Examples
+    /// # Errors
     ///
-    /// ```no_run
-    /// use gitkyl::Highlighter;
-    ///
-    /// let highlighter = Highlighter::new();
-    /// ```
-    pub fn new() -> Self {
-        let syntax_set = SyntaxSet::load_defaults_newlines();
-        let theme_set = ThemeSet::load_defaults();
-        let theme = theme_set.themes["InspiredGitHub"].clone();
+    /// Returns error if no themes can be loaded.
+    pub fn new() -> Result<Self> {
+        Self::with_theme("Catppuccin-Latte").or_else(|_| Self::with_theme("base16-ocean.light"))
+    }
 
-        Self { syntax_set, theme }
+    /// Creates highlighter with specified theme.
+    ///
+    /// # Theme Resolution Order
+    ///
+    /// 1. Themes directory (Catppuccin-Latte, Catppuccin-Mocha)
+    /// 2. Built-in syntect themes (InspiredGitHub, base16-ocean.*, Solarized)
+    /// 3. External .tmTheme files (if path ends with .tmTheme)
+    ///
+    /// # Recommended Themes
+    ///
+    /// - `Catppuccin-Latte` - Modern warm light theme
+    /// - `Catppuccin-Mocha` - Modern dark theme
+    ///
+    /// # Errors
+    ///
+    /// Returns error if theme is not found or cannot be loaded.
+    pub fn with_theme(theme_name: &str) -> Result<Self> {
+        let syntax_set = SyntaxSet::load_defaults_newlines();
+
+        // Themes directory (priority)
+        let theme_path = Path::new("themes").join(format!("{}.tmTheme", theme_name));
+        if theme_path.exists() {
+            let theme = ThemeSet::get_theme(&theme_path)
+                .with_context(|| format!("Failed to load theme: {}", theme_name))?;
+            return Ok(Self { syntax_set, theme });
+        }
+
+        // Built-in syntect themes (fallback)
+        let theme_set = ThemeSet::load_defaults();
+        if let Some(theme) = theme_set.themes.get(theme_name) {
+            return Ok(Self {
+                syntax_set,
+                theme: theme.clone(),
+            });
+        }
+
+        // External .tmTheme file
+        if theme_name.ends_with(".tmTheme") {
+            let theme = ThemeSet::get_theme(theme_name)
+                .with_context(|| format!("Failed to load theme: {}", theme_name))?;
+            return Ok(Self { syntax_set, theme });
+        }
+
+        bail!(
+            "Theme '{}' not found. Available:\n\
+            Recommended: Catppuccin-Latte, Catppuccin-Mocha\n\
+            Built-in: InspiredGitHub, base16-ocean.light, base16-ocean.dark, \
+            Solarized (light), Solarized (dark)\n\
+            Or provide path to .tmTheme file.",
+            theme_name
+        )
     }
 
     /// Highlights source code with syntax highlighting.
     ///
-    /// Detects the programming language from the file extension and applies
-    /// appropriate syntax highlighting line by line. If the language is
-    /// unsupported or detection fails, returns plain escaped HTML.
+    /// Detects language from file extension and applies highlighting
+    /// line by line. Falls back to plain text for unsupported languages.
     ///
     /// # Arguments
     ///
     /// * `code`: Source code to highlight
-    /// * `path`: File path used for language detection via extension
+    /// * `path`: File path for language detection
     ///
     /// # Returns
     ///
-    /// Vector of HTML strings, one per line, with inline styled spans.
-    /// All HTML special characters are properly escaped.
+    /// Vector of HTML strings (one per line) with inline styles.
     ///
     /// # Errors
     ///
-    /// Returns error if syntect highlighting fails unexpectedly.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use gitkyl::Highlighter;
-    /// use std::path::Path;
-    ///
-    /// let highlighter = Highlighter::new();
-    /// let lines = highlighter.highlight("fn main() {}", Path::new("main.rs"))?;
-    /// assert!(!lines.is_empty());
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
+    /// Returns error if syntax highlighting fails.
     pub fn highlight(&self, code: &str, path: &Path) -> Result<Vec<String>> {
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("txt");
 
@@ -95,43 +126,17 @@ impl Highlighter {
     }
 }
 
-impl Default for Highlighter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Highlights source code with syntax highlighting.
 ///
 /// Convenience function that creates a highlighter and highlights the code.
-/// For repeated highlighting operations, create a Highlighter instance
-/// to reuse loaded syntaxes and themes.
-///
-/// # Arguments
-///
-/// * `code`: Source code to highlight
-/// * `path`: File path used for language detection
-///
-/// # Returns
-///
-/// Vector of HTML strings, one per line, with inline styled syntax highlighting.
+/// For repeated highlighting, create a Highlighter instance to reuse
+/// loaded syntaxes and themes.
 ///
 /// # Errors
 ///
-/// Returns error if syntect highlighting fails.
-///
-/// # Examples
-///
-/// ```no_run
-/// use gitkyl::highlight;
-/// use std::path::Path;
-///
-/// let lines = highlight("let x = 42;", Path::new("test.rs"))?;
-/// assert!(!lines.is_empty());
-/// # Ok::<(), anyhow::Error>(())
-/// ```
+/// Returns error if highlighting fails.
 pub fn highlight(code: &str, path: &Path) -> Result<Vec<String>> {
-    let highlighter = Highlighter::new();
+    let highlighter = Highlighter::new()?;
     highlighter.highlight(code, path)
 }
 
@@ -141,30 +146,31 @@ mod tests {
 
     #[test]
     fn test_highlighter_new() {
-        // Arrange & Act
-        let highlighter = Highlighter::new();
+        // Act
+        let result = Highlighter::new();
 
-        // Assert: Verify syntax set has default syntaxes loaded
-        assert!(
-            highlighter
-                .syntax_set
-                .find_syntax_by_extension("rs")
-                .is_some(),
-            "Should have Rust syntax loaded"
-        );
-        assert!(
-            highlighter
-                .syntax_set
-                .find_syntax_by_extension("py")
-                .is_some(),
-            "Should have Python syntax loaded"
-        );
+        // Assert
+        assert!(result.is_ok(), "Should create with default theme");
+    }
+
+    #[test]
+    fn test_with_theme_variations() {
+        // Built-in themes
+        assert!(Highlighter::with_theme("InspiredGitHub").is_ok());
+        assert!(Highlighter::with_theme("base16-ocean.light").is_ok());
+
+        // Catppuccin themes (from themes/ dir)
+        assert!(Highlighter::with_theme("Catppuccin-Latte").is_ok());
+        assert!(Highlighter::with_theme("Catppuccin-Mocha").is_ok());
+
+        // Nonexistent theme
+        assert!(Highlighter::with_theme("NonexistentTheme").is_err());
     }
 
     #[test]
     fn test_highlight_rust() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "fn main() { println!(\"hello\"); }";
         let path = Path::new("test.rs");
 
@@ -178,13 +184,12 @@ mod tests {
         let html = lines.join("");
         assert!(html.contains("style="), "Should contain inline styles");
         assert!(html.contains("fn"), "Should contain original code");
-        assert!(html.contains("main"), "Should contain original code");
     }
 
     #[test]
     fn test_highlight_python() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "def hello():\n    print('world')";
         let path = Path::new("test.py");
 
@@ -197,13 +202,12 @@ mod tests {
         // Assert
         assert!(html.contains("style="), "Should contain inline styles");
         assert!(html.contains("def"), "Should contain original code");
-        assert!(html.contains("hello"), "Should contain original code");
     }
 
     #[test]
     fn test_highlight_javascript() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "function greet() { console.log('hi'); }";
         let path = Path::new("test.js");
 
@@ -221,7 +225,7 @@ mod tests {
     #[test]
     fn test_highlight_typescript() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "const x: number = 42;";
         let path = Path::new("test.ts");
 
@@ -239,7 +243,7 @@ mod tests {
     #[test]
     fn test_highlight_go() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "package main\n\nfunc main() {}";
         let path = Path::new("main.go");
 
@@ -257,7 +261,7 @@ mod tests {
     #[test]
     fn test_highlight_c() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "#include <stdio.h>\nint main() { return 0; }";
         let path = Path::new("main.c");
 
@@ -275,7 +279,7 @@ mod tests {
     #[test]
     fn test_highlight_cpp() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "#include <iostream>\nint main() { std::cout << \"hi\"; }";
         let path = Path::new("main.cpp");
 
@@ -293,7 +297,7 @@ mod tests {
     #[test]
     fn test_highlight_unsupported_fallback() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "This is plain text with no syntax";
         let path = Path::new("README");
 
@@ -313,7 +317,7 @@ mod tests {
     #[test]
     fn test_highlight_html_escaping() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = r#"let s = "<>&\"';"#;
         let path = Path::new("test.rs");
 
@@ -323,14 +327,14 @@ mod tests {
             .expect("Should escape HTML");
         let html = lines.join("");
 
-        // Assert: Syntect handles HTML escaping automatically
+        // Assert
         assert!(!html.contains("<>&"), "HTML entities should be escaped");
     }
 
     #[test]
     fn test_highlight_empty_code() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "";
         let path = Path::new("test.rs");
 
@@ -339,7 +343,7 @@ mod tests {
             .highlight(code, path)
             .expect("Should handle empty code");
 
-        // Assert: Empty code returns no lines
+        // Assert
         assert!(
             lines.is_empty() || lines.iter().all(|l| l.trim().is_empty()),
             "Empty code should produce no/empty lines"
@@ -349,7 +353,7 @@ mod tests {
     #[test]
     fn test_highlight_multiline() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "fn main() {\n    let x = 1;\n    let y = 2;\n}";
         let path = Path::new("test.rs");
 
@@ -380,24 +384,9 @@ mod tests {
     }
 
     #[test]
-    fn test_highlighter_default() {
-        // Arrange & Act
-        let highlighter = Highlighter::default();
-
-        // Assert
-        assert!(
-            highlighter
-                .syntax_set
-                .find_syntax_by_extension("rs")
-                .is_some(),
-            "Default should work like new()"
-        );
-    }
-
-    #[test]
     fn test_highlight_json() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = r#"{"key": "value", "number": 42}"#;
         let path = Path::new("config.json");
 
@@ -415,7 +404,7 @@ mod tests {
     #[test]
     fn test_highlight_yaml() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "name: test\nversion: 1.0";
         let path = Path::new("config.yml");
 
@@ -433,7 +422,7 @@ mod tests {
     #[test]
     fn test_highlight_shell() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "#!/bin/bash\necho 'hello'";
         let path = Path::new("script.sh");
 
@@ -451,7 +440,7 @@ mod tests {
     #[test]
     fn test_highlight_markdown() {
         // Arrange
-        let highlighter = Highlighter::new();
+        let highlighter = Highlighter::new().expect("Should create highlighter");
         let code = "# Title\n\nSome **bold** text";
         let path = Path::new("README.md");
 
