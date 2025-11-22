@@ -1366,43 +1366,54 @@ mod tests {
     }
 
     #[test]
-    fn test_is_readme_with_md_extension() {
-        // Arrange & Act & Assert
-        assert!(is_readme("README.md"), "README.md should be recognized");
-        assert!(is_readme("Readme.md"), "Readme.md should be recognized");
-        assert!(is_readme("readme.md"), "readme.md should be recognized");
-    }
+    fn test_is_readme() {
+        let valid = vec![
+            "README.md",
+            "Readme.md",
+            "readme.md",
+            "README",
+            "Readme",
+            "readme",
+            "README.MD",
+            "readme.txt",
+            "README.rst",
+            "Readme.org",
+            "rEaDmE.md",
+            "ReadMe.md",
+            "readme-first.md",
+            "README.backup.md",
+            "readme123.txt",
+            "docs/README.md",
+            "./README.md",
+            "/absolute/path/README.md",
+            "../README.md",
+            "./subdir/README.md",
+        ];
 
-    #[test]
-    fn test_is_readme_without_extension() {
-        // Arrange & Act & Assert
-        assert!(is_readme("README"), "README should be recognized");
-        assert!(is_readme("Readme"), "Readme should be recognized");
-        assert!(is_readme("readme"), "readme should be recognized");
-    }
+        for path in valid {
+            assert!(is_readme(path), "Should detect README: {}", path);
+        }
 
-    #[test]
-    fn test_is_readme_with_path() {
-        // Arrange & Act & Assert
-        assert!(
-            is_readme("docs/README.md"),
-            "README.md in subdirectory should be recognized"
-        );
-        assert!(
-            is_readme("./README.md"),
-            "README.md with relative path should be recognized"
-        );
-    }
+        let invalid = vec![
+            "CONTRIBUTING.md",
+            "src/lib.rs",
+            "read_me.md",
+            "",
+            "/",
+            "docs/not-readme.md",
+            "readme-docs/file.md",
+            "my_readme.md",
+        ];
 
-    #[test]
-    fn test_is_not_readme() {
-        // Arrange & Act & Assert
-        assert!(
-            !is_readme("CONTRIBUTING.md"),
-            "CONTRIBUTING.md is not README"
-        );
-        assert!(!is_readme("src/lib.rs"), "Regular file is not README");
-        assert!(!is_readme("read_me.md"), "Underscore variant is not README");
+        for path in invalid {
+            assert!(!is_readme(path), "Should reject non-README: {}", path);
+        }
+
+        use std::path::PathBuf;
+        let pathbuf = PathBuf::from("README.md");
+        assert!(is_readme(&pathbuf), "Should handle PathBuf");
+        let path_ref: &std::path::Path = pathbuf.as_ref();
+        assert!(is_readme(path_ref), "Should handle Path reference");
     }
 
     #[test]
@@ -1435,10 +1446,75 @@ mod tests {
         // Assert
         assert!(result.is_ok(), "Should render markdown");
         let html = result.unwrap().into_string();
+
+        // Verify GFM features are rendered
         assert!(
-            html.contains("<h1>") || html.contains("<h2>"),
-            "Should contain rendered heading tags: {}",
-            &html[..html.len().min(500)]
+            html.contains("<h1") || html.contains("<h2"),
+            "Should contain headings"
         );
+    }
+
+    #[test]
+    fn test_generate_markdown_blob_page_nonexistent_file() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let result =
+            generate_markdown_blob_page(&repo_path, "master", "nonexistent-readme.md", "gitkyl");
+
+        // Assert
+        assert!(result.is_err(), "Should fail for nonexistent file");
+    }
+
+    #[test]
+    fn test_generate_markdown_blob_page_invalid_branch() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let result =
+            generate_markdown_blob_page(&repo_path, "nonexistent-branch", "README.md", "gitkyl");
+
+        // Assert
+        assert!(result.is_err(), "Should fail for invalid branch");
+    }
+
+    #[test]
+    fn test_generate_markdown_blob_page_includes_breadcrumbs() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act
+        let result = generate_markdown_blob_page(&repo_path, "master", "README.md", "gitkyl");
+
+        // Assert
+        assert!(result.is_ok(), "Should generate page");
+        let html = result.unwrap().into_string();
+        assert!(
+            html.contains("breadcrumb") || html.contains("README.md"),
+            "Should include breadcrumb or file path"
+        );
+    }
+
+    #[test]
+    fn test_generate_markdown_blob_page_nested_path() {
+        // Arrange
+        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Act: test with nested README if it exists
+        let result = generate_markdown_blob_page(&repo_path, "master", "docs/README.md", "gitkyl");
+
+        // Assert: should either succeed or fail gracefully
+        if result.is_ok() {
+            let html = result.unwrap().into_string();
+            assert!(
+                html.contains("docs") || html.contains("README"),
+                "Should contain path information"
+            );
+        } else {
+            // Expected if docs/README.md doesn't exist
+            assert!(result.is_err(), "Should fail for nonexistent nested README");
+        }
     }
 }

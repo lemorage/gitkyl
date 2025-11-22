@@ -447,3 +447,228 @@ fn test_batch_commits_multiple_history() {
         "Different commits have different hashes"
     );
 }
+
+/// Tests README.md is detected and rendered as markdown.
+#[test]
+fn test_readme_detection_and_rendering() -> Result<()> {
+    // Arrange
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    let readme_content = "# Test Project\n\nThis is a test README.";
+    fs::write(repo_path.join("README.md"), readme_content)?;
+
+    Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add README")?;
+
+    // Act
+    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README.md", "test-repo");
+
+    // Assert
+    assert!(result.is_ok(), "Should render README as markdown");
+    let html = result?.into_string();
+    assert!(html.contains("<h1"), "Should contain rendered heading");
+    assert!(
+        html.contains("Test Project"),
+        "Should contain README content"
+    );
+
+    Ok(())
+}
+
+/// Tests readme (lowercase) is detected.
+#[test]
+fn test_lowercase_readme_detection() -> Result<()> {
+    // Arrange
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    let readme_content = "# Lowercase README\n\nThis uses lowercase filename.";
+    fs::write(repo_path.join("readme.md"), readme_content)?;
+
+    Command::new("git")
+        .args(["add", "readme.md"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add lowercase readme")?;
+
+    // Act
+    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "readme.md", "test-repo");
+
+    // Assert
+    assert!(result.is_ok(), "Should render lowercase readme as markdown");
+    let html = result?.into_string();
+    assert!(
+        html.contains("Lowercase README"),
+        "Should contain readme content"
+    );
+
+    Ok(())
+}
+
+/// Tests README without extension is detected.
+#[test]
+fn test_readme_without_extension_detection() -> Result<()> {
+    // Arrange
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    let readme_content = "# README Without Extension\n\nPlain text README.";
+    fs::write(repo_path.join("README"), readme_content)?;
+
+    Command::new("git")
+        .args(["add", "README"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add README without extension")?;
+
+    // Act
+    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README", "test-repo");
+
+    // Assert
+    assert!(result.is_ok(), "Should render README without extension");
+    let html = result?.into_string();
+    assert!(
+        html.contains("README Without Extension"),
+        "Should contain content"
+    );
+
+    Ok(())
+}
+
+/// Tests non-README markdown file is NOT rendered with README logic.
+#[test]
+fn test_non_readme_markdown_not_detected() {
+    // Arrange: use is_readme function directly
+    use gitkyl::is_readme;
+
+    // Act & Assert
+    assert!(
+        !is_readme("CONTRIBUTING.md"),
+        "CONTRIBUTING.md is not README"
+    );
+    assert!(!is_readme("docs.md"), "docs.md is not README");
+    assert!(!is_readme("guide.md"), "guide.md is not README");
+}
+
+/// Tests README in subdirectory is detected.
+#[test]
+fn test_readme_in_subdirectory() -> Result<()> {
+    // Arrange
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    fs::create_dir_all(repo_path.join("docs"))?;
+    let readme_content = "# Docs README\n\nDocumentation index.";
+    fs::write(repo_path.join("docs/README.md"), readme_content)?;
+
+    Command::new("git")
+        .args(["add", "docs/README.md"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add docs README")?;
+
+    // Act
+    let result =
+        gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "docs/README.md", "test-repo");
+
+    // Assert
+    assert!(result.is_ok(), "Should render nested README");
+    let html = result?.into_string();
+    assert!(
+        html.contains("Docs README"),
+        "Should contain nested README content"
+    );
+
+    Ok(())
+}
+
+/// Tests error handling for corrupt or invalid UTF8 README.
+#[test]
+fn test_readme_with_invalid_utf8_fails_gracefully() -> Result<()> {
+    // Arrange
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    // Create file with invalid UTF8 bytes
+    let invalid_utf8 = vec![0xFF, 0xFE, 0xFD];
+    fs::write(repo_path.join("README.md"), invalid_utf8)?;
+
+    Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add invalid UTF8 README")?;
+
+    // Act
+    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README.md", "test-repo");
+
+    // Assert
+    assert!(result.is_err(), "Should fail for invalid UTF8 content");
+    let err_msg = format!("{:?}", result.unwrap_err());
+    assert!(
+        err_msg.contains("UTF8") || err_msg.contains("utf-8"),
+        "Error should mention UTF8 encoding issue"
+    );
+
+    Ok(())
+}
+
+/// Tests markdown rendering produces valid HTML structure.
+#[test]
+fn test_readme_markdown_produces_valid_html() -> Result<()> {
+    // Arrange
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    let readme_content = r#"# Title
+## Subtitle
+
+Paragraph with **bold** and *italic*.
+
+- List item 1
+- List item 2
+
+```rust
+fn main() {
+    println!("Hello");
+}
+```
+"#;
+    fs::write(repo_path.join("README.md"), readme_content)?;
+
+    Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add complex README")?;
+
+    // Act
+    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README.md", "test-repo");
+
+    // Assert
+    assert!(result.is_ok(), "Should render complex markdown");
+    let html = result?.into_string();
+
+    assert!(html.contains("<!DOCTYPE html>"), "Should have DOCTYPE");
+    assert!(html.contains("<h1"), "Should have h1 heading");
+    assert!(html.contains("<h2"), "Should have h2 heading");
+    assert!(
+        html.contains("<ul") || html.contains("<li"),
+        "Should have list items"
+    );
+    assert!(
+        html.contains("<strong>") || html.contains("bold"),
+        "Should render bold"
+    );
+    assert!(
+        html.contains("<em>") || html.contains("italic"),
+        "Should render italic"
+    );
+    assert!(html.contains("</html>"), "Should close html tag");
+
+    Ok(())
+}

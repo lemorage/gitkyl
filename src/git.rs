@@ -81,6 +81,47 @@ pub struct CommitInfo {
 }
 
 impl CommitInfo {
+    /// Creates a new CommitInfo instance.
+    ///
+    /// Primarily for testing and manual construction. Production code should
+    /// use list_commits() or get_file_last_commit() to retrieve commit data.
+    ///
+    /// # Arguments
+    ///
+    /// * `oid`: Full commit hash
+    /// * `message`: First line of commit message
+    /// * `message_full`: Full commit message (includes body)
+    /// * `author`: Author name
+    /// * `date`: Commit timestamp (Unix seconds)
+    ///
+    /// # Returns
+    ///
+    /// A new CommitInfo instance with derived fields (short OID, committer).
+    pub fn new(
+        oid: String,
+        message: String,
+        message_full: String,
+        author: String,
+        date: i64,
+    ) -> Self {
+        let short_oid = if oid.len() >= 7 {
+            oid[..7].to_string()
+        } else {
+            oid.clone()
+        };
+
+        Self {
+            oid,
+            short_oid,
+            author: author.clone(),
+            author_email: String::new(),
+            committer: author,
+            date,
+            message,
+            message_full,
+        }
+    }
+
     /// Full commit hash.
     pub fn oid(&self) -> &str {
         &self.oid
