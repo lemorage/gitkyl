@@ -297,6 +297,11 @@ fn main() -> Result<()> {
         include_str!("../assets/tree.css"),
     )
     .context("Failed to write tree.css")?;
+    fs::write(
+        assets_dir.join("markdown.css"),
+        include_str!("../assets/markdown.css"),
+    )
+    .context("Failed to write markdown.css")?;
 
     let latest_commit =
         gitkyl::list_commits(&config.repo, Some(repo_info.default_branch()), Some(1))
@@ -421,6 +426,7 @@ fn main() -> Result<()> {
     println!("Generating file pages...");
 
     let mut generated_count = 0;
+    let mut markdown_count = 0;
     for entry in &files {
         if let Some(path) = entry.path() {
             if path.to_str().is_none() {
@@ -431,15 +437,30 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            match gitkyl::generate_blob_page(
-                &config.repo,
-                repo_info.default_branch(),
-                path,
-                &config
-                    .project_name()
-                    .context("Failed to determine project name")?,
-                &config.theme,
-            ) {
+            // Detect README files for markdown rendering
+            let result = if gitkyl::is_readme(path) {
+                markdown_count += 1;
+                gitkyl::generate_markdown_blob_page(
+                    &config.repo,
+                    repo_info.default_branch(),
+                    path,
+                    &config
+                        .project_name()
+                        .context("Failed to determine project name")?,
+                )
+            } else {
+                gitkyl::generate_blob_page(
+                    &config.repo,
+                    repo_info.default_branch(),
+                    path,
+                    &config
+                        .project_name()
+                        .context("Failed to determine project name")?,
+                    &config.theme,
+                )
+            };
+
+            match result {
                 Ok(html) => {
                     let blob_path = config
                         .output
@@ -470,7 +491,12 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("Generated {} file pages", generated_count);
+    println!(
+        "Generated {} file pages ({} markdown, {} code)",
+        generated_count,
+        markdown_count,
+        generated_count - markdown_count
+    );
 
     println!("Generating tree pages...");
 

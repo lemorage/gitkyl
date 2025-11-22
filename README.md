@@ -39,7 +39,8 @@ gitkyl --theme path/to/custom.tmTheme   # External .tmTheme file
 dist/
 ├── index.html                    # Root with top-level files/folders
 ├── tree/master/src.html          # Directory listings
-├── blob/master/main.rs.html      # Individual files
+├── blob/master/main.rs.html      # Code files (syntax highlighted)
+├── blob/master/README.md.html    # Markdown files (rendered as HTML)
 └── commits/master/index.html     # Commit history
 ```
 

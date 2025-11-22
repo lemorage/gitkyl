@@ -1,0 +1,1247 @@
+/*
+ * Catppuccin Markdown Stylesheet
+ *
+ * Based on Catppuccin themes (https://github.com/catppuccin/catppuccin)
+ * Licensed under MIT License
+ *
+ * Adapted for gitkyl with GitHub Flavored Markdown rendering using comrak.
+ * Provides Latte (light) and Mocha (dark) themes with complete GFM support.
+ *
+ * Theme switching: Apply .latte or .mocha class to container element
+ */
+
+/* LATTE THEME (LIGHT) */
+
+/* Base Colors and Variables */
+
+.latte {
+    --bg: #eff1f5;
+    --fg: #4c4f69;
+    --links: #1e66f5;
+    --inline-code-color: #4c4f69;
+    --quote-bg: #e6e9ef;
+    --quote-border: #dce0e8;
+    --table-border-color: #ccd0da;
+    --table-header-bg: #e6e9ef;
+    --table-alternate-bg: #e6e9ef;
+    --warning-border: #fe640b;
+    --color-scheme: light;
+}
+
+/* Typography: Headings */
+
+.latte h1,
+.latte h2,
+.latte h3,
+.latte h4,
+.latte h5,
+.latte h6 {
+    color: #4c4f69;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-top: 24px;
+    margin-bottom: 16px;
+    border-bottom: none;
+}
+
+.latte h1 {
+    font-size: 2em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #ccd0da;
+}
+
+.latte h2 {
+    font-size: 1.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #ccd0da;
+}
+
+.latte h3 {
+    font-size: 1.25em;
+}
+
+.latte h4 {
+    font-size: 1em;
+}
+
+.latte h5 {
+    font-size: 0.875em;
+}
+
+.latte h6 {
+    font-size: 0.85em;
+    color: #7c7f93;
+}
+
+/* Typography: Paragraphs and Text */
+
+.latte p {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #4c4f69;
+    line-height: 1.6;
+}
+
+.latte strong {
+    font-weight: 600;
+    color: #4c4f69;
+}
+
+.latte em {
+    font-style: italic;
+}
+
+.latte del {
+    color: #7c7f93;
+    text-decoration: line-through;
+}
+
+/* Links */
+
+.latte a {
+    color: #1e66f5;
+    text-decoration: none;
+}
+
+.latte a:hover {
+    text-decoration: underline;
+}
+
+.latte a:visited {
+    color: #8839ef;
+}
+
+/* Lists */
+
+.latte ul,
+.latte ol {
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-left: 2em;
+}
+
+.latte ul {
+    list-style-type: disc;
+}
+
+.latte ol {
+    list-style-type: decimal;
+}
+
+.latte li {
+    margin-bottom: 0.25em;
+}
+
+.latte li > p {
+    margin-top: 16px;
+}
+
+.latte li + li {
+    margin-top: 0.25em;
+}
+
+.latte ul ul,
+.latte ul ol,
+.latte ol ol,
+.latte ol ul {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Task lists (GFM): comrak outputs input[type=checkbox] inside li */
+.latte input[type="checkbox"] {
+    margin-right: 0.5em;
+    vertical-align: middle;
+}
+
+.latte li:has(> input[type="checkbox"]) {
+    list-style-type: none;
+    margin-left: -1.5em;
+}
+
+.latte li:has(> input[type="checkbox"]) input[type="checkbox"] {
+    margin-left: 0.25em;
+}
+
+/* Code */
+
+.latte code {
+    color: #4c4f69;
+    background: #e6e9ef;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-family:
+        "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
+        "Courier New", monospace;
+}
+
+.latte pre {
+    background: #e6e9ef;
+    padding: 16px;
+    overflow: auto;
+    font-size: 0.85em;
+    line-height: 1.45;
+    border-radius: 6px;
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+/* Prism syntax highlighting (Catppuccin Latte) */
+.latte .token.comment,
+.latte .token.prolog,
+.latte .token.doctype,
+.latte .token.cdata {
+    color: #7c7f93;
+}
+
+.latte .token.punctuation {
+    color: #5c5f77;
+}
+
+.latte .token.property,
+.latte .token.tag,
+.latte .token.boolean,
+.latte .token.number,
+.latte .token.constant,
+.latte .token.symbol,
+.latte .token.deleted {
+    color: #fe640b;
+}
+
+.latte .token.selector,
+.latte .token.attr-name,
+.latte .token.string,
+.latte .token.char,
+.latte .token.builtin,
+.latte .token.inserted {
+    color: #40a02b;
+}
+
+.latte .token.operator,
+.latte .token.entity,
+.latte .token.url,
+.latte .language-css .token.string,
+.latte .style .token.string {
+    color: #04a5e5;
+}
+
+.latte .token.atrule,
+.latte .token.attr-value,
+.latte .token.keyword {
+    color: #8839ef;
+}
+
+.latte .token.function,
+.latte .token.class-name {
+    color: #1e66f5;
+}
+
+.latte .token.regex,
+.latte .token.important,
+.latte .token.variable {
+    color: #d20f39;
+}
+
+.latte pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 100%;
+    display: block;
+    overflow: auto;
+}
+
+.latte :is(h1, h2, h3, h4, h5, h6) a code {
+    color: #4c4f69;
+}
+
+.latte a code {
+    color: #1e66f5;
+}
+
+/* Blockquotes */
+
+.latte blockquote {
+    padding: 0 1em;
+    color: #7c7f93;
+    border-left: 0.25em solid #ccd0da;
+    margin-top: 0;
+    margin-bottom: 16px;
+    background: #e6e9ef;
+}
+
+.latte blockquote > :first-child {
+    margin-top: 0;
+}
+
+.latte blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+.latte blockquote blockquote {
+    border-top: 0.1em solid #acb0be;
+    border-bottom: 0.1em solid #acb0be;
+}
+
+/* Horizontal Rules */
+
+.latte hr {
+    height: 0.25em;
+    padding: 0;
+    margin: 24px 0;
+    background-color: #ccd0da;
+    border: 0;
+    border-color: #acb0be;
+    border-style: solid;
+}
+
+/* Tables (GFM) */
+
+.latte table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    width: 100%;
+    overflow: auto;
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+.latte table th,
+.latte table td {
+    padding: 6px 13px;
+    border: 1px solid var(--table-border-color);
+}
+
+.latte table th {
+    font-weight: 600;
+    background-color: var(--table-header-bg);
+    text-align: left;
+}
+
+.latte table tr {
+    background-color: var(--bg);
+    border-top: 1px solid var(--table-border-color);
+}
+
+.latte table tr:nth-child(2n) {
+    background-color: var(--table-alternate-bg);
+}
+
+/* Images */
+
+.latte img {
+    max-width: 100%;
+    height: auto;
+    box-sizing: border-box;
+    background-color: var(--bg);
+}
+
+/*
+ * GitHub Alerts (GFM): NOTE, TIP, WARNING, IMPORTANT, CAUTION
+ *
+ * Prepared for future use. Comrak does not currently support GitHub alerts
+ * (> [!NOTE] syntax). These styles are ready when comrak adds support or
+ * when we implement custom parsing.
+ */
+
+.latte .markdown-alert {
+    padding: 0.5rem 1rem;
+    margin-bottom: 16px;
+    border-left: 0.25em solid;
+    border-radius: 4px;
+}
+
+.latte .markdown-alert > :first-child {
+    margin-top: 0;
+}
+
+.latte .markdown-alert > :last-child {
+    margin-bottom: 0;
+}
+
+.latte .markdown-alert-title {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+}
+
+.latte .markdown-alert-note {
+    background-color: rgba(30, 102, 245, 0.1);
+    border-color: #1e66f5;
+    color: #4c4f69;
+}
+
+.latte .markdown-alert-note .markdown-alert-title {
+    color: #1e66f5;
+}
+
+.latte .markdown-alert-tip {
+    background-color: rgba(64, 160, 43, 0.1);
+    border-color: #40a02b;
+    color: #4c4f69;
+}
+
+.latte .markdown-alert-tip .markdown-alert-title {
+    color: #40a02b;
+}
+
+.latte .markdown-alert-important {
+    background-color: rgba(136, 57, 239, 0.1);
+    border-color: #8839ef;
+    color: #4c4f69;
+}
+
+.latte .markdown-alert-important .markdown-alert-title {
+    color: #8839ef;
+}
+
+.latte .markdown-alert-warning {
+    background-color: rgba(223, 142, 29, 0.1);
+    border-color: #df8e1d;
+    color: #4c4f69;
+}
+
+.latte .markdown-alert-warning .markdown-alert-title {
+    color: #df8e1d;
+}
+
+.latte .markdown-alert-caution {
+    background-color: rgba(210, 15, 57, 0.1);
+    border-color: #d20f39;
+    color: #4c4f69;
+}
+
+.latte .markdown-alert-caution .markdown-alert-title {
+    color: #d20f39;
+}
+
+/*
+ * Syntax Highlighting Classes
+ *
+ * These .hljs-* classes are used by syntect's ClassedHTMLGenerator.
+ * Syntect outputs <span class="hljs-*"> tags which are styled by these rules.
+ * Colors follow the Catppuccin Latte (light) theme.
+ */
+
+.latte .hljs-keyword {
+    color: #8839ef;
+}
+
+.latte .hljs-built_in {
+    color: #d20f39;
+}
+
+.latte .hljs-type {
+    color: #df8e1d;
+}
+
+.latte .hljs-literal {
+    color: #fe640b;
+}
+
+.latte .hljs-number {
+    color: #fe640b;
+}
+
+.latte .hljs-operator {
+    color: #04a5e5;
+}
+
+.latte .hljs-punctuation {
+    color: #5c5f77;
+}
+
+.latte .hljs-property {
+    color: #179299;
+}
+
+.latte .hljs-regexp {
+    color: #ea76cb;
+}
+
+.latte .hljs-string {
+    color: #40a02b;
+}
+
+.latte .hljs-char-escape {
+    color: #40a02b;
+}
+
+.latte .hljs-subst {
+    color: #6c6f85;
+}
+
+.latte .hljs-symbol {
+    color: #dd7878;
+}
+
+.latte .hljs-variable {
+    color: #8839ef;
+}
+
+.latte .hljs-variable-language {
+    color: #8839ef;
+}
+
+.latte .hljs-constant {
+    color: #fe640b;
+}
+
+.latte .hljs-title {
+    color: #1e66f5;
+}
+
+.latte .hljs-class-title {
+    color: #df8e1d;
+}
+
+.latte .hljs-function-title {
+    color: #1e66f5;
+}
+
+.latte .hljs-params {
+    color: #4c4f69;
+}
+
+.latte .hljs-comment {
+    color: #7c7f93;
+}
+
+.latte .hljs-doctag {
+    color: #d20f39;
+}
+
+.latte .hljs-meta {
+    color: #fe640b;
+}
+
+.latte .hljs-section {
+    color: #1e66f5;
+}
+
+.latte .hljs-tag {
+    color: #179299;
+}
+
+.latte .hljs-name {
+    color: #8839ef;
+}
+
+.latte .hljs-attr {
+    color: #1e66f5;
+}
+
+.latte .hljs-attribute {
+    color: #40a02b;
+}
+
+.latte .hljs-bullet {
+    color: #179299;
+}
+
+.latte .hljs-code {
+    color: #40a02b;
+}
+
+.latte .hljs-emphasis {
+    color: #d20f39;
+    font-style: italic;
+}
+
+.latte .hljs-strong {
+    color: #d20f39;
+    font-weight: bold;
+}
+
+.latte .hljs-formula {
+    color: #179299;
+}
+
+.latte .hljs-link {
+    color: #209fb5;
+    font-style: italic;
+}
+
+.latte .hljs-quote {
+    color: #40a02b;
+    font-style: italic;
+}
+
+.latte .hljs-selector-tag {
+    color: #df8e1d;
+}
+
+.latte .hljs-selector-id {
+    color: #1e66f5;
+}
+
+.latte .hljs-selector-class {
+    color: #179299;
+}
+
+.latte .hljs-selector-attr {
+    color: #8839ef;
+}
+
+.latte .hljs-selector-pseudo {
+    color: #179299;
+}
+
+.latte .hljs-template-tag {
+    color: #dd7878;
+}
+
+.latte .hljs-template-variable {
+    color: #dd7878;
+}
+
+.latte .hljs-addition {
+    color: #40a02b;
+    background: rgba(64, 160, 43, 0.15);
+}
+
+.latte .hljs-deletion {
+    color: #d20f39;
+    background: rgba(210, 15, 57, 0.15);
+}
+
+/* MOCHA THEME (DARK) */
+
+/* Base Colors and Variables */
+
+.mocha {
+    --bg: #1e1e2e;
+    --fg: #cdd6f4;
+    --links: #89b4fa;
+    --inline-code-color: #cdd6f4;
+    --quote-bg: #181825;
+    --quote-border: #11111b;
+    --table-border-color: #313244;
+    --table-header-bg: #181825;
+    --table-alternate-bg: #181825;
+    --warning-border: #fab387;
+    --color-scheme: dark;
+}
+
+/* Typography: Headings */
+
+.mocha h1,
+.mocha h2,
+.mocha h3,
+.mocha h4,
+.mocha h5,
+.mocha h6 {
+    color: #cdd6f4;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-top: 24px;
+    margin-bottom: 16px;
+    border-bottom: none;
+}
+
+.mocha h1 {
+    font-size: 2em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #313244;
+}
+
+.mocha h2 {
+    font-size: 1.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #313244;
+}
+
+.mocha h3 {
+    font-size: 1.25em;
+}
+
+.mocha h4 {
+    font-size: 1em;
+}
+
+.mocha h5 {
+    font-size: 0.875em;
+}
+
+.mocha h6 {
+    font-size: 0.85em;
+    color: #9399b2;
+}
+
+/* Typography: Paragraphs and Text */
+
+.mocha p {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #cdd6f4;
+    line-height: 1.6;
+}
+
+.mocha strong {
+    font-weight: 600;
+    color: #cdd6f4;
+}
+
+.mocha em {
+    font-style: italic;
+}
+
+.mocha del {
+    color: #9399b2;
+    text-decoration: line-through;
+}
+
+/* Links */
+
+.mocha a {
+    color: #89b4fa;
+    text-decoration: none;
+}
+
+.mocha a:hover {
+    text-decoration: underline;
+}
+
+.mocha a:visited {
+    color: #cba6f7;
+}
+
+/* Lists */
+
+.mocha ul,
+.mocha ol {
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-left: 2em;
+}
+
+.mocha ul {
+    list-style-type: disc;
+}
+
+.mocha ol {
+    list-style-type: decimal;
+}
+
+.mocha li {
+    margin-bottom: 0.25em;
+}
+
+.mocha li > p {
+    margin-top: 16px;
+}
+
+.mocha li + li {
+    margin-top: 0.25em;
+}
+
+.mocha ul ul,
+.mocha ul ol,
+.mocha ol ol,
+.mocha ol ul {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* Task lists (GFM): comrak outputs input[type=checkbox] inside li */
+.mocha input[type="checkbox"] {
+    margin-right: 0.5em;
+    vertical-align: middle;
+}
+
+.mocha li:has(> input[type="checkbox"]) {
+    list-style-type: none;
+    margin-left: -1.5em;
+}
+
+.mocha li:has(> input[type="checkbox"]) input[type="checkbox"] {
+    margin-left: 0.25em;
+}
+
+/* Code */
+
+.mocha code {
+    color: #cdd6f4;
+    background: #181825;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-family:
+        "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
+        "Courier New", monospace;
+}
+
+.mocha pre {
+    background: #181825;
+    padding: 16px;
+    overflow: auto;
+    font-size: 0.85em;
+    line-height: 1.45;
+    border-radius: 6px;
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+/* Prism syntax highlighting (Catppuccin Mocha) */
+.mocha .token.comment,
+.mocha .token.prolog,
+.mocha .token.doctype,
+.mocha .token.cdata {
+    color: #9399b2;
+}
+
+.mocha .token.punctuation {
+    color: #bac2de;
+}
+
+.mocha .token.property,
+.mocha .token.tag,
+.mocha .token.boolean,
+.mocha .token.number,
+.mocha .token.constant,
+.mocha .token.symbol,
+.mocha .token.deleted {
+    color: #fab387;
+}
+
+.mocha .token.selector,
+.mocha .token.attr-name,
+.mocha .token.string,
+.mocha .token.char,
+.mocha .token.builtin,
+.mocha .token.inserted {
+    color: #a6e3a1;
+}
+
+.mocha .token.operator,
+.mocha .token.entity,
+.mocha .token.url,
+.mocha .language-css .token.string,
+.mocha .style .token.string {
+    color: #89dceb;
+}
+
+.mocha .token.atrule,
+.mocha .token.attr-value,
+.mocha .token.keyword {
+    color: #cba6f7;
+}
+
+.mocha .token.function,
+.mocha .token.class-name {
+    color: #89b4fa;
+}
+
+.mocha .token.regex,
+.mocha .token.important,
+.mocha .token.variable {
+    color: #f38ba8;
+}
+
+.mocha pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 100%;
+    display: block;
+    overflow: auto;
+}
+
+.mocha :is(h1, h2, h3, h4, h5, h6) a code {
+    color: #cdd6f4;
+}
+
+.mocha a code {
+    color: #89b4fa;
+}
+
+/* Blockquotes */
+
+.mocha blockquote {
+    padding: 0 1em;
+    color: #9399b2;
+    border-left: 0.25em solid #313244;
+    margin-top: 0;
+    margin-bottom: 16px;
+    background: #181825;
+}
+
+.mocha blockquote > :first-child {
+    margin-top: 0;
+}
+
+.mocha blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+.mocha blockquote blockquote {
+    border-top: 0.1em solid #585b70;
+    border-bottom: 0.1em solid #585b70;
+}
+
+/* Horizontal Rules */
+
+.mocha hr {
+    height: 0.25em;
+    padding: 0;
+    margin: 24px 0;
+    background-color: #313244;
+    border: 0;
+    border-color: #585b70;
+    border-style: solid;
+}
+
+/* Tables (GFM) */
+
+.mocha table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    width: 100%;
+    overflow: auto;
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+.mocha table th,
+.mocha table td {
+    padding: 6px 13px;
+    border: 1px solid var(--table-border-color);
+}
+
+.mocha table th {
+    font-weight: 600;
+    background-color: var(--table-header-bg);
+    text-align: left;
+}
+
+.mocha table tr {
+    background-color: var(--bg);
+    border-top: 1px solid var(--table-border-color);
+}
+
+.mocha table tr:nth-child(2n) {
+    background-color: var(--table-alternate-bg);
+}
+
+/* Images */
+
+.mocha img {
+    max-width: 100%;
+    height: auto;
+    box-sizing: border-box;
+    background-color: var(--bg);
+}
+
+/*
+ * GitHub Alerts (GFM): NOTE, TIP, WARNING, IMPORTANT, CAUTION
+ *
+ * Prepared for future use. Comrak does not currently support GitHub alerts
+ * (> [!NOTE] syntax). These styles are ready when comrak adds support or
+ * when we implement custom parsing.
+ */
+
+.mocha .markdown-alert {
+    padding: 0.5rem 1rem;
+    margin-bottom: 16px;
+    border-left: 0.25em solid;
+    border-radius: 4px;
+}
+
+.mocha .markdown-alert > :first-child {
+    margin-top: 0;
+}
+
+.mocha .markdown-alert > :last-child {
+    margin-bottom: 0;
+}
+
+.mocha .markdown-alert-title {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+}
+
+.mocha .markdown-alert-note {
+    background-color: rgba(137, 180, 250, 0.1);
+    border-color: #89b4fa;
+    color: #cdd6f4;
+}
+
+.mocha .markdown-alert-note .markdown-alert-title {
+    color: #89b4fa;
+}
+
+.mocha .markdown-alert-tip {
+    background-color: rgba(166, 227, 161, 0.1);
+    border-color: #a6e3a1;
+    color: #cdd6f4;
+}
+
+.mocha .markdown-alert-tip .markdown-alert-title {
+    color: #a6e3a1;
+}
+
+.mocha .markdown-alert-important {
+    background-color: rgba(203, 166, 247, 0.1);
+    border-color: #cba6f7;
+    color: #cdd6f4;
+}
+
+.mocha .markdown-alert-important .markdown-alert-title {
+    color: #cba6f7;
+}
+
+.mocha .markdown-alert-warning {
+    background-color: rgba(249, 226, 175, 0.1);
+    border-color: #f9e2af;
+    color: #cdd6f4;
+}
+
+.mocha .markdown-alert-warning .markdown-alert-title {
+    color: #f9e2af;
+}
+
+.mocha .markdown-alert-caution {
+    background-color: rgba(243, 139, 168, 0.1);
+    border-color: #f38ba8;
+    color: #cdd6f4;
+}
+
+.mocha .markdown-alert-caution .markdown-alert-title {
+    color: #f38ba8;
+}
+
+/*
+ * Syntax Highlighting Classes
+ *
+ * These .hljs-* classes are used by syntect's ClassedHTMLGenerator.
+ * Syntect outputs <span class="hljs-*"> tags which are styled by these rules.
+ * Colors follow the Catppuccin Mocha (dark) theme.
+ */
+
+.mocha .hljs-keyword {
+    color: #cba6f7;
+}
+
+.mocha .hljs-built_in {
+    color: #f38ba8;
+}
+
+.mocha .hljs-type {
+    color: #f9e2af;
+}
+
+.mocha .hljs-literal {
+    color: #fab387;
+}
+
+.mocha .hljs-number {
+    color: #fab387;
+}
+
+.mocha .hljs-operator {
+    color: #89dceb;
+}
+
+.mocha .hljs-punctuation {
+    color: #bac2de;
+}
+
+.mocha .hljs-property {
+    color: #94e2d5;
+}
+
+.mocha .hljs-regexp {
+    color: #f5c2e7;
+}
+
+.mocha .hljs-string {
+    color: #a6e3a1;
+}
+
+.mocha .hljs-char-escape {
+    color: #a6e3a1;
+}
+
+.mocha .hljs-subst {
+    color: #a6adc8;
+}
+
+.mocha .hljs-symbol {
+    color: #f2cdcd;
+}
+
+.mocha .hljs-variable {
+    color: #cba6f7;
+}
+
+.mocha .hljs-variable-language {
+    color: #cba6f7;
+}
+
+.mocha .hljs-constant {
+    color: #fab387;
+}
+
+.mocha .hljs-title {
+    color: #89b4fa;
+}
+
+.mocha .hljs-class-title {
+    color: #f9e2af;
+}
+
+.mocha .hljs-function-title {
+    color: #89b4fa;
+}
+
+.mocha .hljs-params {
+    color: #cdd6f4;
+}
+
+.mocha .hljs-comment {
+    color: #9399b2;
+}
+
+.mocha .hljs-doctag {
+    color: #f38ba8;
+}
+
+.mocha .hljs-meta {
+    color: #fab387;
+}
+
+.mocha .hljs-section {
+    color: #89b4fa;
+}
+
+.mocha .hljs-tag {
+    color: #94e2d5;
+}
+
+.mocha .hljs-name {
+    color: #cba6f7;
+}
+
+.mocha .hljs-attr {
+    color: #89b4fa;
+}
+
+.mocha .hljs-attribute {
+    color: #a6e3a1;
+}
+
+.mocha .hljs-bullet {
+    color: #94e2d5;
+}
+
+.mocha .hljs-code {
+    color: #a6e3a1;
+}
+
+.mocha .hljs-emphasis {
+    color: #f38ba8;
+    font-style: italic;
+}
+
+.mocha .hljs-strong {
+    color: #f38ba8;
+    font-weight: bold;
+}
+
+.mocha .hljs-formula {
+    color: #94e2d5;
+}
+
+.mocha .hljs-link {
+    color: #74c7ec;
+    font-style: italic;
+}
+
+.mocha .hljs-quote {
+    color: #a6e3a1;
+    font-style: italic;
+}
+
+.mocha .hljs-selector-tag {
+    color: #f9e2af;
+}
+
+.mocha .hljs-selector-id {
+    color: #89b4fa;
+}
+
+.mocha .hljs-selector-class {
+    color: #94e2d5;
+}
+
+.mocha .hljs-selector-attr {
+    color: #cba6f7;
+}
+
+.mocha .hljs-selector-pseudo {
+    color: #94e2d5;
+}
+
+.mocha .hljs-template-tag {
+    color: #f2cdcd;
+}
+
+.mocha .hljs-template-variable {
+    color: #f2cdcd;
+}
+
+.mocha .hljs-addition {
+    color: #a6e3a1;
+    background: rgba(166, 227, 161, 0.15);
+}
+
+.mocha .hljs-deletion {
+    color: #f38ba8;
+    background: rgba(243, 139, 168, 0.15);
+}
+
+/* RESPONSIVE DESIGN */
+
+@media (max-width: 768px) {
+    .latte h1,
+    .mocha h1 {
+        font-size: 1.75em;
+    }
+
+    .latte h2,
+    .mocha h2 {
+        font-size: 1.25em;
+    }
+
+    .latte h3,
+    .mocha h3 {
+        font-size: 1.1em;
+    }
+
+    .latte pre,
+    .mocha pre {
+        padding: 12px;
+        font-size: 0.8em;
+    }
+
+    .latte table,
+    .mocha table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .latte blockquote,
+    .mocha blockquote {
+        padding: 0 0.5em;
+    }
+
+    .latte .markdown-alert,
+    .mocha .markdown-alert {
+        padding: 0.5rem;
+    }
+}

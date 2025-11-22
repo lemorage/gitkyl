@@ -152,7 +152,8 @@ pre {
     padding: 16px;
 }
 
-code {
+.blob-container code,
+.code-content code {
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 20px;
