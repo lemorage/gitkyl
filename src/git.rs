@@ -698,6 +698,61 @@ mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
 
+    fn temp_repo() -> tempfile::TempDir {
+        let td = tempfile::TempDir::with_prefix("gitkyl-test-").unwrap();
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(td.path())
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(td.path())
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(td.path())
+            .output()
+            .unwrap();
+        td
+    }
+
+    fn write_file(repo_path: &Path, path: &str, content: &str) {
+        let file_path = repo_path.join(path);
+        if let Some(parent) = file_path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(file_path, content).unwrap();
+    }
+
+    fn git_add(repo_path: &Path) {
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+    }
+
+    fn git_commit(repo_path: &Path, message: &str) -> String {
+        let output = std::process::Command::new("git")
+            .args(["commit", "-m", message])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+
+        let rev_parse = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        String::from_utf8(rev_parse.stdout)
+            .unwrap()
+            .trim()
+            .to_string()
+    }
+
     #[test]
     fn test_repo_info_accessors_direct() {
         // Arrange
@@ -1429,6 +1484,258 @@ mod tests {
             commit.message_full().len() >= commit.message().len(),
             "Full message should contain at least first line"
         );
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_octopus_merge() {
+        let td = temp_repo();
+        let repo_path = td.path();
+
+        write_file(repo_path, "base.txt", "base");
+        git_add(repo_path);
+        git_commit(repo_path, "Initial commit");
+
+        let base_commit = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        let base_commit = String::from_utf8(base_commit.stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "branch1"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        write_file(repo_path, "branch1.txt", "content1");
+        git_add(repo_path);
+        git_commit(repo_path, "Add branch1.txt");
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "branch2", &base_commit])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        write_file(repo_path, "branch2.txt", "content2");
+        git_add(repo_path);
+        git_commit(repo_path, "Add branch2.txt");
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "branch3", &base_commit])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        write_file(repo_path, "branch3.txt", "content3");
+        git_add(repo_path);
+        git_commit(repo_path, "Add branch3.txt");
+
+        std::process::Command::new("git")
+            .args(["checkout", "master"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+
+        std::process::Command::new("git")
+            .args([
+                "merge",
+                "--no-ff",
+                "branch1",
+                "branch2",
+                "branch3",
+                "-m",
+                "Octopus merge",
+            ])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+
+        let paths = vec!["branch1.txt", "branch2.txt", "branch3.txt"];
+        let result = get_last_commits_batch(repo_path, None, &paths).unwrap();
+
+        assert_eq!(result.len(), 3);
+        assert!(result.contains_key("branch1.txt"));
+        assert!(result.contains_key("branch2.txt"));
+        assert!(result.contains_key("branch3.txt"));
+
+        assert_eq!(result["branch1.txt"].message(), "Octopus merge");
+        assert_eq!(result["branch2.txt"].message(), "Octopus merge");
+        assert_eq!(result["branch3.txt"].message(), "Octopus merge");
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_empty_merge_commit() {
+        let td = temp_repo();
+        let repo_path = td.path();
+
+        write_file(repo_path, "file.txt", "original");
+        git_add(repo_path);
+        git_commit(repo_path, "Initial commit");
+
+        let base_commit = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        let base_commit = String::from_utf8(base_commit.stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "branch1"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        write_file(repo_path, "file.txt", "modified");
+        git_add(repo_path);
+        git_commit(repo_path, "Modify in branch1");
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "branch2", &base_commit])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        write_file(repo_path, "file.txt", "modified");
+        git_add(repo_path);
+        git_commit(repo_path, "Modify in branch2");
+
+        std::process::Command::new("git")
+            .args(["checkout", "master"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+
+        std::process::Command::new("git")
+            .args([
+                "merge",
+                "--no-ff",
+                "branch1",
+                "branch2",
+                "-m",
+                "Empty merge (no new changes)",
+            ])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+
+        let paths = vec!["file.txt"];
+        let result = get_last_commits_batch(repo_path, None, &paths).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert!(result.contains_key("file.txt"));
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_rename_in_merge() {
+        let td = temp_repo();
+        let repo_path = td.path();
+
+        write_file(repo_path, "original.txt", "content");
+        git_add(repo_path);
+        git_commit(repo_path, "Initial commit");
+
+        let base_commit = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        let base_commit = String::from_utf8(base_commit.stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+
+        std::process::Command::new("git")
+            .args(["mv", "original.txt", "renamed.txt"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        git_add(repo_path);
+        git_commit(repo_path, "Rename original to renamed");
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "branch2", &base_commit])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        write_file(repo_path, "original.txt", "modified content");
+        git_add(repo_path);
+        git_commit(repo_path, "Modify original");
+
+        std::process::Command::new("git")
+            .args(["checkout", "master"])
+            .current_dir(repo_path)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args([
+                "merge",
+                "--no-ff",
+                "branch2",
+                "-m",
+                "Merge rename with modification",
+            ])
+            .current_dir(repo_path)
+            .env("GIT_MERGE_AUTOEDIT", "no")
+            .output()
+            .ok();
+
+        std::fs::remove_file(repo_path.join("original.txt")).ok();
+        write_file(repo_path, "renamed.txt", "modified content");
+        git_add(repo_path);
+        std::process::Command::new("git")
+            .args(["commit", "--no-edit"])
+            .current_dir(repo_path)
+            .output()
+            .ok();
+
+        let paths = vec!["renamed.txt"];
+        let result = get_last_commits_batch(repo_path, None, &paths).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert!(result.contains_key("renamed.txt"));
+    }
+
+    #[test]
+    fn test_get_last_commits_batch_mode_change_only() {
+        let td = temp_repo();
+        let repo_path = td.path();
+
+        write_file(repo_path, "script.sh", "#!/bin/bash\necho hello");
+        git_add(repo_path);
+        git_commit(repo_path, "Initial commit");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let script_path = repo_path.join("script.sh");
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+
+            git_add(repo_path);
+            git_commit(repo_path, "Make script executable");
+
+            let paths = vec!["script.sh"];
+            let result = get_last_commits_batch(repo_path, None, &paths).unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert!(result.contains_key("script.sh"));
+            assert_eq!(result["script.sh"].message(), "Initial commit");
+        }
+
+        #[cfg(not(unix))]
+        {
+            let paths = vec!["script.sh"];
+            let result = get_last_commits_batch(repo_path, None, &paths).unwrap();
+
+            assert_eq!(result.len(), 1);
+            assert!(result.contains_key("script.sh"));
+            assert_eq!(result["script.sh"].message(), "Initial commit");
+        }
     }
 }
 

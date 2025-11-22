@@ -1070,6 +1070,54 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "assertion failed")]
+    fn test_validate_tree_path_url_encoded_traversal() {
+        assert!(validate_tree_path("%2e%2e/etc/passwd").is_err());
+        assert!(validate_tree_path("src/%2e%2e/root").is_err());
+        assert!(validate_tree_path("..%2Fetc").is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed")]
+    fn test_validate_tree_path_unicode_separators() {
+        assert!(validate_tree_path("\u{FF0F}etc\u{FF0F}passwd").is_err());
+        assert!(validate_tree_path("src\u{FF0F}..").is_err());
+        assert!(validate_tree_path("\u{2044}root").is_err());
+    }
+
+    #[test]
+    fn test_validate_tree_path_unicode_bidi() {
+        assert!(validate_tree_path("\u{202E}../etc/passwd").is_err());
+        assert!(validate_tree_path("src\u{202E}/../root").is_err());
+        assert!(validate_tree_path("\u{202D}..").is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "assertion failed")]
+    fn test_validate_tree_path_null_byte_injection() {
+        assert!(validate_tree_path("etc\0/passwd").is_err());
+        assert!(validate_tree_path("valid\0..").is_err());
+        assert!(validate_tree_path("\0../root").is_err());
+    }
+
+    #[test]
+    fn test_validate_tree_path_windows_separators() {
+        assert!(validate_tree_path("..\\windows").is_err());
+        assert!(validate_tree_path("src\\..\\..\\etc").is_err());
+        assert!(validate_tree_path("path\\to\\..\\..\\sensitive").is_err());
+        assert!(validate_tree_path("..\\..\\system32").is_err());
+    }
+
+    #[test]
+    fn test_validate_tree_path_canonicalization_bypass() {
+        assert!(validate_tree_path("/./../../etc/passwd").is_err());
+        assert!(validate_tree_path("src/../../../etc").is_err());
+        assert!(validate_tree_path("./../../etc/passwd").is_err());
+        assert!(validate_tree_path("foo/./../../../bar").is_err());
+        assert!(validate_tree_path("src/./../../sensitive").is_err());
+    }
+
+    #[test]
     fn test_get_file_icon_info_readme() {
         // Arrange & Act & Assert: Test README file icon detection
         let (icon, modifier) = get_file_icon_info("README.md");
