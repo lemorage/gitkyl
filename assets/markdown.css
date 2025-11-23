@@ -41,36 +41,45 @@
     line-height: 1.25;
     margin-top: 24px;
     margin-bottom: 16px;
+    letter-spacing: -0.01em;
     border-bottom: none;
 }
 
 .latte h1 {
-    font-size: 2em;
+    font-size: 2.2em;
+    margin-top: 0;
     padding-bottom: 0.3em;
     border-bottom: 1px solid #ccd0da;
 }
 
 .latte h2 {
-    font-size: 1.5em;
+    font-size: 1.7em;
+    margin-top: 48px;
     padding-bottom: 0.3em;
     border-bottom: 1px solid #ccd0da;
 }
 
 .latte h3 {
-    font-size: 1.25em;
+    font-size: 1.4em;
+    margin-top: 32px;
 }
 
 .latte h4 {
-    font-size: 1em;
+    font-size: 1.1em;
+    margin-top: 24px;
 }
 
 .latte h5 {
     font-size: 0.875em;
+    margin-top: 24px;
 }
 
 .latte h6 {
-    font-size: 0.85em;
+    font-size: 0.8em;
+    margin-top: 24px;
     color: #7c7f93;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 /* Typography: Paragraphs and Text */
@@ -80,6 +89,7 @@
     margin-bottom: 16px;
     color: #4c4f69;
     line-height: 1.6;
+    font-size: 16px;
 }
 
 .latte strong {
@@ -101,6 +111,7 @@
 .latte a {
     color: #1e66f5;
     text-decoration: none;
+    font-weight: 500;
 }
 
 .latte a:hover {
@@ -130,13 +141,14 @@
 
 .latte li {
     margin-bottom: 0.25em;
+    line-height: 1.6;
 }
 
-.latte li > p {
+.latte li>p {
     margin-top: 16px;
 }
 
-.latte li + li {
+.latte li+li {
     margin-top: 0.25em;
 }
 
@@ -167,9 +179,9 @@
 
 .latte code {
     color: #4c4f69;
-    background: #e6e9ef;
+    background: #f5f7fa;
     padding: 0.2em 0.4em;
-    border-radius: 3px;
+    border-radius: 6px;
     font-size: 0.85em;
     font-family:
         "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
@@ -177,14 +189,13 @@
 }
 
 .latte pre {
-    background: #e6e9ef;
+    background: #f5f7fa;
     padding: 16px;
     overflow: auto;
-    font-size: 0.85em;
-    line-height: 1.45;
-    border-radius: 6px;
-    margin-top: 0;
-    margin-bottom: 16px;
+    font-size: 0.9em;
+    line-height: 1.5;
+    border-radius: 8px;
+    margin: 16px 0;
 }
 
 /* Prism syntax highlighting (Catppuccin Latte) */
@@ -268,14 +279,14 @@
     border-left: 0.25em solid #ccd0da;
     margin-top: 0;
     margin-bottom: 16px;
-    background: #e6e9ef;
+    background: transparent;
 }
 
-.latte blockquote > :first-child {
+.latte blockquote> :first-child {
     margin-top: 0;
 }
 
-.latte blockquote > :last-child {
+.latte blockquote> :last-child {
     margin-bottom: 0;
 }
 
@@ -289,11 +300,9 @@
 .latte hr {
     height: 0.25em;
     padding: 0;
-    margin: 24px 0;
+    margin: 32px 0;
     background-color: #ccd0da;
     border: 0;
-    border-color: #acb0be;
-    border-style: solid;
 }
 
 /* Tables (GFM) */
@@ -309,7 +318,7 @@
 
 .latte table th,
 .latte table td {
-    padding: 6px 13px;
+    padding: 8px 16px;
     border: 1px solid var(--table-border-color);
 }
 
@@ -352,11 +361,11 @@
     border-radius: 4px;
 }
 
-.latte .markdown-alert > :first-child {
+.latte .markdown-alert> :first-child {
     margin-top: 0;
 }
 
-.latte .markdown-alert > :last-child {
+.latte .markdown-alert> :last-child {
     margin-bottom: 0;
 }
 
@@ -638,36 +647,45 @@
     line-height: 1.25;
     margin-top: 24px;
     margin-bottom: 16px;
+    letter-spacing: -0.01em;
     border-bottom: none;
 }
 
 .mocha h1 {
-    font-size: 2em;
+    font-size: 2.2em;
+    margin-top: 0;
     padding-bottom: 0.3em;
     border-bottom: 1px solid #313244;
 }
 
 .mocha h2 {
-    font-size: 1.5em;
+    font-size: 1.7em;
+    margin-top: 48px;
     padding-bottom: 0.3em;
     border-bottom: 1px solid #313244;
 }
 
 .mocha h3 {
-    font-size: 1.25em;
+    font-size: 1.4em;
+    margin-top: 32px;
 }
 
 .mocha h4 {
-    font-size: 1em;
+    font-size: 1.1em;
+    margin-top: 24px;
 }
 
 .mocha h5 {
     font-size: 0.875em;
+    margin-top: 24px;
 }
 
 .mocha h6 {
-    font-size: 0.85em;
+    font-size: 0.8em;
+    margin-top: 24px;
     color: #9399b2;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 /* Typography: Paragraphs and Text */
@@ -677,6 +695,7 @@
     margin-bottom: 16px;
     color: #cdd6f4;
     line-height: 1.6;
+    font-size: 16px;
 }
 
 .mocha strong {
@@ -698,6 +717,7 @@
 .mocha a {
     color: #89b4fa;
     text-decoration: none;
+    font-weight: 500;
 }
 
 .mocha a:hover {
@@ -727,13 +747,14 @@
 
 .mocha li {
     margin-bottom: 0.25em;
+    line-height: 1.6;
 }
 
-.mocha li > p {
+.mocha li>p {
     margin-top: 16px;
 }
 
-.mocha li + li {
+.mocha li+li {
     margin-top: 0.25em;
 }
 
@@ -764,9 +785,9 @@
 
 .mocha code {
     color: #cdd6f4;
-    background: #181825;
+    background: #1e1e2e;
     padding: 0.2em 0.4em;
-    border-radius: 3px;
+    border-radius: 6px;
     font-size: 0.85em;
     font-family:
         "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
@@ -774,14 +795,13 @@
 }
 
 .mocha pre {
-    background: #181825;
+    background: #1e1e2e;
     padding: 16px;
     overflow: auto;
-    font-size: 0.85em;
-    line-height: 1.45;
-    border-radius: 6px;
-    margin-top: 0;
-    margin-bottom: 16px;
+    font-size: 0.9em;
+    line-height: 1.5;
+    border-radius: 8px;
+    margin: 16px 0;
 }
 
 /* Prism syntax highlighting (Catppuccin Mocha) */
@@ -865,14 +885,14 @@
     border-left: 0.25em solid #313244;
     margin-top: 0;
     margin-bottom: 16px;
-    background: #181825;
+    background: transparent;
 }
 
-.mocha blockquote > :first-child {
+.mocha blockquote> :first-child {
     margin-top: 0;
 }
 
-.mocha blockquote > :last-child {
+.mocha blockquote> :last-child {
     margin-bottom: 0;
 }
 
@@ -886,11 +906,9 @@
 .mocha hr {
     height: 0.25em;
     padding: 0;
-    margin: 24px 0;
+    margin: 32px 0;
     background-color: #313244;
     border: 0;
-    border-color: #585b70;
-    border-style: solid;
 }
 
 /* Tables (GFM) */
@@ -906,7 +924,7 @@
 
 .mocha table th,
 .mocha table td {
-    padding: 6px 13px;
+    padding: 8px 16px;
     border: 1px solid var(--table-border-color);
 }
 
@@ -949,11 +967,11 @@
     border-radius: 4px;
 }
 
-.mocha .markdown-alert > :first-child {
+.mocha .markdown-alert> :first-child {
     margin-top: 0;
 }
 
-.mocha .markdown-alert > :last-child {
+.mocha .markdown-alert> :last-child {
     margin-bottom: 0;
 }
 
@@ -1207,6 +1225,7 @@
 /* RESPONSIVE DESIGN */
 
 @media (max-width: 768px) {
+
     .latte h1,
     .mocha h1 {
         font-size: 1.75em;
