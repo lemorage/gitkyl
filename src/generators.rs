@@ -541,7 +541,9 @@ fn blob_page_markup(
                                 @if idx == breadcrumb_components.len() - 1 {
                                     span class="breadcrumb-current" { (*component) }
                                 } @else {
-                                    span class="breadcrumb-link" { (*component) }
+                                    @let partial_path = breadcrumb_components[..=idx].join("/");
+                                    @let tree_href = format!("{}tree/{}/{}.html", "../".repeat(depth), ref_name, partial_path);
+                                    a href=(tree_href) class="breadcrumb-link" { (*component) }
                                 }
                             }
                         }
@@ -613,7 +615,9 @@ fn markdown_blob_page_markup(
                                 @if idx == breadcrumb_components.len() - 1 {
                                     span class="breadcrumb-current" { (*component) }
                                 } @else {
-                                    span class="breadcrumb-link" { (*component) }
+                                    @let partial_path = breadcrumb_components[..=idx].join("/");
+                                    @let tree_href = format!("{}tree/{}/{}.html", "../".repeat(depth), ref_name, partial_path);
+                                    a href=(tree_href) class="breadcrumb-link" { (*component) }
                                 }
                             }
                         }

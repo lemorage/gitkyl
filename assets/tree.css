@@ -155,19 +155,19 @@ header {
 }
 
 .icon-folder {
-    color: #0071E3 !important;
+    color: var(--icon-folder);
 }
 
 .icon-readme {
-    color: #3E8ED0 !important;
+    color: var(--icon-readme);
 }
 
 .icon-rust {
-    color: #FF9500 !important;
+    color: var(--icon-rust);
 }
 
 .icon-config {
-    color: #86868B !important;
+    color: var(--icon-config);
 }
 
 .file-link {
