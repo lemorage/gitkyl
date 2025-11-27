@@ -6,6 +6,7 @@ mod generators;
 mod git;
 mod highlight;
 mod markdown;
+mod time;
 mod tree;
 
 pub use config::Config;
