@@ -1,5 +1,6 @@
 //! Static site generator for Git repositories.
 
+mod components;
 mod config;
 mod generators;
 mod git;
