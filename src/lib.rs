@@ -1,21 +1,18 @@
 //! Static site generator for Git repositories.
 
-mod components;
+pub mod components;
 mod config;
-mod generators;
 mod git;
 mod highlight;
 mod markdown;
+pub mod pages;
 mod time;
 mod tree;
 
+pub use components::icons::is_readme;
 pub use config::Config;
-pub use generators::{
-    TreeItem, generate_blob_page, generate_commits_page, generate_markdown_blob_page,
-    generate_tree_page, is_readme,
-};
 pub use git::{
-    CommitInfo, FileEntry, RepoInfo, analyze_repository, get_file_last_commit,
+    CommitInfo, FileEntry, RepoInfo, TreeItem, analyze_repository, get_file_last_commit,
     get_last_commits_batch, list_commits, list_files, read_blob,
 };
 pub use highlight::{Highlighter, highlight};

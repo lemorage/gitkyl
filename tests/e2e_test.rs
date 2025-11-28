@@ -20,9 +20,13 @@ fn test_full_workflow_e2e() -> Result<()> {
             "--manifest-path",
             "Cargo.toml",
             "--",
-            parent_repo.to_str().unwrap(),
+            parent_repo
+                .to_str()
+                .expect("Test repo path should be valid UTF8"),
             "-o",
-            temp_output.to_str().unwrap(),
+            temp_output
+                .to_str()
+                .expect("Test output path should be valid UTF8"),
             "--name",
             "E2E Test",
             "--owner",
@@ -64,9 +68,13 @@ fn test_minimal_args_e2e() -> Result<()> {
             "--manifest-path",
             "Cargo.toml",
             "--",
-            parent_repo.to_str().unwrap(),
+            parent_repo
+                .to_str()
+                .expect("Test repo path should be valid UTF8"),
             "-o",
-            temp_output.to_str().unwrap(),
+            temp_output
+                .to_str()
+                .expect("Test output path should be valid UTF8"),
         ])
         .status()?;
 

@@ -5,9 +5,6 @@
 //! elements with consistent styling and behavior, eliminating duplication
 //! across generator functions.
 
-// Components are not yet integrated into page generators
-#![allow(dead_code)]
-
 pub mod commit;
 pub mod file_list;
 pub mod footer;

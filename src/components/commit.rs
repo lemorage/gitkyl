@@ -15,6 +15,7 @@ use maud::{Markup, html};
 /// # Returns
 ///
 /// Commit badge markup with message and hash
+#[allow(dead_code)]
 pub fn commit_badge(message: &str, hash: &str) -> Markup {
     html! {
         div class="commit-line" {
@@ -41,6 +42,7 @@ pub fn commit_badge(message: &str, hash: &str) -> Markup {
 /// # Returns
 ///
 /// Commit metadata markup with author, hash, and time
+#[allow(dead_code)]
 pub fn commit_meta(author: &str, hash: &str, time: &str) -> Markup {
     html! {
         div class="commit-meta" {

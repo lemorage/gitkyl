@@ -163,6 +163,25 @@ impl CommitInfo {
     }
 }
 
+/// Represents an item in a directory tree view.
+///
+/// Distinguishes between regular files (git blobs) and directories (git trees)
+/// with proper semantic representation and commit metadata.
+#[derive(Debug, Clone)]
+pub enum TreeItem {
+    /// Regular file with its last modifying commit
+    File {
+        entry: FileEntry,
+        commit: CommitInfo,
+    },
+    /// Directory with its most recent commit
+    Directory {
+        name: String,
+        full_path: String,
+        commit: CommitInfo,
+    },
+}
+
 /// Analyzes a git repository and extracts metadata.
 ///
 /// # Arguments
@@ -1735,36 +1754,6 @@ mod tests {
             assert_eq!(result.len(), 1);
             assert!(result.contains_key("script.sh"));
             assert_eq!(result["script.sh"].message(), "Initial commit");
-        }
-    }
-}
-
-#[cfg(test)]
-impl CommitInfo {
-    /// Creates a new CommitInfo instance for testing.
-    ///
-    /// This constructor is only available in test builds.
-    /// Production code should use list_commits() to retrieve commit data.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn new_for_test(
-        oid: String,
-        short_oid: String,
-        author: String,
-        author_email: String,
-        committer: String,
-        date: i64,
-        message: String,
-        message_full: String,
-    ) -> Self {
-        Self {
-            oid,
-            short_oid,
-            author,
-            author_email,
-            committer,
-            date,
-            message,
-            message_full,
         }
     }
 }

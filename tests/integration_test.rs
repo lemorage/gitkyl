@@ -465,7 +465,8 @@ fn test_readme_detection_and_rendering() -> Result<()> {
     git_commit(repo_path, "Add README")?;
 
     // Act
-    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README.md", "test-repo");
+    let result =
+        gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "README.md", "test-repo");
 
     // Assert
     assert!(result.is_ok(), "Should render README as markdown");
@@ -496,7 +497,8 @@ fn test_lowercase_readme_detection() -> Result<()> {
     git_commit(repo_path, "Add lowercase readme")?;
 
     // Act
-    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "readme.md", "test-repo");
+    let result =
+        gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "readme.md", "test-repo");
 
     // Assert
     assert!(result.is_ok(), "Should render lowercase readme as markdown");
@@ -526,7 +528,7 @@ fn test_readme_without_extension_detection() -> Result<()> {
     git_commit(repo_path, "Add README without extension")?;
 
     // Act
-    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README", "test-repo");
+    let result = gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "README", "test-repo");
 
     // Assert
     assert!(result.is_ok(), "Should render README without extension");
@@ -573,7 +575,7 @@ fn test_readme_in_subdirectory() -> Result<()> {
 
     // Act
     let result =
-        gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "docs/README.md", "test-repo");
+        gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "docs/README.md", "test-repo");
 
     // Assert
     assert!(result.is_ok(), "Should render nested README");
@@ -604,7 +606,8 @@ fn test_readme_with_invalid_utf8_fails_gracefully() -> Result<()> {
     git_commit(repo_path, "Add invalid UTF8 README")?;
 
     // Act
-    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README.md", "test-repo");
+    let result =
+        gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "README.md", "test-repo");
 
     // Assert
     assert!(result.is_err(), "Should fail for invalid UTF8 content");
@@ -647,7 +650,8 @@ fn main() {
     git_commit(repo_path, "Add complex README")?;
 
     // Act
-    let result = gitkyl::generate_markdown_blob_page(repo_path, "HEAD", "README.md", "test-repo");
+    let result =
+        gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "README.md", "test-repo");
 
     // Assert
     assert!(result.is_ok(), "Should render complex markdown");

@@ -18,6 +18,7 @@ use maud::{Markup, html};
 /// # Returns
 ///
 /// Breadcrumb navigation markup with links and separators
+#[allow(dead_code)]
 pub fn breadcrumb(
     repo_name: &str,
     index_path: &str,
@@ -45,7 +46,7 @@ pub fn breadcrumb(
     }
 }
 
-/// Extracts path components from file path
+/// Extracts breadcrumb path components from file path
 ///
 /// Splits path string on forward slashes and filters empty components.
 /// Used to build breadcrumb navigation from file paths.
@@ -56,7 +57,7 @@ pub fn breadcrumb(
 ///
 /// # Returns
 ///
-/// Vector of path component strings
-pub fn path_components(path: &str) -> Vec<&str> {
+/// Vector of path component strings for breadcrumb display
+pub fn extract_breadcrumb_components(path: &str) -> Vec<&str> {
     path.split('/').filter(|s| !s.is_empty()).collect()
 }

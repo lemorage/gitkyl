@@ -17,6 +17,7 @@ use maud::{DOCTYPE, Markup, html};
 /// # Returns
 ///
 /// Complete HTML document with wrapped content
+#[allow(dead_code)]
 pub fn page_wrapper(title: &str, stylesheets: &[&str], body: Markup) -> Markup {
     html! {
         (DOCTYPE)

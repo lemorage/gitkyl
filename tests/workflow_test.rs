@@ -3,7 +3,8 @@
 //! Tests complete pipelines from listing files through HTML generation.
 
 use anyhow::{Context, Result};
-use gitkyl::{generate_blob_page, highlight, list_files, read_blob};
+use gitkyl::pages::blob;
+use gitkyl::{highlight, list_files, read_blob};
 use std::path::{Path, PathBuf};
 
 /// Tests complete workflow from listing files to reading blob content.
@@ -138,7 +139,7 @@ fn test_workflow_full_pipeline_rust_file() -> Result<()> {
     let file_path = rust_file.path().expect("File should have valid path");
 
     // Act: generate complete blob page
-    let blob_page = generate_blob_page(
+    let blob_page = blob::generate(
         &repo_path,
         ref_name,
         file_path,
@@ -159,7 +160,11 @@ fn test_workflow_full_pipeline_rust_file() -> Result<()> {
         "Should contain code content section"
     );
     assert!(
-        html.contains(file_path.to_str().unwrap()),
+        html.contains(
+            file_path
+                .to_str()
+                .expect("Test file path should be valid UTF8")
+        ),
         "Should contain file path in breadcrumb"
     );
     assert!(
@@ -181,7 +186,7 @@ fn test_workflow_multiple_file_types() -> Result<()> {
     let ref_name = "HEAD";
 
     // Test Rust file (supported syntax highlighting)
-    let rust_result = generate_blob_page(
+    let rust_result = blob::generate(
         &repo_path,
         ref_name,
         Path::new("src/lib.rs"),
@@ -210,7 +215,7 @@ fn test_workflow_multiple_file_types() -> Result<()> {
     }
 
     // Test TOML file (unsupported, should fallback to plain text)
-    let toml_result = generate_blob_page(
+    let toml_result = blob::generate(
         &repo_path,
         ref_name,
         Path::new("Cargo.toml"),
@@ -252,7 +257,7 @@ fn test_workflow_error_nonexistent_file() {
     let invalid_path = Path::new("this/file/does/not/exist.rs");
 
     // Act
-    let result = generate_blob_page(
+    let result = blob::generate(
         &repo_path,
         ref_name,
         invalid_path,
@@ -281,7 +286,7 @@ fn test_workflow_error_invalid_reference() {
     let file_path = Path::new("src/lib.rs");
 
     // Act
-    let result = generate_blob_page(
+    let result = blob::generate(
         &repo_path,
         invalid_ref,
         file_path,
@@ -309,7 +314,7 @@ fn test_workflow_html_escaping_in_code() -> Result<()> {
     let ref_name = "HEAD";
 
     // Act: find highlight.rs which contains HTML escaping logic
-    let result = generate_blob_page(
+    let result = blob::generate(
         &repo_path,
         ref_name,
         Path::new("src/highlight.rs"),
@@ -367,7 +372,7 @@ fn test_workflow_breadcrumb_generation() -> Result<()> {
     let nested_path = Path::new("src/generators.rs");
 
     // Act
-    let result = generate_blob_page(
+    let result = blob::generate(
         &repo_path,
         ref_name,
         nested_path,
