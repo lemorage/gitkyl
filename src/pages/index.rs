@@ -1,10 +1,15 @@
 //! Repository index page generation
 
 use anyhow::{Context, Result};
-use maud::{DOCTYPE, Markup, PreEscaped, html};
+use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
-use crate::components::icons::icon_classes;
+use crate::components::commit::commit_meta;
+use crate::components::file_list::{file_row, file_table};
+use crate::components::footer::footer;
+use crate::components::icons::file_icon;
+use crate::components::layout::page_wrapper;
+use crate::components::metadata::{branch_selector, repo_header};
 use crate::git::{CommitInfo, TreeItem};
 use crate::time::format_timestamp;
 
@@ -40,151 +45,94 @@ pub struct IndexPageData<'a> {
 ///
 /// Complete HTML markup for index page
 pub fn generate(data: IndexPageData<'_>) -> Markup {
-    html! {
-        (DOCTYPE)
-        html lang="en" {
-            head {
-                meta charset="utf-8";
-                meta name="viewport" content="width=device-width, initial-scale=1.0";
-                title { (data.name) " - Gitkyl" }
-                script src="https://unpkg.com/@phosphor-icons/web" {}
-                link rel="stylesheet" href="assets/index.css";
-                link rel="stylesheet" href="assets/markdown.css";
-            }
-            body {
-                div class="container" {
-                    header class="repo-header" {
-                        @if let Some(owner_name) = data.owner {
-                            span class="repo-owner" { (owner_name) " / " }
+    page_wrapper(
+        data.name,
+        &["assets/index.css", "assets/markdown.css"],
+        html! {
+            (repo_header(data.name, data.owner))
+
+            main class="repo-card" {
+                div class="repo-controls" {
+                    div class="commit-info-group" {
+                        @let branch_strs: Vec<&str> = data.branches.iter().map(|s| s.as_str()).collect();
+                        (branch_selector(&branch_strs, data.default_branch, MIN_BRANCHES_FOR_SELECTOR))
+
+                        @if let Some(commit) = data.latest_commit {
+                            div class="commit-info-wrapper" {
+                                div class="commit-line" {
+                                    span class="avatar-placeholder" {}
+                                    span class="repo-commit-message" { (commit.message()) }
+                                }
+                                (commit_meta(
+                                    commit.author(),
+                                    commit.short_oid(),
+                                    &format_timestamp(commit.date())
+                                ))
+                            }
                         }
-                        h1 class="repo-name" { (data.name) }
                     }
 
-                    main class="repo-card" {
-                        div class="repo-controls" {
-                            div class="commit-info-group" {
-                                @if data.branches.len() >= MIN_BRANCHES_FOR_SELECTOR {
-                                    div class="branch-selector" {
-                                        i class="ph ph-git-branch" {}
-                                        @for branch in data.branches {
-                                            @if branch == data.default_branch {
-                                                span class="branch-name branch-active" { (branch) }
-                                            } @else {
-                                                span class="branch-name" { (branch) }
-                                            }
-                                        }
-                                        i class="ph ph-caret-down branch-caret" {}
-                                    }
-                                } @else {
-                                    div class="branch-selector" {
-                                        i class="ph ph-git-branch" {}
-                                        span { (data.default_branch) }
-                                    }
-                                }
+                    a href=(format!("commits/{}/index.html", data.default_branch)) class="history-link" {
+                        i class="ph ph-clock-counter-clockwise" {}
+                        " " (data.commit_count) " commits"
+                    }
+                }
 
-                                @if let Some(commit) = data.latest_commit {
-                                    div class="commit-info-wrapper" {
-                                        div class="commit-line" {
-                                            span class="avatar-placeholder" {}
-                                            span class="repo-commit-message" { (commit.message()) }
-                                        }
-                                        div class="commit-meta" {
-                                            span { (commit.author()) }
-                                            span { "·" }
-                                            code class="commit-hash" { (commit.short_oid()) }
-                                            span { "·" }
-                                            span { (format_timestamp(commit.date())) }
-                                        }
-                                    }
-                                }
-                            }
-
-                            a href=(format!("commits/{}/index.html", data.default_branch)) class="history-link" {
-                                i class="ph ph-clock-counter-clockwise" {}
-                                " " (data.commit_count) " commits"
-                            }
-                        }
-
-                        @if data.items.is_empty() {
-                            p class="empty-state" { "No files in this repository" }
-                        } @else {
-                            div class="file-table" {
+                @if data.items.is_empty() {
+                    p class="empty-state" { "No files in this repository" }
+                } @else {
+                    (file_table(html! {
                                 @for item in data.items.iter() {
                                     @match item {
                                         TreeItem::File { entry, commit } => {
                                             @if let Some(path) = entry.path()
                                                 && let Some(path_str) = path.to_str() {
-                                                @let (icon_class, icon_modifier) = icon_classes(path_str);
                                                 @let href = format!("blob/{}/{}.html", data.default_branch, path_str);
-                                                a href=(href) class="file-row" {
-                                                    div class="icon-box" {
-                                                        @if let Some(modifier) = icon_modifier {
-                                                            i class=(format!("{} {}", icon_class, modifier)) {}
-                                                        } @else {
-                                                            i class=(icon_class) {}
-                                                        }
-                                                    }
-                                                    div class="file-link" { (path_str) }
-                                                    div class="commit-message" title=(commit.message_full()) {
-                                                        (commit.message())
-                                                    }
-                                                    div class="commit-date" {
-                                                        (format_timestamp(commit.date()))
-                                                    }
-                                                }
+                                                (file_row(
+                                                    &href,
+                                                    file_icon(path_str),
+                                                    path_str,
+                                                    commit.message(),
+                                                    commit.message_full(),
+                                                    &format_timestamp(commit.date())
+                                                ))
                                             }
                                         },
                                         TreeItem::Directory { name, full_path, commit } => {
                                             @let display_path = if full_path.is_empty() { name } else { full_path };
-                                            @let (icon_class, icon_modifier) = icon_classes(&format!("{}/", display_path));
                                             @let href = format!("tree/{}/{}.html", data.default_branch, display_path);
-                                            a href=(href) class="file-row" {
-                                                div class="icon-box" {
-                                                    @if let Some(modifier) = icon_modifier {
-                                                        i class=(format!("{} {}", icon_class, modifier)) {}
-                                                    } @else {
-                                                        i class=(icon_class) {}
-                                                    }
-                                                }
-                                                div class="file-link" { (name) }
-                                                div class="commit-message" title=(commit.message_full()) {
-                                                    (commit.message())
-                                                }
-                                                div class="commit-date" {
-                                                    (format_timestamp(commit.date()))
-                                                }
-                                            }
+                                            (file_row(
+                                                &href,
+                                                file_icon(&format!("{}/", display_path)),
+                                                name,
+                                                commit.message(),
+                                                commit.message_full(),
+                                                &format_timestamp(commit.date())
+                                            ))
                                         }
                                     }
-                                }
-                            }
-                        }
                     }
+                    }))
+                }
+            }
 
-                    @if let Some(readme) = data.readme_html {
-                        section class="readme-section" {
-                            div class="readme-card" {
-                                div class="readme-header" {
-                                    i class="ph ph-info" {}
-                                    span class="readme-title" { "README.md" }
-                                }
-                                div class="readme-content latte" {
-                                    (PreEscaped(readme))
-                                }
-                            }
+            @if let Some(readme) = data.readme_html {
+                section class="readme-section" {
+                    div class="readme-card" {
+                        div class="readme-header" {
+                            i class="ph ph-info" {}
+                            span class="readme-title" { "README.md" }
                         }
-                    }
-
-                    footer {
-                        p {
-                            "Generated by "
-                            a href="https://github.com/lemorage/gitkyl" target="_blank" { "Gitkyl" }
+                        div class="readme-content latte" {
+                            (PreEscaped(readme))
                         }
                     }
                 }
             }
-        }
-    }
+
+            (footer())
+        },
+    )
 }
 
 /// Finds and renders README file at repository root

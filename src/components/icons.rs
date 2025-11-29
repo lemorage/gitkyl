@@ -15,7 +15,6 @@ use std::path::Path;
 /// # Returns
 ///
 /// Icon markup with appropriate Phosphor icon class and color modifier
-#[allow(dead_code)]
 pub fn file_icon(path: &str) -> Markup {
     let (icon_class, icon_modifier) = icon_classes(path);
 
@@ -42,7 +41,6 @@ pub fn file_icon(path: &str) -> Markup {
 /// # Returns
 ///
 /// Phosphor icon class name and optional CSS modifier class for color styling
-#[allow(dead_code)]
 pub fn icon_classes(path: &str) -> (&'static str, Option<&'static str>) {
     if path.ends_with('/') {
         return ("ph-fill ph-folder", Some("icon-folder"));

@@ -15,7 +15,6 @@ use maud::{Markup, html};
 /// # Returns
 ///
 /// File table wrapper with rows
-#[allow(dead_code)]
 pub fn file_table(rows: Markup) -> Markup {
     html! {
         div class="file-table" {
@@ -41,7 +40,6 @@ pub fn file_table(rows: Markup) -> Markup {
 /// # Returns
 ///
 /// Clickable file row with all metadata displayed
-#[allow(dead_code)]
 pub fn file_row(
     href: &str,
     icon: Markup,

@@ -369,7 +369,7 @@ fn test_workflow_breadcrumb_generation() -> Result<()> {
     // Arrange
     let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let ref_name = "HEAD";
-    let nested_path = Path::new("src/generators.rs");
+    let nested_path = Path::new("src/components/layout.rs");
 
     // Act
     let result = blob::generate(
@@ -385,11 +385,12 @@ fn test_workflow_breadcrumb_generation() -> Result<()> {
             let html_str = html.into_string();
 
             // Assert: breadcrumb components should be present
-            assert!(html_str.contains("src"), "Should contain directory name");
+            assert!(html_str.contains("src"), "Should contain root directory");
             assert!(
-                html_str.contains("generators.rs"),
-                "Should contain filename"
+                html_str.contains("components"),
+                "Should contain subdirectory"
             );
+            assert!(html_str.contains("layout.rs"), "Should contain filename");
             assert!(
                 html_str.contains("breadcrumb"),
                 "Should have breadcrumb class"

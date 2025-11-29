@@ -6,7 +6,6 @@ use maud::{Markup, html};
 ///
 /// This footer appears consistently across all page types (index, blob, tree,
 /// commits) providing a single source of truth for the attribution markup.
-#[allow(dead_code)]
 pub fn footer() -> Markup {
     html! {
         footer {

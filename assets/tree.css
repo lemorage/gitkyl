@@ -12,6 +12,10 @@
     --radius-m: 12px;
     --radius-s: 6px;
     --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    --icon-folder: #5AC8FA;
+    --icon-rust: #FF9500;
+    --icon-readme: #0071E3;
+    --icon-config: #86868B;
 }
 
 * {

@@ -18,7 +18,6 @@ use maud::{Markup, html};
 /// # Returns
 ///
 /// Breadcrumb navigation markup with links and separators
-#[allow(dead_code)]
 pub fn breadcrumb(
     repo_name: &str,
     index_path: &str,

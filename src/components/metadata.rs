@@ -15,7 +15,6 @@ use maud::{Markup, html};
 /// # Returns
 ///
 /// Repository header markup
-#[allow(dead_code)]
 pub fn repo_header(name: &str, owner: Option<&str>) -> Markup {
     html! {
         header class="repo-header" {
@@ -41,7 +40,6 @@ pub fn repo_header(name: &str, owner: Option<&str>) -> Markup {
 /// # Returns
 ///
 /// Branch selector or static badge markup
-#[allow(dead_code)]
 pub fn branch_selector(branches: &[&str], current: &str, min_for_selector: usize) -> Markup {
     html! {
         @if branches.len() >= min_for_selector {

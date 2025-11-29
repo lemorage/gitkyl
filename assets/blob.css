@@ -133,6 +133,7 @@ header {
     line-height: 20px;
     color: var(--text-secondary);
     display: block;
+    text-decoration: none;
     transition: color 0.15s;
 }
 
@@ -162,7 +163,13 @@ pre {
 }
 
 .code-line {
+    display: block;
     min-height: 20px;
+}
+
+.code-line:target {
+    background-color: rgba(255, 223, 93, 0.4);
+    box-shadow: inset 3px 0 0 #FFD700;
 }
 
 /* Selection */
