@@ -5,7 +5,6 @@ use maud::{Markup, html};
 use std::path::Path;
 
 use crate::components::file_list::{file_row, file_table};
-use crate::components::footer::footer;
 use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
@@ -162,7 +161,81 @@ pub fn generate(
                     }))
                 }
             }
-            (footer())
         },
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{CommitInfo, list_files};
+
+    #[test]
+    fn test_generate_empty() {
+        let items: Vec<TreeItem> = vec![];
+        let html = generate(Path::new("."), "main", "", "test-repo", &items).unwrap();
+
+        let html_str = html.into_string();
+        assert!(html_str.contains("test-repo"));
+        assert!(html_str.contains("<!DOCTYPE html>"));
+    }
+
+    #[test]
+    fn test_generate_with_files() {
+        use std::fs;
+        use std::process::Command;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+
+        fs::write(dir.path().join("file.txt"), "test").unwrap();
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["commit", "-m", "test"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+
+        let files = list_files(dir.path(), None).unwrap();
+        let commit = CommitInfo::new(
+            "abc123".into(),
+            "test".into(),
+            "test".into(),
+            "Test".into(),
+            1234567890,
+        );
+
+        let items: Vec<TreeItem> = files
+            .into_iter()
+            .map(|entry| TreeItem::File {
+                entry,
+                commit: commit.clone(),
+            })
+            .collect();
+
+        let html = generate(dir.path(), "HEAD", "", "test-repo", &items).unwrap();
+
+        let html_str = html.into_string();
+        assert!(html_str.contains("test-repo"));
+        assert!(html_str.contains("file.txt"));
+    }
 }

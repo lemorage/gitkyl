@@ -6,7 +6,6 @@ use std::path::Path;
 
 use crate::components::commit::commit_meta;
 use crate::components::file_list::{file_row, file_table};
-use crate::components::footer::footer;
 use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
 use crate::components::metadata::{branch_selector, repo_header};
@@ -129,8 +128,6 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                     }
                 }
             }
-
-            (footer())
         },
     )
 }

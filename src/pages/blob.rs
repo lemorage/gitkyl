@@ -4,7 +4,6 @@ use anyhow::{Context, Result};
 use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
-use crate::components::footer::footer;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
 use crate::git::read_blob;
@@ -209,7 +208,6 @@ fn blob_page_markup(
                     }
                 }
             }
-            (footer())
         },
     )
 }
@@ -254,7 +252,78 @@ fn markdown_blob_page_markup(
             main class="markdown-content latte" {
                 (PreEscaped(rendered_html))
             }
-            (footer())
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::process::Command;
+    use tempfile::TempDir;
+
+    fn create_test_repo() -> anyhow::Result<TempDir> {
+        let dir = TempDir::new()?;
+        Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .output()?;
+        Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(dir.path())
+            .output()?;
+        Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(dir.path())
+            .output()?;
+        Ok(dir)
+    }
+
+    fn git_commit(path: &Path) -> anyhow::Result<()> {
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(path)
+            .output()?;
+        Command::new("git")
+            .args(["commit", "-m", "test"])
+            .current_dir(path)
+            .output()?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_generate_rust_file() {
+        let repo = create_test_repo().unwrap();
+        fs::write(repo.path().join("test.rs"), "fn main() {}").unwrap();
+        git_commit(repo.path()).unwrap();
+
+        let html = generate(
+            repo.path(),
+            "HEAD",
+            Path::new("test.rs"),
+            "test-repo",
+            "base16-ocean.dark",
+        )
+        .unwrap();
+
+        let html_str = html.into_string();
+        assert!(html_str.contains("test-repo"));
+        assert!(html_str.contains("test.rs"));
+    }
+
+    #[test]
+    fn test_generate_markdown() {
+        let repo = create_test_repo().unwrap();
+        fs::write(repo.path().join("README.md"), "# Test\nContent").unwrap();
+        git_commit(repo.path()).unwrap();
+
+        let html =
+            generate_markdown(repo.path(), "HEAD", Path::new("README.md"), "test-repo").unwrap();
+
+        let html_str = html.into_string();
+        assert!(html_str.contains("test-repo"));
+        assert!(html_str.contains("README.md"));
+        assert!(html_str.contains("<h1"));
+    }
 }

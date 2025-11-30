@@ -2,7 +2,6 @@
 
 use maud::{Markup, html};
 
-use crate::components::footer::footer;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
 use crate::git::CommitInfo;
@@ -77,7 +76,6 @@ pub fn generate(commits: &[CommitInfo], ref_name: &str, repo_name: &str) -> Mark
                             }
                         }
             }
-            (footer())
         },
     )
 }

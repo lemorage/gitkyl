@@ -2,6 +2,8 @@
 
 use maud::{DOCTYPE, Markup, html};
 
+use super::footer::footer;
+
 /// Wraps page content with standard HTML structure
 ///
 /// Provides consistent DOCTYPE, html, head, and container structure across
@@ -34,6 +36,7 @@ pub fn page_wrapper(title: &str, stylesheets: &[&str], body: Markup) -> Markup {
                 div class="container" {
                     (body)
                 }
+                (footer())
             }
         }
     }
