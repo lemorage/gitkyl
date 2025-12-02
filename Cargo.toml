@@ -19,6 +19,7 @@ syntect = { version = "5.3", default-features = false, features = ["default-synt
 comrak = { version = "0.27", default-features = false }
 
 [dev-dependencies]
+hex = "0.4.3"
 tempfile = { version = "3.12", default-features = false }
 
 [profile.dev]

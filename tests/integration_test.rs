@@ -676,3 +676,786 @@ fn main() {
 
     Ok(())
 }
+
+/// Tests blob generation with various file extensions applies correct syntax.
+#[test]
+fn test_blob_generate_with_various_file_extensions() -> Result<()> {
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    let files = vec![
+        ("script.py", "def hello():\n    print('world')\n"),
+        ("config.toml", "[package]\nname = \"test\"\n"),
+        ("style.css", "body { margin: 0; }\n"),
+    ];
+
+    for (filename, content) in &files {
+        fs::write(repo_path.join(filename), content)?;
+        Command::new("git")
+            .args(["add", filename])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, &format!("Add {}", filename))?;
+
+        let result = gitkyl::pages::blob::generate(
+            repo_path,
+            "HEAD",
+            filename,
+            "test-repo",
+            "base16-ocean.dark",
+        )?;
+
+        let html = result.into_string();
+        assert!(html.contains(filename), "Should contain filename");
+        assert!(html.contains("<!DOCTYPE html>"), "Should be valid HTML");
+    }
+
+    Ok(())
+}
+
+/// Tests blob generation fails gracefully for nonexistent file.
+#[test]
+fn test_blob_generate_nonexistent_file_fails() -> Result<()> {
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    fs::write(repo_path.join("exists.txt"), "content\n")?;
+    Command::new("git")
+        .args(["add", "exists.txt"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Initial commit")?;
+
+    let result = gitkyl::pages::blob::generate(
+        repo_path,
+        "HEAD",
+        "nonexistent.txt",
+        "test-repo",
+        "base16-ocean.dark",
+    );
+
+    assert!(result.is_err(), "Should fail for nonexistent file");
+    let err_msg = format!("{:?}", result.unwrap_err());
+    assert!(
+        err_msg.contains("Failed to read blob") || err_msg.contains("nonexistent"),
+        "Error should reference the missing file"
+    );
+
+    Ok(())
+}
+
+/// Tests blob generation fails for invalid git reference.
+#[test]
+fn test_blob_generate_invalid_reference_fails() -> Result<()> {
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    fs::write(repo_path.join("file.txt"), "content\n")?;
+    Command::new("git")
+        .args(["add", "file.txt"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add file")?;
+
+    let result = gitkyl::pages::blob::generate(
+        repo_path,
+        "nonexistent-branch",
+        "file.txt",
+        "test-repo",
+        "base16-ocean.dark",
+    );
+
+    assert!(result.is_err(), "Should fail for invalid reference");
+
+    Ok(())
+}
+
+/// Tests blob generation handles empty file correctly.
+#[test]
+fn test_blob_generate_empty_file_succeeds() -> Result<()> {
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    fs::write(repo_path.join("empty.txt"), "")?;
+    Command::new("git")
+        .args(["add", "empty.txt"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add empty file")?;
+
+    let result = gitkyl::pages::blob::generate(
+        repo_path,
+        "HEAD",
+        "empty.txt",
+        "test-repo",
+        "base16-ocean.dark",
+    )?;
+
+    let html = result.into_string();
+    assert!(
+        html.contains("<!DOCTYPE html>"),
+        "Should generate valid HTML"
+    );
+    assert!(html.contains("empty.txt"), "Should contain filename");
+
+    Ok(())
+}
+
+/// Tests markdown blob handles code blocks correctly.
+#[test]
+fn test_markdown_blob_with_code_blocks() -> Result<()> {
+    let repo = create_test_repo()?;
+    let repo_path = repo.path();
+
+    let markdown = r#"# Code Example
+
+```rust
+fn main() {
+    println!("Hello");
+}
+```
+"#;
+    fs::write(repo_path.join("example.md"), markdown)?;
+    Command::new("git")
+        .args(["add", "example.md"])
+        .current_dir(repo_path)
+        .output()?;
+    git_commit(repo_path, "Add example")?;
+
+    let result =
+        gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "example.md", "test-repo")?;
+
+    let html = result.into_string();
+    assert!(html.contains("<h1"), "Should render heading");
+    assert!(
+        html.contains("<code>") || html.contains("main"),
+        "Should render code block"
+    );
+
+    Ok(())
+}
+
+mod tree_page_tests {
+    use super::*;
+    use gitkyl::{CommitInfo, TreeItem};
+    use gix::bstr::BString;
+
+    fn create_file_entry(path: &str, oid: &str) -> gitkyl::FileEntry {
+        let repeated = oid.repeat((40 / oid.len()) + 1);
+        let hex_40 = &repeated[..40];
+        let oid_bytes = hex::decode(hex_40).expect("Invalid OID");
+        let oid = gix::ObjectId::try_from(&oid_bytes[..]).expect("Failed to create OID");
+
+        unsafe {
+            std::mem::transmute::<(BString, gix::ObjectId), gitkyl::FileEntry>((
+                BString::from(path.as_bytes()),
+                oid,
+            ))
+        }
+    }
+
+    fn create_test_commit(oid: &str, message: &str, author: &str, date: i64) -> CommitInfo {
+        CommitInfo::new(
+            oid.to_string(),
+            message.to_string(),
+            message.to_string(),
+            author.to_string(),
+            date,
+        )
+    }
+
+    #[test]
+    fn test_tree_generate_lists_root_directory_files() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::write(
+            repo_path.join("README.md"),
+            "# Test Project\n\nDescription.",
+        )?;
+        fs::write(repo_path.join("main.rs"), "fn main() {}\n")?;
+        fs::write(repo_path.join("Cargo.toml"), "[package]\nname = \"test\"\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Initial commit")?;
+
+        let commit = create_test_commit(
+            "abc1234567890123456789012345678901234567",
+            "Initial commit",
+            "Test User",
+            1700000000,
+        );
+
+        let items = vec![
+            TreeItem::File {
+                entry: create_file_entry("Cargo.toml", "cafe"),
+                commit: commit.clone(),
+            },
+            TreeItem::File {
+                entry: create_file_entry("README.md", "dead"),
+                commit: commit.clone(),
+            },
+            TreeItem::File {
+                entry: create_file_entry("main.rs", "beef"),
+                commit,
+            },
+        ];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(html.contains("<!DOCTYPE html>"), "Should have DOCTYPE");
+        assert!(html.contains("test-repo"), "Should contain repo name");
+        assert!(html.contains("README.md"), "Should list README.md");
+        assert!(html.contains("main.rs"), "Should list main.rs");
+        assert!(html.contains("Cargo.toml"), "Should list Cargo.toml");
+        assert!(
+            html.contains("file-table"),
+            "Should use file table component"
+        );
+        assert!(
+            html.contains("Initial commit"),
+            "Should show commit message"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_lists_subdirectory_files() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir(repo_path.join("src"))?;
+        fs::write(repo_path.join("src/lib.rs"), "pub fn test() {}\n")?;
+        fs::write(repo_path.join("src/main.rs"), "fn main() {}\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add src directory")?;
+
+        let commit = create_test_commit(
+            "def4567890123456789012345678901234567890",
+            "Add src directory",
+            "Test User",
+            1700000100,
+        );
+
+        let items = vec![
+            TreeItem::File {
+                entry: create_file_entry("src/lib.rs", "1234"),
+                commit: commit.clone(),
+            },
+            TreeItem::File {
+                entry: create_file_entry("src/main.rs", "5678"),
+                commit,
+            },
+        ];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "src", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(html.contains("src"), "Should show subdirectory in title");
+        assert!(html.contains("lib.rs"), "Should list lib.rs");
+        assert!(html.contains("main.rs"), "Should list main.rs");
+        assert!(
+            html.contains("breadcrumb"),
+            "Should include breadcrumb navigation"
+        );
+        assert!(html.contains(".."), "Should include parent directory link");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_shows_directory_entries() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir(repo_path.join("src"))?;
+        fs::write(repo_path.join("src/lib.rs"), "pub fn test() {}\n")?;
+        fs::create_dir(repo_path.join("docs"))?;
+        fs::write(repo_path.join("docs/README.md"), "# Docs\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add directories")?;
+
+        let commit = create_test_commit(
+            "abc1234567890123456789012345678901234567",
+            "Add directories",
+            "Test User",
+            1700000200,
+        );
+
+        let items = vec![
+            TreeItem::Directory {
+                name: "docs".to_string(),
+                full_path: "docs".to_string(),
+                commit: commit.clone(),
+            },
+            TreeItem::Directory {
+                name: "src".to_string(),
+                full_path: "src".to_string(),
+                commit,
+            },
+        ];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(html.contains("docs"), "Should list docs directory");
+        assert!(html.contains("src"), "Should list src directory");
+        assert!(html.contains("icon-folder"), "Should use folder icon");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_deep_subdirectory() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir_all(repo_path.join("src/modules/utils"))?;
+        fs::write(
+            repo_path.join("src/modules/utils/helpers.rs"),
+            "pub fn helper() {}\n",
+        )?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add deep structure")?;
+
+        let commit = create_test_commit(
+            "deep123456789012345678901234567890123456",
+            "Add deep structure",
+            "Test User",
+            1700000300,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("src/modules/utils/helpers.rs", "abcd"),
+            commit,
+        }];
+
+        let result = gitkyl::pages::tree::generate(
+            repo_path,
+            "HEAD",
+            "src/modules/utils",
+            "test-repo",
+            &items,
+        )?;
+
+        let html = result.into_string();
+
+        assert!(html.contains("helpers.rs"), "Should list helpers.rs");
+        assert!(html.contains("breadcrumb"), "Should have breadcrumb");
+        assert!(html.contains("utils"), "Should show current directory");
+        assert!(html.contains(".."), "Should have parent link");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_empty_directory_shows_message() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::write(repo_path.join("README.md"), "# Test\n")?;
+        Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Initial")?;
+
+        let items = vec![];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            html.contains("Empty directory"),
+            "Should show empty directory message"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_subdirectory_shows_file_table() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir(repo_path.join("tests"))?;
+        fs::write(repo_path.join("tests/test1.rs"), "#[test]\nfn test1() {}\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add tests")?;
+
+        let commit = create_test_commit(
+            "test123456789012345678901234567890123456",
+            "Add tests",
+            "Test User",
+            1700000400,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("tests/test1.rs", "9999"),
+            commit,
+        }];
+
+        let result =
+            gitkyl::pages::tree::generate(repo_path, "HEAD", "tests", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            !html.contains("Empty directory"),
+            "Should NOT show empty message"
+        );
+        assert!(html.contains("file-table"), "Should show file table");
+        assert!(html.contains("test1.rs"), "Should show file");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_includes_commit_metadata() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::write(repo_path.join("config.toml"), "[settings]\n")?;
+
+        Command::new("git")
+            .args(["add", "config.toml"])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add configuration file")?;
+
+        let commit = create_test_commit(
+            "meta123456789012345678901234567890123456",
+            "Add configuration file",
+            "Author Name",
+            1700000500,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("config.toml", "c0ff"),
+            commit,
+        }];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            html.contains("Add configuration file"),
+            "Should show commit message"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_breadcrumb_navigation() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir_all(repo_path.join("src/pages"))?;
+        fs::write(repo_path.join("src/pages/home.rs"), "pub fn home() {}\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add pages")?;
+
+        let commit = create_test_commit(
+            "page123456789012345678901234567890123456",
+            "Add pages",
+            "Test User",
+            1700000600,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("src/pages/home.rs", "f00d"),
+            commit,
+        }];
+
+        let result =
+            gitkyl::pages::tree::generate(repo_path, "HEAD", "src/pages", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            html.contains("breadcrumb"),
+            "Should have breadcrumb component"
+        );
+        assert!(
+            html.contains("pages"),
+            "Should show current directory in breadcrumb"
+        );
+        assert!(
+            html.contains("src"),
+            "Should show parent directory in breadcrumb"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_file_links_point_to_blob_pages() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::write(repo_path.join("script.sh"), "#!/bin/bash\necho 'test'\n")?;
+
+        Command::new("git")
+            .args(["add", "script.sh"])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add script")?;
+
+        let commit = create_test_commit(
+            "link123456789012345678901234567890123456",
+            "Add script",
+            "Test User",
+            1700000700,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("script.sh", "ba5e"),
+            commit,
+        }];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            html.contains("blob/HEAD/script.sh.html"),
+            "Should link to blob page"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_directory_links_point_to_tree_pages() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir(repo_path.join("lib"))?;
+        fs::write(repo_path.join("lib/mod.rs"), "pub mod test;\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add lib")?;
+
+        let commit = create_test_commit(
+            "link456789012345678901234567890123456789",
+            "Add lib",
+            "Test User",
+            1700000800,
+        );
+
+        let items = vec![TreeItem::Directory {
+            name: "lib".to_string(),
+            full_path: "lib".to_string(),
+            commit,
+        }];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            html.contains("tree/HEAD/lib.html"),
+            "Should link to tree page"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_mixed_files_and_directories() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir(repo_path.join("bin"))?;
+        fs::write(repo_path.join("bin/cli.rs"), "fn main() {}\n")?;
+        fs::write(repo_path.join("LICENSE"), "MIT License\n")?;
+        fs::create_dir(repo_path.join("examples"))?;
+        fs::write(repo_path.join("examples/demo.rs"), "fn main() {}\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add mixed content")?;
+
+        let commit = create_test_commit(
+            "mix1234567890123456789012345678901234567",
+            "Add mixed content",
+            "Test User",
+            1700000900,
+        );
+
+        let items = vec![
+            TreeItem::Directory {
+                name: "bin".to_string(),
+                full_path: "bin".to_string(),
+                commit: commit.clone(),
+            },
+            TreeItem::Directory {
+                name: "examples".to_string(),
+                full_path: "examples".to_string(),
+                commit: commit.clone(),
+            },
+            TreeItem::File {
+                entry: create_file_entry("LICENSE", "1111"),
+                commit,
+            },
+        ];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(html.contains("bin"), "Should list bin directory");
+        assert!(html.contains("examples"), "Should list examples directory");
+        assert!(html.contains("LICENSE"), "Should list LICENSE file");
+        assert!(html.contains("icon-folder"), "Should have folder icons");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_title_includes_path() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir(repo_path.join("docs"))?;
+        fs::write(repo_path.join("docs/guide.md"), "# Guide\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add docs")?;
+
+        let commit = create_test_commit(
+            "title12345678901234567890123456789012345",
+            "Add docs",
+            "Test User",
+            1700001000,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("docs/guide.md", "2222"),
+            commit,
+        }];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "docs", "my-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(html.contains("<title>"), "Should have title tag");
+        assert!(html.contains("docs"), "Title should include path");
+        assert!(html.contains("my-repo"), "Title should include repo name");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_root_title_is_repo_name() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::write(repo_path.join("file.txt"), "content\n")?;
+
+        Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add file")?;
+
+        let commit = create_test_commit(
+            "root123456789012345678901234567890123456",
+            "Add file",
+            "Test User",
+            1700001100,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("file.txt", "3333"),
+            commit,
+        }];
+
+        let result =
+            gitkyl::pages::tree::generate(repo_path, "HEAD", "", "awesome-project", &items)?;
+
+        let html = result.into_string();
+
+        assert!(
+            html.contains("<title>awesome-project - Gitkyl</title>"),
+            "Root title should be repo name with Gitkyl suffix"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_generate_parent_link_goes_to_parent_directory() -> Result<()> {
+        let repo = create_test_repo()?;
+        let repo_path = repo.path();
+
+        fs::create_dir_all(repo_path.join("a/b"))?;
+        fs::write(repo_path.join("a/b/file.txt"), "content\n")?;
+
+        Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .output()?;
+        git_commit(repo_path, "Add nested")?;
+
+        let commit = create_test_commit(
+            "nest123456789012345678901234567890123456",
+            "Add nested",
+            "Test User",
+            1700001200,
+        );
+
+        let items = vec![TreeItem::File {
+            entry: create_file_entry("a/b/file.txt", "4444"),
+            commit,
+        }];
+
+        let result = gitkyl::pages::tree::generate(repo_path, "HEAD", "a/b", "test-repo", &items)?;
+
+        let html = result.into_string();
+
+        assert!(html.contains(".."), "Should have parent directory link");
+        assert!(html.contains("ph-arrow-up"), "Should have arrow up icon");
+
+        Ok(())
+    }
+}
