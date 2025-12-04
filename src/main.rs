@@ -32,31 +32,37 @@ fn main() -> Result<()> {
     let assets_dir = config.output.join("assets");
     fs::create_dir_all(&assets_dir).context("Failed to create assets directory")?;
 
-    fs::write(
-        assets_dir.join("index.css"),
-        include_str!("../assets/index.css"),
-    )
-    .context("Failed to write index.css")?;
-    fs::write(
-        assets_dir.join("blob.css"),
-        include_str!("../assets/blob.css"),
-    )
-    .context("Failed to write blob.css")?;
-    fs::write(
-        assets_dir.join("commits.css"),
-        include_str!("../assets/commits.css"),
-    )
-    .context("Failed to write commits.css")?;
-    fs::write(
-        assets_dir.join("tree.css"),
-        include_str!("../assets/tree.css"),
-    )
-    .context("Failed to write tree.css")?;
-    fs::write(
-        assets_dir.join("markdown.css"),
-        include_str!("../assets/markdown.css"),
-    )
-    .context("Failed to write markdown.css")?;
+    let base = include_str!("../assets/base.css");
+    let layout = include_str!("../assets/components/layout.css");
+    let nav = include_str!("../assets/components/nav.css");
+    let file_list = include_str!("../assets/components/file-list.css");
+
+    let write_css = |name: &str, components: &[&str], page: &str| -> Result<()> {
+        let css = components.join("\n") + "\n" + page;
+        fs::write(assets_dir.join(name), css).with_context(|| format!("Failed to write {}", name))
+    };
+
+    write_css(
+        "index.css",
+        &[base, layout, file_list],
+        include_str!("../assets/page-index.css"),
+    )?;
+    write_css(
+        "tree.css",
+        &[base, layout, nav, file_list],
+        include_str!("../assets/page-tree.css"),
+    )?;
+    write_css(
+        "blob.css",
+        &[base, layout, nav],
+        include_str!("../assets/page-blob.css"),
+    )?;
+    write_css(
+        "commits.css",
+        &[base, layout, nav],
+        include_str!("../assets/page-commits.css"),
+    )?;
+    write_css("markdown.css", &[], include_str!("../assets/markdown.css"))?;
 
     let latest_commit =
         gitkyl::list_commits(&config.repo, Some(repo_info.default_branch()), Some(1))

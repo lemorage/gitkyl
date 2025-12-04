@@ -1,0 +1,65 @@
+/* CSS Variables */
+:root {
+    --bg-body: #F5F5F7;
+    --bg-card: #FFFFFF;
+    --text-primary: #1D1D1F;
+    --text-secondary: #86868B;
+    --accent: #0071E3;
+    --accent-hover: #0077ED;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.04);
+    --radius-l: 18px;
+    --radius-m: 12px;
+    --radius-s: 6px;
+    --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    --icon-folder: #5AC8FA;
+    --icon-rust: #FF9500;
+    --icon-readme: #0071E3;
+    --icon-config: #86868B;
+    --bg-code: #FAFAFC;
+    --bg-lines: rgba(249, 249, 250, 0.8);
+    --text-code: #1D1D1F;
+    --indent-offset: 32px;
+    --filename-shift: -12px;
+}
+
+/* Smooth Scroll Behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Universal Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body Defaults */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--bg-body);
+    padding: 2rem 1.5rem;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Container */
+.container {
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+/* Selection */
+::selection {
+    background-color: rgba(0, 113, 227, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 1rem;
+    }
+}

@@ -1,0 +1,77 @@
+/* Breadcrumb Navigation Component */
+
+.breadcrumb {
+    font-size: 13px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.breadcrumb-link {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.breadcrumb-link:hover {
+    color: var(--accent-hover);
+}
+
+.breadcrumb-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-s);
+}
+
+.breadcrumb-separator {
+    color: var(--text-secondary);
+    margin: 0 4px;
+}
+
+.breadcrumb-current {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ref-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ref-label {
+    font-weight: 500;
+}
+
+.ref-name {
+    font-family: var(--font-mono);
+    background: #e8e8ed;
+    padding: 4px 10px;
+    border-radius: 100px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.ref-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    background: rgba(0, 113, 227, 0.1);
+    border-radius: 100px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .breadcrumb {
+        font-size: 12px;
+    }
+}

@@ -1,0 +1,22 @@
+/* Tree Page Specific Styles */
+
+/* Header Section */
+header {
+    margin-bottom: 2rem;
+}
+
+/* Tree Container */
+.tree-container {
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+}
+
+/* Empty State */
+.empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: var(--text-secondary);
+}

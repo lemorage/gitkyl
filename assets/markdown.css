@@ -182,7 +182,7 @@
     background: #f5f7fa;
     padding: 0.2em 0.4em;
     border-radius: 6px;
-    font-size: 0.85em;
+    font-size: 0.9em;
     font-family:
         "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
         "Courier New", monospace;
@@ -192,7 +192,7 @@
     background: #f5f7fa;
     padding: 16px;
     overflow: auto;
-    font-size: 0.9em;
+    font-size: 0.95em;
     line-height: 1.5;
     border-radius: 8px;
     margin: 16px 0;
@@ -788,7 +788,7 @@
     background: #1e1e2e;
     padding: 0.2em 0.4em;
     border-radius: 6px;
-    font-size: 0.85em;
+    font-size: 0.9em;
     font-family:
         "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono",
         "Courier New", monospace;
@@ -798,7 +798,7 @@
     background: #1e1e2e;
     padding: 16px;
     overflow: auto;
-    font-size: 0.9em;
+    font-size: 0.95em;
     line-height: 1.5;
     border-radius: 8px;
     margin: 16px 0;

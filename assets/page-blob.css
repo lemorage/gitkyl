@@ -1,0 +1,105 @@
+/* Blob Page Specific Styles */
+
+/* Header Section */
+header {
+    margin-bottom: 2rem;
+}
+
+/* Blob Container */
+.blob-container {
+    display: flex;
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+}
+
+/* Line Numbers */
+.line-numbers {
+    background: var(--bg-lines);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 16px 12px;
+    text-align: right;
+    user-select: none;
+    border-right: 1px solid var(--border-subtle);
+    min-width: 56px;
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(20px)) {
+    .line-numbers {
+        background: #f9f9fa;
+    }
+}
+
+.line-number {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 20px;
+    color: var(--text-secondary);
+    display: block;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.line-number:hover {
+    color: var(--accent);
+    cursor: pointer;
+}
+
+/* Code Content */
+.code-content {
+    flex: 1;
+    overflow-x: auto;
+    background: var(--bg-card);
+}
+
+pre {
+    margin: 0;
+    padding: 16px;
+}
+
+.blob-container code,
+.code-content code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 20px;
+    display: block;
+    color: var(--text-code);
+}
+
+.code-line {
+    display: block;
+    min-height: 20px;
+    scroll-margin-top: 100px;
+    position: relative;
+}
+
+.code-line:target {
+    background-color: rgba(255, 223, 93, 0.4);
+}
+
+.code-line:target::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: #FFD700;
+    z-index: 10;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .line-numbers {
+        min-width: 48px;
+        padding: 12px 8px;
+    }
+
+    pre {
+        padding: 12px;
+    }
+}
