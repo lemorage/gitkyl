@@ -26,10 +26,11 @@ pub fn repo_header(name: &str, owner: Option<&str>) -> Markup {
     }
 }
 
-/// Renders branch selector dropdown
+/// Renders branch selector with navigation links
 ///
-/// Shows available branches with active branch highlighted. When repository
-/// has fewer than threshold branches, displays static badge instead.
+/// Shows available branches with active branch highlighted. Each branch is a
+/// clickable link to that branch's index page. When repository has fewer than
+/// threshold branches, displays static badge instead.
 ///
 /// # Arguments
 ///
@@ -41,23 +42,35 @@ pub fn repo_header(name: &str, owner: Option<&str>) -> Markup {
 ///
 /// Branch selector or static badge markup
 pub fn branch_selector(branches: &[&str], current: &str, min_for_selector: usize) -> Markup {
-    html! {
-        @if branches.len() >= min_for_selector {
-            div class="branch-selector" {
+    if branches.len() < min_for_selector {
+        return html! {
+            div class="branch-info" {
                 i class="ph ph-git-branch" {}
-                @for branch in branches {
-                    @if *branch == current {
-                        span class="branch-name branch-active" { (branch) }
-                    } @else {
-                        span class="branch-name" { (branch) }
-                    }
-                }
+                span class="branch-name branch-active" { (current) }
+            }
+        };
+    }
+
+    html! {
+        div class="branch-selector" {
+            div class="branch-button" {
+                i class="ph ph-git-branch" {}
+                span class="branch-name branch-active" { (current) }
                 i class="ph ph-caret-down branch-caret" {}
             }
-        } @else {
-            div class="branch-selector" {
-                i class="ph ph-git-branch" {}
-                span { (current) }
+            div class="branch-dropdown" {
+                @for branch in branches {
+                    @if *branch == current {
+                        div class="branch-item branch-current" {
+                            i class="ph ph-check" {}
+                            span { (branch) }
+                        }
+                    } @else {
+                        a class="branch-item" href=(format!("tree/{}/index.html", branch)) {
+                            span { (branch) }
+                        }
+                    }
+                }
             }
         }
     }

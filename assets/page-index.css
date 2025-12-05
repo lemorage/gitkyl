@@ -63,51 +63,133 @@
 
 /* Branch Selector */
 .branch-selector {
+    position: relative;
+    display: inline-block;
+}
+
+.branch-info,
+.branch-button {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 6px 12px;
-    background: #E8E8ED;
+    background: rgba(0, 0, 0, 0.04);
     color: var(--text-primary);
     border-radius: 100px;
     font-weight: 500;
     font-size: 13px;
+    line-height: 1;
     border: none;
-    transition: all 0.2s ease;
     font-family: inherit;
-    line-height: 20px;
-    flex-wrap: wrap;
 }
 
-.branch-selector:has(.branch-caret):hover {
-    background: #D2D2D7;
+.branch-button {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.branch-button:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.branch-button .ph-git-branch {
+    font-size: 16px;
+    opacity: 0.6;
 }
 
 .branch-name {
-    padding: 2px 8px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.6);
-    font-size: 12px;
-    transition: all 0.2s ease;
-}
-
-.branch-name:hover {
-    background: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
 }
 
 .branch-active {
-    background: var(--accent);
-    color: white;
-    font-weight: 600;
-}
-
-.branch-active:hover {
-    background: var(--accent-hover);
+    font-weight: 500;
 }
 
 .branch-caret {
-    font-size: 10px;
-    margin-left: 2px;
+    font-size: 12px;
+    opacity: 0.5;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.branch-selector:hover .branch-caret {
+    transform: rotate(180deg);
+}
+
+/* Dropdown Menu */
+.branch-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 220px;
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    z-index: 100;
+}
+
+.branch-selector:hover .branch-dropdown {
+    display: block;
+    animation: dropdown-appear 0.15s ease-out;
+}
+
+@keyframes dropdown-appear {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.branch-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 400;
+    border-radius: 6px;
+    transition: background 0.1s ease;
+    cursor: pointer;
+}
+
+.branch-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.branch-item span {
+    flex: 1;
+    line-height: 1;
+}
+
+.branch-item i {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.branch-current {
+    font-weight: 500;
+    cursor: default;
+}
+
+.branch-current:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.branch-current i {
+    color: var(--accent);
 }
 
 /* Commit Info Components */
