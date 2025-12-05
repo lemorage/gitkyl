@@ -158,6 +158,7 @@ fn test_config_validation_valid() -> Result<()> {
         name: Some("test".to_string()),
         owner: None,
         theme: "Catppuccin-Latte".to_string(),
+        no_open: true,
     };
 
     // Act
@@ -179,6 +180,7 @@ fn test_config_validation_invalid_repo() {
         name: None,
         owner: None,
         theme: "Catppuccin-Latte".to_string(),
+        no_open: true,
     };
 
     // Act
@@ -201,6 +203,7 @@ fn test_project_name_custom() -> Result<()> {
         name: Some("Custom Name".to_string()),
         owner: None,
         theme: "Catppuccin-Latte".to_string(),
+        no_open: true,
     };
 
     // Act
@@ -222,6 +225,7 @@ fn test_project_name_fallback() -> Result<()> {
         name: None,
         owner: None,
         theme: "Catppuccin-Latte".to_string(),
+        no_open: true,
     };
 
     // Act
@@ -243,6 +247,7 @@ fn test_project_name_with_current_dir() -> Result<()> {
         name: None,
         owner: None,
         theme: "Catppuccin-Latte".to_string(),
+        no_open: true,
     };
 
     // Act
@@ -267,6 +272,7 @@ fn test_project_name_root_path() {
         name: None,
         owner: None,
         theme: "Catppuccin-Latte".to_string(),
+        no_open: true,
     };
 
     // Act

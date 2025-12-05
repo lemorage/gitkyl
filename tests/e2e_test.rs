@@ -31,6 +31,7 @@ fn test_full_workflow_e2e() -> Result<()> {
             "E2E Test",
             "--owner",
             "testuser",
+            "--no-open",
         ])
         .status()?;
 
@@ -75,6 +76,7 @@ fn test_minimal_args_e2e() -> Result<()> {
             temp_output
                 .to_str()
                 .expect("Test output path should be valid UTF8"),
+            "--no-open",
         ])
         .status()?;
 

@@ -27,6 +27,10 @@ pub struct Config {
     /// Syntax highlighting theme (Catppuccin-Latte, Catppuccin-Mocha, etc.)
     #[arg(long, default_value = "Catppuccin-Latte")]
     pub theme: String,
+
+    /// Disable automatic opening of index.html in browser
+    #[arg(long, default_value_t = false)]
+    pub no_open: bool,
 }
 
 impl Config {
@@ -83,6 +87,7 @@ mod tests {
             name: Some("ExplicitName".to_string()),
             owner: None,
             theme: "Catppuccin-Latte".to_string(),
+            no_open: false,
         };
 
         // Act
@@ -102,6 +107,7 @@ mod tests {
             name: Some("test".to_string()),
             owner: Some("owner".to_string()),
             theme: "Catppuccin-Mocha".to_string(),
+            no_open: false,
         };
 
         // Act
@@ -113,6 +119,7 @@ mod tests {
         assert_eq!(cloned.name, original.name);
         assert_eq!(cloned.owner, original.owner);
         assert_eq!(cloned.theme, original.theme);
+        assert_eq!(cloned.no_open, original.no_open);
     }
 
     #[test]
@@ -124,6 +131,7 @@ mod tests {
             name: None,
             owner: None,
             theme: "base16-ocean.light".to_string(),
+            no_open: false,
         };
 
         // Act
@@ -143,6 +151,7 @@ mod tests {
             name: None,
             owner: None,
             theme: "Catppuccin-Latte".to_string(),
+            no_open: false,
         };
 
         // Act
@@ -161,6 +170,7 @@ mod tests {
             name: None,
             owner: None,
             theme: "Catppuccin-Latte".to_string(),
+            no_open: false,
         };
 
         // Assert
@@ -168,5 +178,70 @@ mod tests {
             config.theme, "Catppuccin-Latte",
             "Default theme should be Catppuccin-Latte"
         );
+    }
+
+    #[test]
+    fn test_validate_nonexistent_path() {
+        // Arrange
+        let config = Config {
+            repo: PathBuf::from("/nonexistent/path/that/does/not/exist"),
+            output: PathBuf::from("dist"),
+            name: None,
+            owner: None,
+            theme: "Catppuccin-Latte".to_string(),
+            no_open: false,
+        };
+
+        // Act
+        let result = config.validate();
+
+        // Assert
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("does not exist"));
+    }
+
+    #[test]
+    fn test_project_name_without_explicit_name() {
+        // Arrange
+        let config = Config {
+            repo: PathBuf::from("."),
+            output: PathBuf::from("dist"),
+            name: None,
+            owner: None,
+            theme: "Catppuccin-Latte".to_string(),
+            no_open: false,
+        };
+
+        // Act
+        let result = config.project_name();
+
+        // Assert
+        assert!(result.is_ok());
+        let name = result.unwrap();
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn test_project_name_from_path_component() {
+        // Arrange
+        let temp_dir = std::env::temp_dir().join("test_gitkyl_repo");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let config = Config {
+            repo: temp_dir.clone(),
+            output: PathBuf::from("dist"),
+            name: None,
+            owner: None,
+            theme: "Catppuccin-Latte".to_string(),
+            no_open: false,
+        };
+
+        // Act
+        let result = config.project_name();
+
+        // Assert
+        std::fs::remove_dir_all(&temp_dir).ok();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test_gitkyl_repo");
     }
 }

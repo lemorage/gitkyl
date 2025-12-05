@@ -379,6 +379,15 @@ fn main() -> Result<()> {
 
     println!("Generated {} tree pages", tree_count);
 
+    if !config.no_open {
+        let index_path = config.output.join("index.html");
+        if index_path.exists()
+            && let Err(e) = open::that(&index_path)
+        {
+            eprintln!("Warning: Failed to open index.html: {}", e);
+        }
+    }
+
     Ok(())
 }
 
