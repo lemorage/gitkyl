@@ -609,8 +609,8 @@ fn test_branch_selector_single_branch_shows_static_badge() {
     let html_str = html.into_string();
 
     assert!(
-        html_str.contains("branch-selector"),
-        "Should contain branch-selector div"
+        html_str.contains("branch-info"),
+        "Should contain branch-info div for static badge"
     );
 }
 

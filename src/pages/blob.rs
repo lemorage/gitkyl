@@ -9,6 +9,7 @@ use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
 use crate::git::read_blob;
 use crate::highlight::Highlighter;
 use crate::markdown::MarkdownRenderer;
+use crate::path::calculate_depth;
 
 /// Generates HTML blob page with syntax highlighting
 ///
@@ -161,10 +162,7 @@ fn blob_page_markup(
     highlighted_lines: &[String],
 ) -> Markup {
     let line_count = highlighted_lines.len().max(1);
-
-    // Calculate relative path back to index.html based on depth
-    // Depth = blob/ + branch/ + path directories
-    let depth = breadcrumb_components.len() + 1;
+    let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
 
@@ -220,7 +218,7 @@ fn markdown_blob_page_markup(
     repo_name: &str,
     rendered_html: &str,
 ) -> Markup {
-    let depth = breadcrumb_components.len() + 1;
+    let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
     let markdown_css_path = format!("{}assets/markdown.css", "../".repeat(depth));

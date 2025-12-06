@@ -6,6 +6,7 @@ mod git;
 mod highlight;
 mod markdown;
 pub mod pages;
+mod path;
 mod time;
 mod tree;
 

@@ -354,11 +354,19 @@ fn main() -> Result<()> {
             &tree_items_for_page,
         ) {
             Ok(html) => {
-                let tree_path = config
-                    .output
-                    .join("tree")
-                    .join(repo_info.default_branch())
-                    .join(format!("{}.html", dir_path));
+                let tree_path = if dir_path.is_empty() {
+                    config
+                        .output
+                        .join("tree")
+                        .join(repo_info.default_branch())
+                        .join("index.html")
+                } else {
+                    config
+                        .output
+                        .join("tree")
+                        .join(repo_info.default_branch())
+                        .join(format!("{}.html", dir_path))
+                };
 
                 if let Some(parent) = tree_path.parent() {
                     fs::create_dir_all(parent).context("Failed to create tree directory")?;
@@ -377,7 +385,154 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("Generated {} tree pages", tree_count);
+    println!("Generated {} tree pages for default branch", tree_count);
+
+    println!("Generating tree pages for all branches...");
+
+    let mut total_tree_pages = tree_count;
+
+    for branch in repo_info.branches() {
+        if branch == repo_info.default_branch() {
+            continue;
+        }
+
+        let branch_files = gitkyl::list_files(&config.repo, Some(branch)).unwrap_or_else(|e| {
+            eprintln!(
+                "Warning: Failed to list files for branch {}: {:#}",
+                branch, e
+            );
+            vec![]
+        });
+
+        if branch_files.is_empty() {
+            continue;
+        }
+
+        let branch_tree = gitkyl::FileTree::from_files(branch_files.clone());
+
+        let branch_file_paths: Vec<&str> = branch_files
+            .iter()
+            .filter_map(|f| f.path()?.to_str())
+            .collect();
+
+        let branch_commit_map =
+            gitkyl::get_last_commits_batch(&config.repo, Some(branch), &branch_file_paths)
+                .unwrap_or_else(|e| {
+                    eprintln!(
+                        "Warning: Failed to batch lookup commits for branch {}: {:#}",
+                        branch, e
+                    );
+                    std::collections::HashMap::new()
+                });
+
+        let branch_directories = branch_tree.all_dirs();
+
+        for dir_path in &branch_directories {
+            validate_tree_path(dir_path)
+                .with_context(|| format!("Invalid tree path: {}", dir_path))?;
+
+            let entries_at_level = branch_tree.files_at(dir_path);
+            let subdirs_at_level = branch_tree.subdirs_at(dir_path);
+
+            let full_subdir_paths: Vec<String> = subdirs_at_level
+                .iter()
+                .map(|subdir| {
+                    if dir_path.is_empty() {
+                        subdir.to_string()
+                    } else {
+                        format!("{}/{}", dir_path, subdir)
+                    }
+                })
+                .collect();
+
+            let dir_paths_refs: Vec<&str> = full_subdir_paths.iter().map(|s| s.as_str()).collect();
+
+            let level_dir_commit_map = if !dir_paths_refs.is_empty() {
+                gitkyl::get_last_commits_batch(&config.repo, Some(branch), &dir_paths_refs)
+                    .unwrap_or_else(|e| {
+                        eprintln!(
+                            "Warning: Failed to lookup directory commits for branch {} dir {}: {:#}",
+                            branch, dir_path, e
+                        );
+                        std::collections::HashMap::new()
+                    })
+            } else {
+                std::collections::HashMap::new()
+            };
+
+            let mut tree_items = Vec::new();
+
+            for (i, subdir) in subdirs_at_level.iter().enumerate() {
+                let full_subdir_path = &full_subdir_paths[i];
+                if let Some(commit) = level_dir_commit_map.get(full_subdir_path.as_str()) {
+                    tree_items.push(TreeItem::Directory {
+                        name: subdir.to_string(),
+                        full_path: full_subdir_path.clone(),
+                        commit: commit.clone(),
+                    });
+                }
+            }
+
+            for entry in entries_at_level {
+                if let Some(path) = entry.path()
+                    && let Some(path_str) = path.to_str()
+                    && let Some(commit) = branch_commit_map.get(path_str)
+                {
+                    tree_items.push(TreeItem::File {
+                        entry: entry.clone(),
+                        commit: commit.clone(),
+                    });
+                }
+            }
+
+            match gitkyl::pages::tree::generate(
+                &config.repo,
+                branch,
+                dir_path,
+                repo_info.name(),
+                &tree_items,
+            ) {
+                Ok(html) => {
+                    let tree_path = if dir_path.is_empty() {
+                        config.output.join("tree").join(branch).join("index.html")
+                    } else {
+                        config
+                            .output
+                            .join("tree")
+                            .join(branch)
+                            .join(format!("{}.html", dir_path))
+                    };
+
+                    if let Some(parent) = tree_path.parent() {
+                        fs::create_dir_all(parent).context("Failed to create tree directory")?;
+                    }
+
+                    fs::write(&tree_path, html.into_string()).with_context(|| {
+                        format!("Failed to write tree page {}", tree_path.display())
+                    })?;
+
+                    total_tree_pages += 1;
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Failed to generate tree page for branch {} dir {}: {:#}",
+                        branch, dir_path, e
+                    );
+                }
+            }
+        }
+
+        println!(
+            "Generated tree pages for branch: {} ({} directories)",
+            branch,
+            branch_directories.len()
+        );
+    }
+
+    println!(
+        "Generated {} total tree pages across all branches",
+        total_tree_pages
+    );
 
     if !config.no_open {
         let index_path = config.output.join("index.html");

@@ -54,7 +54,9 @@ pub fn generate(
         tree_path.split('/').filter(|s| !s.is_empty()).collect()
     };
 
-    let depth = path_components.len() + 1;
+    // Calculate depth accounting for slashes in branch name
+    // Examples: tree/dev/index.html -> depth 2
+    let depth = crate::path::calculate_depth(ref_name, tree_path);
     let index_path = "../".repeat(depth) + "index.html";
 
     // Build breadcrumb data from path_components

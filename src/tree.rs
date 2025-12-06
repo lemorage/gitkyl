@@ -253,9 +253,7 @@ impl FileTree {
     }
 
     fn collect_dirs(node: &DirNode, path: String, dirs: &mut Vec<String>) {
-        if !path.is_empty() {
-            dirs.push(path.clone());
-        }
+        dirs.push(path.clone());
 
         for (name, subdir) in &node.subdirs {
             let subpath = if path.is_empty() {
@@ -294,7 +292,11 @@ mod tests {
             tree.subdirs_at("").is_empty(),
             "Root should have no subdirs"
         );
-        assert!(tree.all_dirs().is_empty(), "Should have no directories");
+        assert_eq!(
+            tree.all_dirs(),
+            vec![""],
+            "Empty tree should still have root directory"
+        );
     }
 
     #[test]

@@ -34,8 +34,7 @@ use crate::time::format_timestamp;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn generate(commits: &[CommitInfo], ref_name: &str, repo_name: &str) -> Markup {
-    // Commits pages are always at depth 2: commits/<branch>/index.html
-    let depth = 2;
+    let depth = crate::path::calculate_depth(ref_name, "");
     let css_path = format!("{}assets/commits.css", "../".repeat(depth));
     let index_path = format!("{}index.html", "../".repeat(depth));
 
