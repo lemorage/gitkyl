@@ -28,6 +28,7 @@ pub struct IndexPageData<'a> {
     pub latest_commit: Option<&'a CommitInfo>,
     pub items: &'a [TreeItem],
     pub readme_html: Option<&'a str>,
+    pub depth: usize,
 }
 
 /// Generates repository index page HTML with optional README rendering
@@ -44,9 +45,23 @@ pub struct IndexPageData<'a> {
 ///
 /// Complete HTML markup for index page
 pub fn generate(data: IndexPageData<'_>) -> Markup {
+    let css_paths: Vec<String> = if data.depth == 0 {
+        vec![
+            "assets/index.css".to_string(),
+            "assets/markdown.css".to_string(),
+        ]
+    } else {
+        let prefix = "../".repeat(data.depth);
+        vec![
+            format!("{}assets/index.css", prefix),
+            format!("{}assets/markdown.css", prefix),
+        ]
+    };
+    let css_path_refs: Vec<&str> = css_paths.iter().map(|s| s.as_str()).collect();
+
     page_wrapper(
         data.name,
-        &["assets/index.css", "assets/markdown.css"],
+        &css_path_refs,
         html! {
             (repo_header(data.name, data.owner))
 
@@ -54,7 +69,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                 div class="repo-controls" {
                     div class="commit-info-group" {
                         @let branch_strs: Vec<&str> = data.branches.iter().map(|s| s.as_str()).collect();
-                        (branch_selector(&branch_strs, data.default_branch, MIN_BRANCHES_FOR_SELECTOR))
+                        (branch_selector(&branch_strs, data.default_branch, MIN_BRANCHES_FOR_SELECTOR, data.depth))
 
                         @if let Some(commit) = data.latest_commit {
                             div class="commit-info-wrapper" {
@@ -71,7 +86,12 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                         }
                     }
 
-                    a href=(format!("commits/{}/index.html", data.default_branch)) class="history-link" {
+                    @let commits_href = if data.depth == 0 {
+                        format!("commits/{}/index.html", data.default_branch)
+                    } else {
+                        format!("{}commits/{}/index.html", "../".repeat(data.depth), data.default_branch)
+                    };
+                    a href=(commits_href) class="history-link" {
                         i class="ph ph-clock-counter-clockwise" {}
                         " " (data.commit_count) " commits"
                     }
@@ -86,7 +106,11 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                                         TreeItem::File { entry, commit } => {
                                             @if let Some(path) = entry.path()
                                                 && let Some(path_str) = path.to_str() {
-                                                @let href = format!("blob/{}/{}.html", data.default_branch, path_str);
+                                                @let href = if data.depth == 0 {
+                                                    format!("blob/{}/{}.html", data.default_branch, path_str)
+                                                } else {
+                                                    format!("{}blob/{}/{}.html", "../".repeat(data.depth), data.default_branch, path_str)
+                                                };
                                                 (file_row(
                                                     &href,
                                                     file_icon(path_str),
@@ -99,7 +123,11 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                                         },
                                         TreeItem::Directory { name, full_path, commit } => {
                                             @let display_path = if full_path.is_empty() { name } else { full_path };
-                                            @let href = format!("tree/{}/{}.html", data.default_branch, display_path);
+                                            @let href = if data.depth == 0 {
+                                                format!("tree/{}/{}.html", data.default_branch, display_path)
+                                            } else {
+                                                format!("{}tree/{}/{}.html", "../".repeat(data.depth), data.default_branch, display_path)
+                                            };
                                             (file_row(
                                                 &href,
                                                 file_icon(&format!("{}/", display_path)),
@@ -219,6 +247,7 @@ mod tests {
             latest_commit: None,
             items: &items,
             readme_html: None,
+            depth: 0,
         });
         let html_string = html.into_string();
 
@@ -260,6 +289,7 @@ mod tests {
             latest_commit: Some(&mock_commit),
             items: &items,
             readme_html: None,
+            depth: 0,
         });
         let html_string = html.into_string();
 
@@ -323,6 +353,7 @@ mod tests {
             latest_commit: None,
             items: &items,
             readme_html: None,
+            depth: 0,
         });
         let html_string = html.into_string();
 
@@ -372,6 +403,7 @@ mod tests {
             latest_commit: None,
             items: &items,
             readme_html: None,
+            depth: 0,
         });
         let html_string = html.into_string();
 
@@ -413,6 +445,7 @@ mod tests {
             latest_commit: None,
             items: &items,
             readme_html,
+            depth: 0,
         });
         let html_string = html.into_string();
 
@@ -456,6 +489,7 @@ mod tests {
             latest_commit: None,
             items: &items,
             readme_html: None,
+            depth: 0,
         });
         let html_string = html.into_string();
 

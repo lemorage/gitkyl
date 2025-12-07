@@ -37,11 +37,17 @@ pub fn repo_header(name: &str, owner: Option<&str>) -> Markup {
 /// * `branches`: Slice of branch names
 /// * `current`: Name of currently active branch
 /// * `min_for_selector`: Minimum branches to show dropdown (else shows badge)
+/// * `depth`: Current page depth for relative path calculation
 ///
 /// # Returns
 ///
 /// Branch selector or static badge markup
-pub fn branch_selector(branches: &[&str], current: &str, min_for_selector: usize) -> Markup {
+pub fn branch_selector(
+    branches: &[&str],
+    current: &str,
+    min_for_selector: usize,
+    depth: usize,
+) -> Markup {
     if branches.len() < min_for_selector {
         return html! {
             div class="branch-info" {
@@ -66,7 +72,8 @@ pub fn branch_selector(branches: &[&str], current: &str, min_for_selector: usize
                             span { (branch) }
                         }
                     } @else {
-                        a class="branch-item" href=(format!("tree/{}/index.html", branch)) {
+                        @let href = format!("{}tree/{}/index.html", "../".repeat(depth), branch);
+                        a class="branch-item" href=(href) {
                             span { (branch) }
                         }
                     }

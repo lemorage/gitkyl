@@ -605,7 +605,7 @@ fn test_branch_selector_single_branch_shows_static_badge() {
     let current = "main";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -622,7 +622,7 @@ fn test_branch_selector_single_branch_contains_name() {
     let current = "develop";
     let min_for_selector = 3;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(html_str.contains("develop"), "Should display branch name");
@@ -636,7 +636,7 @@ fn test_branch_selector_single_branch_no_dropdown_icon() {
     let current = "main";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -653,7 +653,7 @@ fn test_branch_selector_multiple_branches_shows_dropdown() {
     let current = "main";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -670,7 +670,7 @@ fn test_branch_selector_multiple_branches_contains_all_names() {
     let current = "develop";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(html_str.contains("main"), "Should contain main branch");
@@ -692,7 +692,7 @@ fn test_branch_selector_marks_current_branch_active() {
     let current = "develop";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -719,7 +719,7 @@ fn test_branch_selector_multiple_branches_has_dropdown_icon() {
     let current = "main";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -740,7 +740,7 @@ fn test_branch_selector_threshold_exactly_at_min() {
     let current = "main";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -761,7 +761,7 @@ fn test_branch_selector_threshold_just_below_min() {
     let current = "main";
     let min_for_selector = 2;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
@@ -784,7 +784,7 @@ fn test_branch_selector_realistic_branch_names() {
     let current = "feature/user-auth";
     let min_for_selector = 3;
 
-    let html = branch_selector(branches, current, min_for_selector);
+    let html = branch_selector(branches, current, min_for_selector, 0);
     let html_str = html.into_string();
 
     assert!(
