@@ -10,7 +10,7 @@ use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
 use crate::components::metadata::{branch_selector, repo_header};
 use crate::git::{CommitInfo, TreeItem};
-use crate::time::format_timestamp;
+use crate::util::format_timestamp;
 
 /// Minimum branches required to show selector dropdown
 ///

@@ -9,7 +9,7 @@ use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
 use crate::git::TreeItem;
-use crate::time::format_timestamp;
+use crate::util::{calculate_depth, format_timestamp};
 
 /// Generates HTML tree page for directory browsing
 ///
@@ -54,9 +54,7 @@ pub fn generate(
         tree_path.split('/').filter(|s| !s.is_empty()).collect()
     };
 
-    // Calculate depth accounting for slashes in branch name
-    // Examples: tree/dev/index.html -> depth 2
-    let depth = crate::path::calculate_depth(ref_name, tree_path);
+    let depth = calculate_depth(ref_name, tree_path);
     let index_path = "../".repeat(depth) + "index.html";
 
     // Build breadcrumb data from path_components

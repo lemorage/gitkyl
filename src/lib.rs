@@ -6,9 +6,8 @@ mod git;
 mod highlight;
 mod markdown;
 pub mod pages;
-mod path;
-mod time;
 mod tree;
+mod util;
 
 pub use components::icons::is_readme;
 pub use config::Config;

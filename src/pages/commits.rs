@@ -5,7 +5,7 @@ use maud::{Markup, html};
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
 use crate::git::CommitInfo;
-use crate::time::format_timestamp;
+use crate::util::{calculate_depth, format_timestamp};
 
 /// Generates HTML page displaying commit log for a reference
 ///
@@ -34,7 +34,7 @@ use crate::time::format_timestamp;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn generate(commits: &[CommitInfo], ref_name: &str, repo_name: &str) -> Markup {
-    let depth = crate::path::calculate_depth(ref_name, "");
+    let depth = calculate_depth(ref_name, "");
     let css_path = format!("{}assets/commits.css", "../".repeat(depth));
     let index_path = format!("{}index.html", "../".repeat(depth));
 

@@ -9,7 +9,7 @@ use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
 use crate::git::read_blob;
 use crate::highlight::Highlighter;
 use crate::markdown::MarkdownRenderer;
-use crate::path::calculate_depth;
+use crate::util::calculate_depth;
 
 /// Generates HTML blob page with syntax highlighting
 ///
