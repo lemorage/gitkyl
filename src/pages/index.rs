@@ -517,16 +517,19 @@ mod tests {
             })
             .expect("Repository should have README");
 
-        let commit = crate::git::get_file_last_commit(
-            &repo_path,
-            Some(ref_name),
-            readme_file
-                .path()
-                .expect("README entry should have valid path")
-                .to_str()
-                .expect("README path should be valid UTF8"),
-        )
-        .expect("Should get README commit");
+        let readme_path = readme_file
+            .path()
+            .expect("README entry should have valid path")
+            .to_str()
+            .expect("README path should be valid UTF8");
+
+        let commits =
+            crate::git::get_last_commits_batch(&repo_path, Some(ref_name), &[readme_path])
+                .expect("Should get commits");
+        let commit = commits
+            .get(readme_path)
+            .expect("Should get commit for README")
+            .clone();
 
         let tree_items = vec![TreeItem::File {
             entry: readme_file.clone(),
@@ -584,19 +587,25 @@ mod tests {
             return;
         }
 
-        let mut tree_items = vec![];
-        for file in readme_files {
-            if let Ok(commit) = crate::git::get_file_last_commit(
-                &repo_path,
-                Some(ref_name),
-                file.path()
+        let readme_paths: Vec<&str> = readme_files
+            .iter()
+            .map(|f| {
+                f.path()
                     .expect("Test file entry should have valid path")
                     .to_str()
-                    .expect("Test file path should be valid UTF8"),
-            ) {
+                    .expect("Test file path should be valid UTF8")
+            })
+            .collect();
+
+        let commits = crate::git::get_last_commits_batch(&repo_path, Some(ref_name), &readme_paths)
+            .expect("Should get commits");
+
+        let mut tree_items = vec![];
+        for (idx, file) in readme_files.iter().enumerate() {
+            if let Some(commit) = commits.get(readme_paths[idx]) {
                 tree_items.push(TreeItem::File {
-                    entry: file.clone(),
-                    commit,
+                    entry: (*file).clone(),
+                    commit: commit.clone(),
                 });
             }
         }

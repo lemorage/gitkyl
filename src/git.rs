@@ -23,11 +23,6 @@ impl FileEntry {
     pub fn oid(&self) -> &gix::ObjectId {
         &self.oid
     }
-
-    /// Git object ID as hexadecimal string.
-    pub fn oid_hex(&self) -> String {
-        self.oid.to_hex().to_string()
-    }
 }
 
 /// Repository metadata.
@@ -84,7 +79,7 @@ impl CommitInfo {
     /// Creates a new CommitInfo instance.
     ///
     /// Primarily for testing and manual construction. Production code should
-    /// use list_commits() or get_file_last_commit() to retrieve commit data.
+    /// use list_commits() or get_last_commits_batch() to retrieve commit data.
     ///
     /// # Arguments
     ///
@@ -349,7 +344,7 @@ pub fn read_blob(
 /// let files = list_files(Path::new("."), None)?;
 /// for entry in files {
 ///     if let Some(path) = entry.path() {
-///         println!("{}: {}", path.display(), entry.oid_hex());
+///         println!("{}", path.display());
 ///     }
 /// }
 /// # Ok::<(), anyhow::Error>(())
@@ -636,82 +631,6 @@ pub fn get_last_commits_batch(
     Ok(results)
 }
 
-/// Retrieves the latest commit that modified a specific file path.
-///
-/// Walks commit history from the given reference to find the most recent commit
-/// that affected the specified file. This is used to display per file commit
-/// information in file browsers.
-///
-/// # Arguments
-///
-/// * `repo_path`: Path to git repository
-/// * `ref_name`: Reference name (branch/tag/commit), defaults to HEAD if None
-/// * `file_path`: Path to file within repository tree
-///
-/// # Returns
-///
-/// CommitInfo for the most recent commit that modified the file
-///
-/// # Errors
-///
-/// Returns error if:
-/// - Repository cannot be opened
-/// - Reference cannot be resolved
-/// - File path is not found in commit history
-/// - Commit traversal fails
-///
-/// # Examples
-///
-/// ```no_run
-/// use gitkyl::get_file_last_commit;
-/// use std::path::Path;
-///
-/// let commit = get_file_last_commit(Path::new("."), None, "src/lib.rs")?;
-/// println!("{}: {}", commit.short_oid(), commit.message());
-/// # Ok::<(), anyhow::Error>(())
-/// ```
-pub fn get_file_last_commit(
-    repo_path: impl AsRef<Path>,
-    ref_name: Option<&str>,
-    file_path: &str,
-) -> Result<CommitInfo> {
-    let repo = gix::open(repo_path.as_ref()).with_context(|| {
-        format!(
-            "Failed to open repository at {}",
-            repo_path.as_ref().display()
-        )
-    })?;
-
-    let commit = resolve_commit(&repo, ref_name)?;
-
-    let walker = commit
-        .ancestors()
-        .all()
-        .context("Failed to create commit ancestor iterator")?;
-
-    for result in walker {
-        let commit_info = result.context("Failed to traverse commit ancestor")?;
-        let commit_obj = commit_info
-            .object()
-            .context("Failed to read commit object")?;
-
-        let mut tree = commit_obj.tree().context("Failed to read commit tree")?;
-
-        if tree
-            .peel_to_entry_by_path(file_path)
-            .context("Failed to traverse tree to path")?
-            .is_some()
-        {
-            return extract_commit_info(&commit_obj);
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "File '{}' not found in commit history",
-        file_path
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -840,10 +759,6 @@ mod tests {
                     .map_or(false, |s| s.contains("Cargo.toml"))
             }),
             "Should find Cargo.toml in repository"
-        );
-        assert!(
-            files.iter().all(|entry| !entry.oid_hex().is_empty()),
-            "All entries should have valid OIDs"
         );
     }
 
@@ -1218,91 +1133,6 @@ mod tests {
                 "Git OID should be 20 bytes (SHA-1)"
             );
         }
-    }
-
-    #[test]
-    fn test_get_file_last_commit_default_ref() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-        // Act
-        let commit =
-            get_file_last_commit(&repo_path, None, "Cargo.toml").expect("Should get commit");
-
-        // Assert
-        assert!(!commit.oid().is_empty(), "Should have commit OID");
-        assert_eq!(commit.short_oid().len(), 7, "Short OID should be 7 chars");
-        assert!(!commit.author().is_empty(), "Should have author");
-        assert!(!commit.message().is_empty(), "Should have message");
-        assert!(commit.date() > 0, "Should have positive timestamp");
-    }
-
-    #[test]
-    fn test_get_file_last_commit_specific_ref() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-        // Act
-        let commit = get_file_last_commit(&repo_path, Some("HEAD"), "Cargo.toml")
-            .expect("Should get commit for HEAD reference");
-
-        // Assert
-        assert!(!commit.oid().is_empty(), "Should have commit OID");
-        assert!(
-            !commit.author_email().is_empty(),
-            "Should have author email"
-        );
-    }
-
-    #[test]
-    fn test_get_file_last_commit_nonexistent_file() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let nonexistent_file = "this_file_definitely_does_not_exist_12345.txt";
-
-        // Act
-        let result = get_file_last_commit(&repo_path, None, nonexistent_file);
-
-        // Assert
-        assert!(result.is_err(), "Should return error for nonexistent file");
-        let err_msg = format!("{:?}", result.unwrap_err());
-        assert!(
-            err_msg.contains("not found in commit history"),
-            "Error should mention file not found in history"
-        );
-    }
-
-    #[test]
-    fn test_get_file_last_commit_invalid_ref() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let invalid_ref = "refs/heads/nonexistent_branch_12345";
-
-        // Act
-        let result = get_file_last_commit(&repo_path, Some(invalid_ref), "Cargo.toml");
-
-        // Assert
-        assert!(result.is_err(), "Should return error for invalid reference");
-    }
-
-    #[test]
-    fn test_get_file_last_commit_message_format() {
-        // Arrange
-        let repo_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-        // Act
-        let commit =
-            get_file_last_commit(&repo_path, None, "Cargo.toml").expect("Should get commit");
-
-        // Assert
-        assert!(
-            !commit.message().contains('\n'),
-            "Message should be single line"
-        );
-        assert!(
-            commit.message_full().len() >= commit.message().len(),
-            "Full message should contain at least the first line"
-        );
     }
 
     #[test]

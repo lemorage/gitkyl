@@ -229,6 +229,7 @@ impl FileTree {
     /// let all_src_files = tree.all_files_under("src");
     /// # Ok::<(), anyhow::Error>(())
     /// ```
+    #[allow(dead_code)] // Reserved for future recursive operations (search, stats)
     pub fn all_files_under(&self, dir_path: &str) -> Vec<&FileEntry> {
         let mut files = Vec::new();
         if let Some(node) = self.get_node(dir_path) {

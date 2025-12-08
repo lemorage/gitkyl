@@ -68,7 +68,8 @@ pub fn generate(
         .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
 
     let highlighter = Highlighter::with_theme(theme)
-        .with_context(|| format!("Failed to create syntax highlighter with theme: {}", theme))?;
+        .or_else(|_| Highlighter::new())
+        .context("Failed to create highlighter")?;
 
     let highlighted_lines = highlighter
         .highlight(&content, file_path.as_ref())
