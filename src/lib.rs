@@ -1,5 +1,6 @@
 //! Static site generator for Git repositories.
 
+mod assets;
 pub mod components;
 mod config;
 mod git;
@@ -9,6 +10,7 @@ pub mod pages;
 mod tree;
 mod util;
 
+pub use assets::write_css_assets;
 pub use components::icons::is_readme;
 pub use config::Config;
 pub use git::{
