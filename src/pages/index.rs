@@ -210,7 +210,7 @@ pub fn find_and_render_readme(
 
         let content = String::from_utf8(content_bytes).context("README contains invalid UTF8")?;
 
-        let renderer = crate::markdown::MarkdownRenderer::new();
+        let renderer = crate::markdown::MarkdownRenderer::with_link_resolver(ref_name, path);
         let rendered = renderer
             .render(&content)
             .context("Failed to render README markdown")?;

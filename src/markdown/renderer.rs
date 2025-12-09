@@ -1,23 +1,24 @@
 //! Markdown rendering with GitHub Flavored Markdown support.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use comrak::Options;
 use std::path::Path;
 use syntect::html::{ClassStyle, ClassedHTMLGenerator};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
 
-/// Maximum markdown file size to prevent memory exhaustion (1MB).
-const MAX_MARKDOWN_SIZE: usize = 1_048_576;
+use super::LinkResolver;
 
 /// Renders markdown to HTML with GitHub Flavored Markdown extensions.
 ///
 /// Provides GFM extensions including tables, strikethrough, autolinks,
 /// task lists, footnotes, and description lists. Uses syntect for code
-/// block syntax highlighting when language is specified.
+/// block syntax highlighting when language is specified. Optionally resolves
+/// relative links to repository paths when configured with LinkResolver.
 pub struct MarkdownRenderer<'a> {
     options: Options<'a>,
     syntax_set: SyntaxSet,
+    link_resolver: Option<LinkResolver>,
 }
 
 impl<'a> MarkdownRenderer<'a> {
@@ -51,14 +52,30 @@ impl<'a> MarkdownRenderer<'a> {
         Self {
             options,
             syntax_set,
+            link_resolver: None,
         }
+    }
+
+    /// Creates renderer with link resolution for repository internal links.
+    ///
+    /// Relative links in markdown (./file.md, ../dir/) are transformed to
+    /// static site URLs (/blob/branch/path.html). Absolute URLs and anchor
+    /// links remain unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `branch`: Git branch for link resolution
+    /// * `current_path`: Path to markdown file being rendered
+    pub fn with_link_resolver(branch: impl Into<String>, current_path: impl AsRef<Path>) -> Self {
+        let mut renderer = Self::new();
+        renderer.link_resolver = Some(LinkResolver::new(branch, current_path));
+        renderer
     }
 
     /// Renders markdown content to HTML string.
     ///
     /// Parses markdown into AST, applies transformations, and renders
-    /// to HTML with GFM extensions. Content size is validated to prevent
-    /// memory exhaustion attacks. Code blocks are syntax highlighted with
+    /// to HTML with GFM extensions. Code blocks are syntax highlighted with
     /// CSS class names using syntect.
     ///
     /// # Arguments
@@ -71,20 +88,96 @@ impl<'a> MarkdownRenderer<'a> {
     ///
     /// # Errors
     ///
-    /// Returns error if content exceeds maximum size (1MB) or highlighting fails
+    /// Returns error if syntax highlighting fails
     pub fn render(&self, content: &str) -> Result<String> {
-        if content.len() > MAX_MARKDOWN_SIZE {
-            bail!(
-                "Markdown content too large: {} bytes (max: {})",
-                content.len(),
-                MAX_MARKDOWN_SIZE
-            );
-        }
+        let mut html = comrak::markdown_to_html(content, &self.options);
 
-        let html = comrak::markdown_to_html(content, &self.options);
+        // Rewrite relative links if resolver configured
+        if let Some(resolver) = &self.link_resolver {
+            html = self.rewrite_links(&html, resolver)?;
+        }
 
         // Post-process HTML to add syntax highlighting with CSS classes
         self.highlight_code_blocks(&html)
+    }
+
+    /// Rewrites relative links in HTML to repository static paths.
+    ///
+    /// Finds all `<a href="...">` and `<img src="...">` tags and resolves
+    /// relative paths to static site URLs using LinkResolver. Absolute URLs
+    /// and anchor links remain unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `html`: HTML from markdown conversion
+    /// * `resolver`: Link resolver for path transformation
+    ///
+    /// # Returns
+    ///
+    /// HTML with rewritten link paths
+    ///
+    /// # Errors
+    ///
+    /// Returns error if link resolution fails
+    fn rewrite_links(&self, html: &str, resolver: &LinkResolver) -> Result<String> {
+        let mut result = String::with_capacity(html.len());
+        let mut pos = 0;
+
+        while pos < html.len() {
+            // Find next link or image tag
+            let link_pos = html[pos..].find("<a ");
+            let img_pos = html[pos..].find("<img ");
+
+            let (tag_start, is_image) = match (link_pos, img_pos) {
+                (Some(l), Some(i)) if l < i => (pos + l, false),
+                (Some(l), None) => (pos + l, false),
+                (None, Some(i)) => (pos + i, true),
+                (Some(_), Some(i)) => (pos + i, true),
+                (None, None) => {
+                    result.push_str(&html[pos..]);
+                    break;
+                }
+            };
+
+            // Copy everything before this tag
+            result.push_str(&html[pos..tag_start]);
+
+            // Find the attribute (href or src)
+            let attr = if is_image { "src=\"" } else { "href=\"" };
+            let attr_start = match html[tag_start..].find(attr) {
+                Some(p) => tag_start + p + attr.len(),
+                None => {
+                    result.push_str(&html[tag_start..tag_start + 1]);
+                    pos = tag_start + 1;
+                    continue;
+                }
+            };
+
+            // Find end of attribute value
+            let attr_end = match html[attr_start..].find('"') {
+                Some(p) => attr_start + p,
+                None => {
+                    result.push_str(&html[tag_start..attr_start]);
+                    pos = attr_start;
+                    continue;
+                }
+            };
+
+            let url = &html[attr_start..attr_end];
+
+            // Resolve the link
+            let resolved = resolver
+                .resolve(url, is_image)
+                .unwrap_or_else(|_| url.to_string());
+
+            // Write tag up to attribute value, then resolved URL
+            result.push_str(&html[tag_start..attr_start]);
+            result.push_str(&resolved);
+
+            pos = attr_end;
+        }
+
+        Ok(result)
     }
 
     /// Post-processes HTML to apply syntax highlighting with CSS classes.
@@ -490,53 +583,6 @@ fn main() {
     }
 
     #[test]
-    fn test_render_size_limit() {
-        // Arrange
-        let renderer = MarkdownRenderer::new();
-        let large_content = "a".repeat(MAX_MARKDOWN_SIZE + 1);
-
-        // Act
-        let result = renderer.render(&large_content);
-
-        // Assert
-        assert!(result.is_err(), "Should reject oversized content");
-        assert!(
-            result.unwrap_err().to_string().contains("too large"),
-            "Error should mention size limit"
-        );
-    }
-
-    #[test]
-    fn test_render_file_size_limit_exceeded() {
-        // Arrange
-        use std::io::Write;
-        use tempfile::TempDir;
-
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let file_path = temp_dir.path().join("large.md");
-
-        // Create file exceeding MAX_MARKDOWN_SIZE
-        let mut file = std::fs::File::create(&file_path).expect("Failed to create large file");
-        let large_content = "a".repeat(MAX_MARKDOWN_SIZE + 100);
-        file.write_all(large_content.as_bytes())
-            .expect("Failed to write large content");
-
-        let renderer = MarkdownRenderer::new();
-
-        // Act
-        let result = renderer.render_file(&file_path);
-
-        // Assert
-        assert!(result.is_err(), "Should reject file exceeding size limit");
-        let error_msg = result.unwrap_err().to_string();
-        assert!(
-            error_msg.contains("too large"),
-            "Error should mention size limit: {}",
-            error_msg
-        );
-    }
-
-    #[test]
     fn test_render_blockquotes() {
         // Arrange
         let renderer = MarkdownRenderer::new();
@@ -684,6 +730,106 @@ const x = "<script>alert('xss')</script>";
         assert!(
             html.contains("&lt;script&gt;") || html.contains("<script>"),
             "Should handle special characters"
+        );
+    }
+
+    #[test]
+    fn test_link_resolution_integration() {
+        // Arrange
+        let renderer = MarkdownRenderer::with_link_resolver("main", "docs/README.md");
+        let markdown = r#"
+[Relative link](./api/guide.md)
+[Parent link](../src/lib.rs)
+[Absolute URL](https://example.com)
+[Anchor](#section)
+![Image](../assets/logo.png)
+"#;
+
+        // Act
+        let html = renderer
+            .render(markdown)
+            .expect("Should render with link resolution");
+
+        // Assert
+        assert!(
+            html.contains("href=\"/blob/main/docs/api/guide.md.html\""),
+            "Should resolve relative link: {}",
+            html
+        );
+        assert!(
+            html.contains("href=\"/blob/main/src/lib.rs.html\""),
+            "Should resolve parent link: {}",
+            html
+        );
+        assert!(
+            html.contains("href=\"https://example.com\""),
+            "Should preserve absolute URL: {}",
+            html
+        );
+        assert!(
+            html.contains("href=\"#section\""),
+            "Should preserve anchor link: {}",
+            html
+        );
+        assert!(
+            html.contains("src=\"/blob/main/assets/logo.png\""),
+            "Should resolve image without .html extension: {}",
+            html
+        );
+    }
+
+    #[test]
+    fn test_without_link_resolution() {
+        // Arrange
+        let renderer = MarkdownRenderer::new();
+        let markdown = "[Link](./file.md)";
+
+        // Act
+        let html = renderer
+            .render(markdown)
+            .expect("Should render without resolution");
+
+        // Assert
+        assert!(
+            html.contains("href=\"./file.md\""),
+            "Should preserve original link without resolver: {}",
+            html
+        );
+    }
+
+    #[test]
+    fn test_render_large_documentation() {
+        // Arrange
+        let renderer = MarkdownRenderer::new();
+        let section = "# Large Documentation\n\n\
+            This is a comprehensive documentation file with substantial content.\n\n\
+            ## Section Details\n\n\
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. \
+            Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n\
+            ```rust\n\
+            fn example() {\n    \
+                println!(\"Code block\");\n\
+            }\n\
+            ```\n\n";
+
+        // ~500 bytes per section, 10000 sections = ~5MB
+        let large_markdown = section.repeat(10_000);
+
+        // Act
+        let result = renderer.render(&large_markdown);
+
+        // Assert
+        assert!(
+            result.is_ok(),
+            "Should handle large documentation without artificial limits"
+        );
+
+        let html = result.unwrap();
+        assert!(html.contains("<h1>"), "Should render headers");
+        assert!(html.contains("<code"), "Should render code blocks");
+        assert!(
+            html.len() > large_markdown.len(),
+            "HTML should be generated"
         );
     }
 }
