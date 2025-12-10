@@ -10,6 +10,20 @@ use std::fs;
 /// pagination in future versions.
 const DEFAULT_COMMIT_LIMIT: usize = 35;
 
+/// Generation statistics for a single branch.
+#[derive(Debug, Default, Clone)]
+struct BranchStats {
+    tree_pages: usize,
+    blob_pages: usize,
+    markdown_pages: usize,
+}
+
+impl BranchStats {
+    fn total_blobs(&self) -> usize {
+        self.blob_pages + self.markdown_pages
+    }
+}
+
 fn validate_tree_path(path: &str) -> Result<()> {
     if path.contains("..") {
         anyhow::bail!("Path contains directory traversal: {}", path);
@@ -261,6 +275,7 @@ fn generate_tree_pages_for_branch(
 /// # Arguments
 ///
 /// * `config`: Application configuration including output path and theme
+/// * `repo_info`: Repository metadata including name
 /// * `branch`: Branch name to generate blob pages for
 /// * `files`: File entries to process
 ///
@@ -273,15 +288,12 @@ fn generate_tree_pages_for_branch(
 /// Returns error if blob page generation or file writing fails
 fn generate_blob_pages_for_branch(
     config: &Config,
+    repo_info: &gitkyl::RepoInfo,
     branch: &str,
     files: &[gitkyl::FileEntry],
 ) -> Result<(usize, usize)> {
     let mut blob_count = 0;
     let mut markdown_count = 0;
-
-    let project_name = config
-        .project_name()
-        .context("Failed to determine project name")?;
 
     for entry in files {
         if let Some(path) = entry.path() {
@@ -295,13 +307,13 @@ fn generate_blob_pages_for_branch(
 
             let result = if gitkyl::is_readme(path) {
                 markdown_count += 1;
-                gitkyl::pages::blob::generate_markdown(&config.repo, branch, path, &project_name)
+                gitkyl::pages::blob::generate_markdown(&config.repo, branch, path, repo_info.name())
             } else {
                 gitkyl::pages::blob::generate(
                     &config.repo,
                     branch,
                     path,
-                    &project_name,
+                    repo_info.name(),
                     &config.theme,
                 )
             };
@@ -379,6 +391,58 @@ fn generate_commits_page_for_branch(
     Ok(commits.len())
 }
 
+/// Generates all pages for a single branch.
+///
+/// Orchestrates generation of tree pages, blob pages, and commits page for
+/// the specified branch. Returns statistics for reporting.
+///
+/// # Arguments
+///
+/// * `config`: CLI configuration
+/// * `repo_info`: Repository metadata
+/// * `branch`: Branch name to generate for
+///
+/// # Returns
+///
+/// Statistics about generated pages
+///
+/// # Errors
+///
+/// Returns error if any critical generation step fails
+fn generate_all_pages_for_branch(
+    config: &Config,
+    repo_info: &gitkyl::RepoInfo,
+    branch: &str,
+) -> Result<BranchStats> {
+    let files = gitkyl::list_files(&config.repo, Some(branch)).context("Failed to list files")?;
+
+    let tree = gitkyl::FileTree::from_files(files.clone());
+
+    let file_paths: Vec<&str> = files.iter().filter_map(|f| f.path()?.to_str()).collect();
+
+    let commit_map = gitkyl::get_last_commits_batch(&config.repo, Some(branch), &file_paths)
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "Warning: Failed to batch lookup commits for branch {}: {:#}",
+                branch, e
+            );
+            std::collections::HashMap::new()
+        });
+
+    let tree_pages = generate_tree_pages_for_branch(config, repo_info, branch, &tree, &commit_map)?;
+
+    let (blob_pages, markdown_pages) =
+        generate_blob_pages_for_branch(config, repo_info, branch, &files)?;
+
+    let _commit_count = generate_commits_page_for_branch(config, repo_info, branch)?;
+
+    Ok(BranchStats {
+        tree_pages,
+        blob_pages,
+        markdown_pages,
+    })
+}
+
 fn main() -> Result<()> {
     let config = Config::parse();
     config.validate().context("Invalid configuration")?;
@@ -399,10 +463,8 @@ fn main() -> Result<()> {
             vec![]
         });
 
-    // Build tree structure once for O(depth) queries
     let tree = gitkyl::FileTree::from_files(files.clone());
 
-    // Batch lookup commits for ALL files once (reused for root and tree pages)
     let all_file_paths: Vec<&str> = files.iter().filter_map(|f| f.path()?.to_str()).collect();
 
     let commit_map = gitkyl::get_last_commits_batch(
@@ -418,7 +480,6 @@ fn main() -> Result<()> {
     let top_level_files = tree.files_at("");
     let top_level_subdirs = tree.subdirs_at("");
 
-    // Batch lookup for root level directories
     let root_dir_commit_map = if !top_level_subdirs.is_empty() {
         gitkyl::get_last_commits_batch(
             &config.repo,
@@ -441,7 +502,6 @@ fn main() -> Result<()> {
         &root_dir_commit_map,
     );
 
-    // Detect and render README file at repository root
     let readme_html = find_and_render_readme(&config.repo, repo_info.default_branch(), &tree_items)
         .unwrap_or_else(|e| {
             eprintln!("Warning: Failed to render README: {:#}", e);
@@ -466,102 +526,48 @@ fn main() -> Result<()> {
     fs::write(&index_path, html.into_string())
         .with_context(|| format!("Failed to write index page to {}", index_path.display()))?;
 
-    println!("Generated: {}", index_path.display());
+    let default_stats =
+        generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
 
-    // Generate commits page for default branch
-    let commit_count =
-        generate_commits_page_for_branch(&config, &repo_info, repo_info.default_branch())?;
-    println!("Generated commits page ({} commits)", commit_count);
-
-    // Generate blob pages for default branch
-    println!("Generating file pages...");
-    let (blob_count, markdown_count) =
-        generate_blob_pages_for_branch(&config, repo_info.default_branch(), &files)?;
     println!(
-        "Generated {} blob pages ({} markdown, {} code)",
-        blob_count + markdown_count,
-        markdown_count,
-        blob_count
+        "→ {}: {} trees, {} blobs ({} md)",
+        repo_info.default_branch(),
+        default_stats.tree_pages,
+        default_stats.total_blobs(),
+        default_stats.markdown_pages
     );
 
-    // Generate tree pages for default branch
-    println!("Generating tree pages...");
-    let tree_count = generate_tree_pages_for_branch(
-        &config,
-        &repo_info,
-        repo_info.default_branch(),
-        &tree,
-        &commit_map,
-    )?;
-    println!("Generated {} tree pages for default branch", tree_count);
-
-    println!("Generating tree pages for all branches...");
-
-    let mut total_tree_pages = tree_count;
+    let mut total_trees = default_stats.tree_pages;
+    let mut total_blobs = default_stats.total_blobs();
+    let mut branch_count = 1;
 
     for branch in repo_info.branches() {
         if branch == repo_info.default_branch() {
             continue;
         }
 
-        let branch_files = gitkyl::list_files(&config.repo, Some(branch)).unwrap_or_else(|e| {
-            eprintln!(
-                "Warning: Failed to list files for branch {}: {:#}",
-                branch, e
-            );
-            vec![]
-        });
-
-        if branch_files.is_empty() {
-            continue;
+        match generate_all_pages_for_branch(&config, &repo_info, branch) {
+            Ok(stats) => {
+                println!(
+                    "→ {}: {} trees, {} blobs ({} md)",
+                    branch,
+                    stats.tree_pages,
+                    stats.total_blobs(),
+                    stats.markdown_pages
+                );
+                total_trees += stats.tree_pages;
+                total_blobs += stats.total_blobs();
+                branch_count += 1;
+            }
+            Err(e) => {
+                eprintln!("✗ {}: {:#}", branch, e);
+            }
         }
-
-        let branch_tree = gitkyl::FileTree::from_files(branch_files.clone());
-
-        let branch_file_paths: Vec<&str> = branch_files
-            .iter()
-            .filter_map(|f| f.path()?.to_str())
-            .collect();
-
-        let branch_commit_map =
-            gitkyl::get_last_commits_batch(&config.repo, Some(branch), &branch_file_paths)
-                .unwrap_or_else(|e| {
-                    eprintln!(
-                        "Warning: Failed to batch lookup commits for branch {}: {:#}",
-                        branch, e
-                    );
-                    std::collections::HashMap::new()
-                });
-
-        // Generate all page types for branch
-        let branch_tree_count = generate_tree_pages_for_branch(
-            &config,
-            &repo_info,
-            branch,
-            &branch_tree,
-            &branch_commit_map,
-        )?;
-
-        let (branch_blob_count, branch_markdown_count) =
-            generate_blob_pages_for_branch(&config, branch, &branch_files)?;
-
-        let branch_commit_count = generate_commits_page_for_branch(&config, &repo_info, branch)?;
-
-        total_tree_pages += branch_tree_count;
-
-        println!(
-            "Branch {}: {} trees, {} blobs ({} markdown), {} commits",
-            branch,
-            branch_tree_count,
-            branch_blob_count,
-            branch_markdown_count,
-            branch_commit_count
-        );
     }
 
     println!(
-        "Generated {} total tree pages across all branches",
-        total_tree_pages
+        "✓ Generated {} trees, {} blobs ({} branches)",
+        total_trees, total_blobs, branch_count
     );
 
     if !config.no_open {
