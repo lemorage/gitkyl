@@ -2,57 +2,12 @@
 //!
 //! Tests repository analysis, configuration, and git operations.
 
+mod common;
+
 use anyhow::Result;
 use gitkyl::{Config, analyze_repository, get_last_commits_batch};
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
-use tempfile::TempDir;
-
-/// Creates temporary git repository with test configuration.
-fn create_test_repo() -> Result<TempDir> {
-    let dir = TempDir::new()?;
-    let path = dir.path();
-
-    Command::new("git")
-        .args(["init"])
-        .current_dir(path)
-        .output()?;
-
-    Command::new("git")
-        .args(["config", "user.name", "Test User"])
-        .current_dir(path)
-        .output()?;
-
-    Command::new("git")
-        .args(["config", "user.email", "test@example.com"])
-        .current_dir(path)
-        .output()?;
-
-    Ok(dir)
-}
-
-/// Commits staged changes and returns commit hash.
-fn git_commit(repo_path: &std::path::Path, message: &str) -> Result<String> {
-    let output = Command::new("git")
-        .args(["commit", "-m", message])
-        .current_dir(repo_path)
-        .output()?;
-
-    if !output.status.success() {
-        anyhow::bail!(
-            "Git commit failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(repo_path)
-        .output()?;
-
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
-}
 
 /// Tests repository analysis with valid repository.
 #[test]
@@ -337,73 +292,58 @@ fn test_analyze_repository_branch_count() -> Result<()> {
     Ok(())
 }
 
-// /// Tests batch commit lookup handles file deletion correctly.
-// #[test]
-// fn test_batch_commits_file_deletion() {
-//     // Arrange
-//     let repo = create_test_repo().expect("Failed to create test repo");
-//     let repo_path = repo.path();
+/// Tests batch commit lookup handles file deletion correctly.
+#[test]
+fn test_batch_commits_file_deletion() {
+    // Arrange
+    let repo = common::create_test_repo().expect("Failed to create test repo");
+    let repo_path = repo.path();
 
-//     fs::write(repo_path.join("temp.txt"), "temporary").expect("Failed to write temp");
-//     fs::write(repo_path.join("permanent.txt"), "stays").expect("Failed to write permanent");
-//     Command::new("git")
-//         .args(["add", "."])
-//         .current_dir(repo_path)
-//         .output()
-//         .expect("Failed to add files");
-//     let create_commit = git_commit(repo_path, "Create files").expect("Failed to commit creation");
+    common::write_file(repo_path, "temp.txt", "temporary").expect("Failed to write temp");
+    common::write_file(repo_path, "permanent.txt", "stays").expect("Failed to write permanent");
+    common::git_add(repo_path, &["."]).expect("Failed to add files");
+    let create_commit =
+        common::git_commit(repo_path, "Create files").expect("Failed to commit creation");
 
-//     fs::remove_file(repo_path.join("temp.txt")).expect("Failed to delete temp");
-//     Command::new("git")
-//         .args(["add", "-A"])
-//         .current_dir(repo_path)
-//         .output()
-//         .expect("Failed to stage deletion");
-//     git_commit(repo_path, "Delete temp.txt").expect("Failed to commit deletion");
+    fs::remove_file(repo_path.join("temp.txt")).expect("Failed to delete temp");
+    common::git_add(repo_path, &["."]).expect("Failed to stage deletion");
+    common::git_commit(repo_path, "Delete temp.txt").expect("Failed to commit deletion");
 
-//     // Act
-//     let results = get_last_commits_batch(repo_path, None, &["temp.txt", "permanent.txt"])
-//         .expect("Should handle deleted files");
+    // Act
+    let results = get_last_commits_batch(repo_path, None, &["temp.txt", "permanent.txt"])
+        .expect("Should handle deleted files");
 
-//     // Assert
-//     assert!(
-//         results.contains_key("permanent.txt"),
-//         "Should find existing file"
-//     );
+    // Assert
+    assert!(
+        results.contains_key("permanent.txt"),
+        "Should find existing file"
+    );
 
-//     if results.contains_key("temp.txt") {
-//         let temp_commit = &results["temp.txt"];
-//         assert_eq!(
-//             temp_commit.oid(),
-//             create_commit,
-//             "Deleted file should point to creation commit"
-//         );
-//     }
-// }
+    if results.contains_key("temp.txt") {
+        let temp_commit = &results["temp.txt"];
+        assert_eq!(
+            temp_commit.oid(),
+            create_commit,
+            "Deleted file should point to creation commit"
+        );
+    }
+}
 
 /// Tests batch commit lookup distinguishes modification from addition.
 #[test]
 fn test_batch_commits_modification_vs_addition() {
     // Arrange
-    let repo = create_test_repo().expect("Failed to create test repo");
+    let repo = common::create_test_repo().expect("Failed to create test repo");
     let repo_path = repo.path();
 
-    fs::write(repo_path.join("file.txt"), "v1").expect("Failed to write v1");
-    Command::new("git")
-        .args(["add", "file.txt"])
-        .current_dir(repo_path)
-        .output()
-        .expect("Failed to add");
-    git_commit(repo_path, "Initial version").expect("Failed to commit v1");
+    common::write_file(repo_path, "file.txt", "v1").expect("Failed to write v1");
+    common::git_add(repo_path, &["file.txt"]).expect("Failed to add");
+    common::git_commit(repo_path, "Initial version").expect("Failed to commit v1");
 
-    fs::write(repo_path.join("file.txt"), "v2").expect("Failed to write v2");
-    Command::new("git")
-        .args(["add", "file.txt"])
-        .current_dir(repo_path)
-        .output()
-        .expect("Failed to add modification");
+    common::write_file(repo_path, "file.txt", "v2").expect("Failed to write v2");
+    common::git_add(repo_path, &["file.txt"]).expect("Failed to add modification");
     let modify_commit =
-        git_commit(repo_path, "Modify file").expect("Failed to commit modification");
+        common::git_commit(repo_path, "Modify file").expect("Failed to commit modification");
 
     // Act
     let results =
@@ -420,24 +360,16 @@ fn test_batch_commits_modification_vs_addition() {
 #[test]
 fn test_batch_commits_multiple_history() {
     // Arrange
-    let repo = create_test_repo().expect("Failed to create test repo");
+    let repo = common::create_test_repo().expect("Failed to create test repo");
     let repo_path = repo.path();
 
-    fs::write(repo_path.join("file1.txt"), "content1").expect("Failed to write file1");
-    Command::new("git")
-        .args(["add", "file1.txt"])
-        .current_dir(repo_path)
-        .output()
-        .expect("Failed to add file1");
-    let commit1 = git_commit(repo_path, "Add file1").expect("Failed to commit file1");
+    common::write_file(repo_path, "file1.txt", "content1").expect("Failed to write file1");
+    common::git_add(repo_path, &["file1.txt"]).expect("Failed to add file1");
+    let commit1 = common::git_commit(repo_path, "Add file1").expect("Failed to commit file1");
 
-    fs::write(repo_path.join("file2.txt"), "content2").expect("Failed to write file2");
-    Command::new("git")
-        .args(["add", "file2.txt"])
-        .current_dir(repo_path)
-        .output()
-        .expect("Failed to add file2");
-    let commit2 = git_commit(repo_path, "Add file2").expect("Failed to commit file2");
+    common::write_file(repo_path, "file2.txt", "content2").expect("Failed to write file2");
+    common::git_add(repo_path, &["file2.txt"]).expect("Failed to add file2");
+    let commit2 = common::git_commit(repo_path, "Add file2").expect("Failed to commit file2");
 
     // Act
     let results = get_last_commits_batch(repo_path, None, &["file1.txt", "file2.txt"])
@@ -458,17 +390,13 @@ fn test_batch_commits_multiple_history() {
 #[test]
 fn test_readme_detection_and_rendering() -> Result<()> {
     // Arrange
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     let readme_content = "# Test Project\n\nThis is a test README.";
-    fs::write(repo_path.join("README.md"), readme_content)?;
-
-    Command::new("git")
-        .args(["add", "README.md"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add README")?;
+    common::write_file(repo_path, "README.md", readme_content)?;
+    common::git_add(repo_path, &["README.md"])?;
+    common::git_commit(repo_path, "Add README")?;
 
     // Act
     let result =
@@ -490,17 +418,13 @@ fn test_readme_detection_and_rendering() -> Result<()> {
 #[test]
 fn test_lowercase_readme_detection() -> Result<()> {
     // Arrange
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     let readme_content = "# Lowercase README\n\nThis uses lowercase filename.";
-    fs::write(repo_path.join("readme.md"), readme_content)?;
-
-    Command::new("git")
-        .args(["add", "readme.md"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add lowercase readme")?;
+    common::write_file(repo_path, "readme.md", readme_content)?;
+    common::git_add(repo_path, &["readme.md"])?;
+    common::git_commit(repo_path, "Add lowercase readme")?;
 
     // Act
     let result =
@@ -521,17 +445,13 @@ fn test_lowercase_readme_detection() -> Result<()> {
 #[test]
 fn test_readme_without_extension_detection() -> Result<()> {
     // Arrange
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     let readme_content = "# README Without Extension\n\nPlain text README.";
-    fs::write(repo_path.join("README"), readme_content)?;
-
-    Command::new("git")
-        .args(["add", "README"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add README without extension")?;
+    common::write_file(repo_path, "README", readme_content)?;
+    common::git_add(repo_path, &["README"])?;
+    common::git_commit(repo_path, "Add README without extension")?;
 
     // Act
     let result = gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "README", "test-repo");
@@ -566,18 +486,13 @@ fn test_non_readme_markdown_not_detected() {
 #[test]
 fn test_readme_in_subdirectory() -> Result<()> {
     // Arrange
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
-    fs::create_dir_all(repo_path.join("docs"))?;
     let readme_content = "# Docs README\n\nDocumentation index.";
-    fs::write(repo_path.join("docs/README.md"), readme_content)?;
-
-    Command::new("git")
-        .args(["add", "docs/README.md"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add docs README")?;
+    common::write_file(repo_path, "docs/README.md", readme_content)?;
+    common::git_add(repo_path, &["docs/README.md"])?;
+    common::git_commit(repo_path, "Add docs README")?;
 
     // Act
     let result =
@@ -598,18 +513,13 @@ fn test_readme_in_subdirectory() -> Result<()> {
 #[test]
 fn test_readme_with_invalid_utf8_fails_gracefully() -> Result<()> {
     // Arrange
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     // Create file with invalid UTF8 bytes
-    let invalid_utf8 = vec![0xFF, 0xFE, 0xFD];
-    fs::write(repo_path.join("README.md"), invalid_utf8)?;
-
-    Command::new("git")
-        .args(["add", "README.md"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add invalid UTF8 README")?;
+    fs::write(repo_path.join("README.md"), vec![0xFF, 0xFE, 0xFD])?;
+    common::git_add(repo_path, &["README.md"])?;
+    common::git_commit(repo_path, "Add invalid UTF8 README")?;
 
     // Act
     let result =
@@ -630,7 +540,7 @@ fn test_readme_with_invalid_utf8_fails_gracefully() -> Result<()> {
 #[test]
 fn test_readme_markdown_produces_valid_html() -> Result<()> {
     // Arrange
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     let readme_content = r#"# Title
@@ -647,13 +557,9 @@ fn main() {
 }
 ```
 "#;
-    fs::write(repo_path.join("README.md"), readme_content)?;
-
-    Command::new("git")
-        .args(["add", "README.md"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add complex README")?;
+    common::write_file(repo_path, "README.md", readme_content)?;
+    common::git_add(repo_path, &["README.md"])?;
+    common::git_commit(repo_path, "Add complex README")?;
 
     // Act
     let result =
@@ -686,7 +592,7 @@ fn main() {
 /// Tests blob generation with various file extensions applies correct syntax.
 #[test]
 fn test_blob_generate_with_various_file_extensions() -> Result<()> {
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     let files = vec![
@@ -696,12 +602,9 @@ fn test_blob_generate_with_various_file_extensions() -> Result<()> {
     ];
 
     for (filename, content) in &files {
-        fs::write(repo_path.join(filename), content)?;
-        Command::new("git")
-            .args(["add", filename])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, &format!("Add {}", filename))?;
+        common::write_file(repo_path, filename, content)?;
+        common::git_add(repo_path, &[filename])?;
+        common::git_commit(repo_path, &format!("Add {}", filename))?;
 
         let result = gitkyl::pages::blob::generate(
             repo_path,
@@ -722,15 +625,12 @@ fn test_blob_generate_with_various_file_extensions() -> Result<()> {
 /// Tests blob generation fails gracefully for nonexistent file.
 #[test]
 fn test_blob_generate_nonexistent_file_fails() -> Result<()> {
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
-    fs::write(repo_path.join("exists.txt"), "content\n")?;
-    Command::new("git")
-        .args(["add", "exists.txt"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Initial commit")?;
+    common::write_file(repo_path, "exists.txt", "content\n")?;
+    common::git_add(repo_path, &["exists.txt"])?;
+    common::git_commit(repo_path, "Initial commit")?;
 
     let result = gitkyl::pages::blob::generate(
         repo_path,
@@ -753,15 +653,12 @@ fn test_blob_generate_nonexistent_file_fails() -> Result<()> {
 /// Tests blob generation fails for invalid git reference.
 #[test]
 fn test_blob_generate_invalid_reference_fails() -> Result<()> {
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
-    fs::write(repo_path.join("file.txt"), "content\n")?;
-    Command::new("git")
-        .args(["add", "file.txt"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add file")?;
+    common::write_file(repo_path, "file.txt", "content\n")?;
+    common::git_add(repo_path, &["file.txt"])?;
+    common::git_commit(repo_path, "Add file")?;
 
     let result = gitkyl::pages::blob::generate(
         repo_path,
@@ -779,15 +676,12 @@ fn test_blob_generate_invalid_reference_fails() -> Result<()> {
 /// Tests blob generation handles empty file correctly.
 #[test]
 fn test_blob_generate_empty_file_succeeds() -> Result<()> {
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
-    fs::write(repo_path.join("empty.txt"), "")?;
-    Command::new("git")
-        .args(["add", "empty.txt"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add empty file")?;
+    common::write_file(repo_path, "empty.txt", "")?;
+    common::git_add(repo_path, &["empty.txt"])?;
+    common::git_commit(repo_path, "Add empty file")?;
 
     let result = gitkyl::pages::blob::generate(
         repo_path,
@@ -810,7 +704,7 @@ fn test_blob_generate_empty_file_succeeds() -> Result<()> {
 /// Tests markdown blob handles code blocks correctly.
 #[test]
 fn test_markdown_blob_with_code_blocks() -> Result<()> {
-    let repo = create_test_repo()?;
+    let repo = common::create_test_repo()?;
     let repo_path = repo.path();
 
     let markdown = r#"# Code Example
@@ -821,12 +715,9 @@ fn main() {
 }
 ```
 "#;
-    fs::write(repo_path.join("example.md"), markdown)?;
-    Command::new("git")
-        .args(["add", "example.md"])
-        .current_dir(repo_path)
-        .output()?;
-    git_commit(repo_path, "Add example")?;
+    common::write_file(repo_path, "example.md", markdown)?;
+    common::git_add(repo_path, &["example.md"])?;
+    common::git_commit(repo_path, "Add example")?;
 
     let result =
         gitkyl::pages::blob::generate_markdown(repo_path, "HEAD", "example.md", "test-repo")?;
@@ -872,21 +763,15 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_lists_root_directory_files() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::write(
-            repo_path.join("README.md"),
-            "# Test Project\n\nDescription.",
-        )?;
-        fs::write(repo_path.join("main.rs"), "fn main() {}\n")?;
-        fs::write(repo_path.join("Cargo.toml"), "[package]\nname = \"test\"\n")?;
+        common::write_file(repo_path, "README.md", "# Test Project\n\nDescription.")?;
+        common::write_file(repo_path, "main.rs", "fn main() {}\n")?;
+        common::write_file(repo_path, "Cargo.toml", "[package]\nname = \"test\"\n")?;
 
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Initial commit")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Initial commit")?;
 
         let commit = create_test_commit(
             "abc1234567890123456789012345678901234567",
@@ -933,18 +818,14 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_lists_subdirectory_files() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir(repo_path.join("src"))?;
-        fs::write(repo_path.join("src/lib.rs"), "pub fn test() {}\n")?;
-        fs::write(repo_path.join("src/main.rs"), "fn main() {}\n")?;
+        common::write_file(repo_path, "src/lib.rs", "pub fn test() {}\n")?;
+        common::write_file(repo_path, "src/main.rs", "fn main() {}\n")?;
 
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add src directory")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add src directory")?;
 
         let commit = create_test_commit(
             "def4567890123456789012345678901234567890",
@@ -982,19 +863,14 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_shows_directory_entries() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir(repo_path.join("src"))?;
-        fs::write(repo_path.join("src/lib.rs"), "pub fn test() {}\n")?;
-        fs::create_dir(repo_path.join("docs"))?;
-        fs::write(repo_path.join("docs/README.md"), "# Docs\n")?;
+        common::write_file(repo_path, "src/lib.rs", "pub fn test() {}\n")?;
+        common::write_file(repo_path, "docs/README.md", "# Docs\n")?;
 
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add directories")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add directories")?;
 
         let commit = create_test_commit(
             "abc1234567890123456789012345678901234567",
@@ -1029,20 +905,16 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_deep_subdirectory() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir_all(repo_path.join("src/modules/utils"))?;
-        fs::write(
-            repo_path.join("src/modules/utils/helpers.rs"),
+        common::write_file(
+            repo_path,
+            "src/modules/utils/helpers.rs",
             "pub fn helper() {}\n",
         )?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add deep structure")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add deep structure")?;
 
         let commit = create_test_commit(
             "deep123456789012345678901234567890123456",
@@ -1076,15 +948,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_empty_directory_shows_message() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::write(repo_path.join("README.md"), "# Test\n")?;
-        Command::new("git")
-            .args(["add", "README.md"])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Initial")?;
+        common::write_file(repo_path, "README.md", "# Test\n")?;
+        common::git_add(repo_path, &["README.md"])?;
+        common::git_commit(repo_path, "Initial")?;
 
         let items = vec![];
 
@@ -1102,17 +971,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_subdirectory_shows_file_table() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir(repo_path.join("tests"))?;
-        fs::write(repo_path.join("tests/test1.rs"), "#[test]\nfn test1() {}\n")?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add tests")?;
+        common::write_file(repo_path, "tests/test1.rs", "#[test]\nfn test1() {}\n")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add tests")?;
 
         let commit = create_test_commit(
             "test123456789012345678901234567890123456",
@@ -1143,16 +1007,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_includes_commit_metadata() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::write(repo_path.join("config.toml"), "[settings]\n")?;
-
-        Command::new("git")
-            .args(["add", "config.toml"])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add configuration file")?;
+        common::write_file(repo_path, "config.toml", "[settings]\n")?;
+        common::git_add(repo_path, &["config.toml"])?;
+        common::git_commit(repo_path, "Add configuration file")?;
 
         let commit = create_test_commit(
             "meta123456789012345678901234567890123456",
@@ -1180,17 +1040,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_breadcrumb_navigation() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir_all(repo_path.join("src/pages"))?;
-        fs::write(repo_path.join("src/pages/home.rs"), "pub fn home() {}\n")?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add pages")?;
+        common::write_file(repo_path, "src/pages/home.rs", "pub fn home() {}\n")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add pages")?;
 
         let commit = create_test_commit(
             "page123456789012345678901234567890123456",
@@ -1227,16 +1082,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_file_links_point_to_blob_pages() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::write(repo_path.join("script.sh"), "#!/bin/bash\necho 'test'\n")?;
-
-        Command::new("git")
-            .args(["add", "script.sh"])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add script")?;
+        common::write_file(repo_path, "script.sh", "#!/bin/bash\necho 'test'\n")?;
+        common::git_add(repo_path, &["script.sh"])?;
+        common::git_commit(repo_path, "Add script")?;
 
         let commit = create_test_commit(
             "link123456789012345678901234567890123456",
@@ -1264,17 +1115,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_directory_links_point_to_tree_pages() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir(repo_path.join("lib"))?;
-        fs::write(repo_path.join("lib/mod.rs"), "pub mod test;\n")?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add lib")?;
+        common::write_file(repo_path, "lib/mod.rs", "pub mod test;\n")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add lib")?;
 
         let commit = create_test_commit(
             "link456789012345678901234567890123456789",
@@ -1303,20 +1149,14 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_mixed_files_and_directories() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir(repo_path.join("bin"))?;
-        fs::write(repo_path.join("bin/cli.rs"), "fn main() {}\n")?;
-        fs::write(repo_path.join("LICENSE"), "MIT License\n")?;
-        fs::create_dir(repo_path.join("examples"))?;
-        fs::write(repo_path.join("examples/demo.rs"), "fn main() {}\n")?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add mixed content")?;
+        common::write_file(repo_path, "bin/cli.rs", "fn main() {}\n")?;
+        common::write_file(repo_path, "LICENSE", "MIT License\n")?;
+        common::write_file(repo_path, "examples/demo.rs", "fn main() {}\n")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add mixed content")?;
 
         let commit = create_test_commit(
             "mix1234567890123456789012345678901234567",
@@ -1356,17 +1196,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_title_includes_path() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir(repo_path.join("docs"))?;
-        fs::write(repo_path.join("docs/guide.md"), "# Guide\n")?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add docs")?;
+        common::write_file(repo_path, "docs/guide.md", "# Guide\n")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add docs")?;
 
         let commit = create_test_commit(
             "title12345678901234567890123456789012345",
@@ -1393,16 +1228,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_root_title_is_repo_name() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::write(repo_path.join("file.txt"), "content\n")?;
-
-        Command::new("git")
-            .args(["add", "file.txt"])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add file")?;
+        common::write_file(repo_path, "file.txt", "content\n")?;
+        common::git_add(repo_path, &["file.txt"])?;
+        common::git_commit(repo_path, "Add file")?;
 
         let commit = create_test_commit(
             "root123456789012345678901234567890123456",
@@ -1431,17 +1262,12 @@ mod tree_page_tests {
 
     #[test]
     fn test_tree_generate_parent_link_goes_to_parent_directory() -> Result<()> {
-        let repo = create_test_repo()?;
+        let repo = common::create_test_repo()?;
         let repo_path = repo.path();
 
-        fs::create_dir_all(repo_path.join("a/b"))?;
-        fs::write(repo_path.join("a/b/file.txt"), "content\n")?;
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(repo_path)
-            .output()?;
-        git_commit(repo_path, "Add nested")?;
+        common::write_file(repo_path, "a/b/file.txt", "content\n")?;
+        common::git_add(repo_path, &["."])?;
+        common::git_commit(repo_path, "Add nested")?;
 
         let commit = create_test_commit(
             "nest123456789012345678901234567890123456",
