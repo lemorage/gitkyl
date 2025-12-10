@@ -106,6 +106,279 @@ fn build_tree_items(
     items
 }
 
+/// Generates tree pages for all directories in a branch.
+///
+/// Creates index pages for the repository root and tree pages for all
+/// subdirectories within the specified branch. Each page displays directory
+/// listings with file metadata and last commit information.
+///
+/// # Arguments
+///
+/// * `config`: Application configuration containing output paths
+/// * `repo_info`: Repository metadata including name and branches
+/// * `branch`: Branch name to generate tree pages for
+/// * `tree`: File tree structure for the branch
+/// * `file_commit_map`: Pre-fetched mapping of file paths to last commits
+///
+/// # Returns
+///
+/// Count of tree pages generated
+///
+/// # Errors
+///
+/// Returns error if page generation or file writing fails
+fn generate_tree_pages_for_branch(
+    config: &Config,
+    repo_info: &gitkyl::RepoInfo,
+    branch: &str,
+    tree: &gitkyl::FileTree,
+    file_commit_map: &std::collections::HashMap<String, gitkyl::CommitInfo>,
+) -> Result<usize> {
+    let directories = tree.all_dirs();
+    let mut count = 0;
+
+    let commits = gitkyl::list_commits(&config.repo, Some(branch), Some(DEFAULT_COMMIT_LIMIT))
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "Warning: Failed to list commits for branch {}: {:#}",
+                branch, e
+            );
+            vec![]
+        });
+
+    let latest_commit = commits.first();
+
+    for dir_path in directories {
+        validate_tree_path(&dir_path)
+            .with_context(|| format!("Invalid tree path: {}", dir_path))?;
+
+        let entries_at_this_level = tree.files_at(&dir_path);
+        let subdirs_at_this_level = tree.subdirs_at(&dir_path);
+
+        let full_dir_paths: Vec<String> = subdirs_at_this_level
+            .iter()
+            .map(|subdir| {
+                if dir_path.is_empty() {
+                    subdir.to_string()
+                } else {
+                    format!("{}/{}", dir_path, subdir)
+                }
+            })
+            .collect();
+
+        let dir_path_refs: Vec<&str> = full_dir_paths.iter().map(|s| s.as_str()).collect();
+
+        let level_dir_commit_map = if !dir_path_refs.is_empty() {
+            gitkyl::get_last_commits_batch(&config.repo, Some(branch), &dir_path_refs)
+                .unwrap_or_else(|e| {
+                    eprintln!(
+                        "Warning: Failed to batch lookup directory commits for {}: {:#}",
+                        dir_path, e
+                    );
+                    std::collections::HashMap::new()
+                })
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        let tree_items_for_page = build_tree_items(
+            entries_at_this_level,
+            &subdirs_at_this_level,
+            &dir_path,
+            file_commit_map,
+            &level_dir_commit_map,
+        );
+
+        let html_result = if dir_path.is_empty() {
+            let readme_html = gitkyl::pages::index::find_and_render_readme(
+                &config.repo,
+                branch,
+                &tree_items_for_page,
+            )
+            .ok()
+            .flatten();
+
+            let depth = branch.matches('/').count() + 2;
+            Ok(gitkyl::pages::index::generate(IndexPageData {
+                name: repo_info.name(),
+                owner: repo_info.owner(),
+                default_branch: branch,
+                branches: repo_info.branches(),
+                commit_count: commits.len(),
+                latest_commit,
+                items: &tree_items_for_page,
+                readme_html: readme_html.as_deref(),
+                depth,
+            }))
+        } else {
+            gitkyl::pages::tree::generate(
+                &config.repo,
+                branch,
+                &dir_path,
+                repo_info.name(),
+                &tree_items_for_page,
+            )
+        };
+
+        match html_result {
+            Ok(html) => {
+                let tree_path = if dir_path.is_empty() {
+                    config.output.join("tree").join(branch).join("index.html")
+                } else {
+                    config
+                        .output
+                        .join("tree")
+                        .join(branch)
+                        .join(format!("{}.html", dir_path))
+                };
+
+                if let Some(parent) = tree_path.parent() {
+                    fs::create_dir_all(parent).context("Failed to create tree directory")?;
+                }
+
+                fs::write(&tree_path, html.into_string()).with_context(|| {
+                    format!("Failed to write tree page {}", tree_path.display())
+                })?;
+
+                count += 1;
+            }
+            Err(e) => {
+                return Err(e)
+                    .with_context(|| format!("Failed to generate tree page for {}", dir_path));
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+/// Generates blob pages for all files in a branch.
+///
+/// Creates HTML pages for all files in the specified branch, with special
+/// handling for markdown files. README files are rendered with full markdown
+/// processing, while code files receive syntax highlighting.
+///
+/// # Arguments
+///
+/// * `config`: Application configuration including output path and theme
+/// * `branch`: Branch name to generate blob pages for
+/// * `files`: File entries to process
+///
+/// # Returns
+///
+/// Tuple of (code blob count, markdown file count)
+///
+/// # Errors
+///
+/// Returns error if blob page generation or file writing fails
+fn generate_blob_pages_for_branch(
+    config: &Config,
+    branch: &str,
+    files: &[gitkyl::FileEntry],
+) -> Result<(usize, usize)> {
+    let mut blob_count = 0;
+    let mut markdown_count = 0;
+
+    let project_name = config
+        .project_name()
+        .context("Failed to determine project name")?;
+
+    for entry in files {
+        if let Some(path) = entry.path() {
+            if path.to_str().is_none() {
+                eprintln!(
+                    "Warning: Skipping file with invalid UTF-8 path: {}",
+                    path.display()
+                );
+                continue;
+            }
+
+            let result = if gitkyl::is_readme(path) {
+                markdown_count += 1;
+                gitkyl::pages::blob::generate_markdown(&config.repo, branch, path, &project_name)
+            } else {
+                gitkyl::pages::blob::generate(
+                    &config.repo,
+                    branch,
+                    path,
+                    &project_name,
+                    &config.theme,
+                )
+            };
+
+            match result {
+                Ok(html) => {
+                    let blob_path = config
+                        .output
+                        .join("blob")
+                        .join(branch)
+                        .join(format!("{}.html", path.display()));
+
+                    if let Some(parent) = blob_path.parent() {
+                        fs::create_dir_all(parent).context("Failed to create blob directory")?;
+                    }
+
+                    fs::write(&blob_path, html.into_string()).with_context(|| {
+                        format!("Failed to write blob page {}", blob_path.display())
+                    })?;
+
+                    blob_count += 1;
+                }
+                Err(e) => {
+                    let err_msg = format!("{:?}", e);
+                    if err_msg.contains("not a blob") || err_msg.contains("invalid UTF8") {
+                        continue;
+                    }
+                    return Err(e).with_context(|| {
+                        format!("Failed to generate blob page for {}", path.display())
+                    });
+                }
+            }
+        }
+    }
+
+    Ok((blob_count, markdown_count))
+}
+
+/// Generates commits log page for a branch.
+///
+/// Creates an HTML page displaying the commit history for the specified
+/// branch, limited to DEFAULT_COMMIT_LIMIT entries.
+///
+/// # Arguments
+///
+/// * `config`: Application configuration containing output path
+/// * `repo_info`: Repository metadata including name
+/// * `branch`: Branch name to generate commits page for
+///
+/// # Returns
+///
+/// Count of commits displayed on the page
+///
+/// # Errors
+///
+/// Returns error if commit listing or page writing fails
+fn generate_commits_page_for_branch(
+    config: &Config,
+    repo_info: &gitkyl::RepoInfo,
+    branch: &str,
+) -> Result<usize> {
+    let commits = gitkyl::list_commits(&config.repo, Some(branch), Some(DEFAULT_COMMIT_LIMIT))
+        .context("Failed to list commits")?;
+
+    let commits_html = gitkyl::pages::commits::generate(&commits, branch, repo_info.name());
+
+    let commits_dir = config.output.join("commits").join(branch);
+
+    fs::create_dir_all(&commits_dir).context("Failed to create commits directory")?;
+
+    let commits_path = commits_dir.join("index.html");
+    fs::write(&commits_path, commits_html.into_string())
+        .with_context(|| format!("Failed to write commits page to {}", commits_path.display()))?;
+
+    Ok(commits.len())
+}
+
 fn main() -> Result<()> {
     let config = Config::parse();
     config.validate().context("Invalid configuration")?;
@@ -195,223 +468,31 @@ fn main() -> Result<()> {
 
     println!("Generated: {}", index_path.display());
 
-    let commits = gitkyl::list_commits(
-        &config.repo,
-        Some(repo_info.default_branch()),
-        Some(DEFAULT_COMMIT_LIMIT),
-    )
-    .context("Failed to list commits")?;
+    // Generate commits page for default branch
+    let commit_count =
+        generate_commits_page_for_branch(&config, &repo_info, repo_info.default_branch())?;
+    println!("Generated commits page ({} commits)", commit_count);
 
-    let commits_html =
-        gitkyl::pages::commits::generate(&commits, repo_info.default_branch(), repo_info.name());
-
-    let commits_dir = config
-        .output
-        .join("commits")
-        .join(repo_info.default_branch());
-
-    fs::create_dir_all(&commits_dir).context("Failed to create commits directory")?;
-
-    let commits_path = commits_dir.join("index.html");
-    fs::write(&commits_path, commits_html.into_string())
-        .with_context(|| format!("Failed to write commits page to {}", commits_path.display()))?;
-
-    println!(
-        "Generated: {} ({} commits)",
-        commits_path.display(),
-        commits.len()
-    );
-
+    // Generate blob pages for default branch
     println!("Generating file pages...");
-
-    let mut generated_count = 0;
-    let mut markdown_count = 0;
-    for entry in &files {
-        if let Some(path) = entry.path() {
-            if path.to_str().is_none() {
-                eprintln!(
-                    "Warning: Skipping file with invalid UTF-8 path: {}",
-                    path.display()
-                );
-                continue;
-            }
-
-            // Detect README files for markdown rendering
-            let result = if gitkyl::is_readme(path) {
-                markdown_count += 1;
-                gitkyl::pages::blob::generate_markdown(
-                    &config.repo,
-                    repo_info.default_branch(),
-                    path,
-                    &config
-                        .project_name()
-                        .context("Failed to determine project name")?,
-                )
-            } else {
-                gitkyl::pages::blob::generate(
-                    &config.repo,
-                    repo_info.default_branch(),
-                    path,
-                    &config
-                        .project_name()
-                        .context("Failed to determine project name")?,
-                    &config.theme,
-                )
-            };
-
-            match result {
-                Ok(html) => {
-                    let blob_path = config
-                        .output
-                        .join("blob")
-                        .join(repo_info.default_branch())
-                        .join(format!("{}.html", path.display()));
-
-                    if let Some(parent) = blob_path.parent() {
-                        fs::create_dir_all(parent).context("Failed to create blob directory")?;
-                    }
-
-                    fs::write(&blob_path, html.into_string()).with_context(|| {
-                        format!("Failed to write blob page {}", blob_path.display())
-                    })?;
-
-                    generated_count += 1;
-                }
-                Err(e) => {
-                    let err_msg = format!("{:?}", e);
-                    if err_msg.contains("not a blob") || err_msg.contains("invalid UTF8") {
-                        continue;
-                    }
-                    return Err(e).with_context(|| {
-                        format!("Failed to generate blob page for {}", path.display())
-                    });
-                }
-            }
-        }
-    }
-
+    let (blob_count, markdown_count) =
+        generate_blob_pages_for_branch(&config, repo_info.default_branch(), &files)?;
     println!(
-        "Generated {} file pages ({} markdown, {} code)",
-        generated_count,
+        "Generated {} blob pages ({} markdown, {} code)",
+        blob_count + markdown_count,
         markdown_count,
-        generated_count - markdown_count
+        blob_count
     );
 
+    // Generate tree pages for default branch
     println!("Generating tree pages...");
-
-    let directories = tree.all_dirs();
-    let mut tree_count = 0;
-
-    for dir_path in directories {
-        validate_tree_path(&dir_path)
-            .with_context(|| format!("Invalid tree path: {}", dir_path))?;
-
-        let entries_at_this_level = tree.files_at(&dir_path);
-        let subdirs_at_this_level = tree.subdirs_at(&dir_path);
-
-        // Build full subdir paths for directory commit lookup
-        let full_dir_paths: Vec<String> = subdirs_at_this_level
-            .iter()
-            .map(|subdir| {
-                if dir_path.is_empty() {
-                    subdir.to_string()
-                } else {
-                    format!("{}/{}", dir_path, subdir)
-                }
-            })
-            .collect();
-
-        let dir_path_refs: Vec<&str> = full_dir_paths.iter().map(|s| s.as_str()).collect();
-
-        let level_dir_commit_map = if !dir_path_refs.is_empty() {
-            gitkyl::get_last_commits_batch(
-                &config.repo,
-                Some(repo_info.default_branch()),
-                &dir_path_refs,
-            )
-            .unwrap_or_else(|e| {
-                eprintln!(
-                    "Warning: Failed to batch lookup directory commits for {}: {:#}",
-                    dir_path, e
-                );
-                std::collections::HashMap::new()
-            })
-        } else {
-            std::collections::HashMap::new()
-        };
-
-        let tree_items_for_page = build_tree_items(
-            entries_at_this_level,
-            &subdirs_at_this_level,
-            &dir_path,
-            &commit_map,
-            &level_dir_commit_map,
-        );
-
-        let html_result = if dir_path.is_empty() {
-            let readme_html = gitkyl::pages::index::find_and_render_readme(
-                &config.repo,
-                repo_info.default_branch(),
-                &tree_items_for_page,
-            )
-            .ok()
-            .flatten();
-
-            let depth = repo_info.default_branch().matches('/').count() + 2;
-            Ok(gitkyl::pages::index::generate(IndexPageData {
-                name: repo_info.name(),
-                owner: repo_info.owner(),
-                default_branch: repo_info.default_branch(),
-                branches: repo_info.branches(),
-                commit_count: commits.len(),
-                latest_commit: latest_commit.as_ref(),
-                items: &tree_items_for_page,
-                readme_html: readme_html.as_deref(),
-                depth,
-            }))
-        } else {
-            gitkyl::pages::tree::generate(
-                &config.repo,
-                repo_info.default_branch(),
-                &dir_path,
-                repo_info.name(),
-                &tree_items_for_page,
-            )
-        };
-
-        match html_result {
-            Ok(html) => {
-                let tree_path = if dir_path.is_empty() {
-                    config
-                        .output
-                        .join("tree")
-                        .join(repo_info.default_branch())
-                        .join("index.html")
-                } else {
-                    config
-                        .output
-                        .join("tree")
-                        .join(repo_info.default_branch())
-                        .join(format!("{}.html", dir_path))
-                };
-
-                if let Some(parent) = tree_path.parent() {
-                    fs::create_dir_all(parent).context("Failed to create tree directory")?;
-                }
-
-                fs::write(&tree_path, html.into_string()).with_context(|| {
-                    format!("Failed to write tree page {}", tree_path.display())
-                })?;
-
-                tree_count += 1;
-            }
-            Err(e) => {
-                return Err(e)
-                    .with_context(|| format!("Failed to generate tree page for {}", dir_path));
-            }
-        }
-    }
-
+    let tree_count = generate_tree_pages_for_branch(
+        &config,
+        &repo_info,
+        repo_info.default_branch(),
+        &tree,
+        &commit_map,
+    )?;
     println!("Generated {} tree pages for default branch", tree_count);
 
     println!("Generating tree pages for all branches...");
@@ -452,216 +533,29 @@ fn main() -> Result<()> {
                     std::collections::HashMap::new()
                 });
 
-        let branch_commits =
-            gitkyl::list_commits(&config.repo, Some(branch), None).unwrap_or_else(|e| {
-                eprintln!(
-                    "Warning: Failed to list commits for branch {}: {:#}",
-                    branch, e
-                );
-                vec![]
-            });
-
-        let branch_latest_commit = branch_commits.first();
-
-        let branch_directories = branch_tree.all_dirs();
-
-        for dir_path in &branch_directories {
-            validate_tree_path(dir_path)
-                .with_context(|| format!("Invalid tree path: {}", dir_path))?;
-
-            let entries_at_level = branch_tree.files_at(dir_path);
-            let subdirs_at_level = branch_tree.subdirs_at(dir_path);
-
-            let full_subdir_paths: Vec<String> = subdirs_at_level
-                .iter()
-                .map(|subdir| {
-                    if dir_path.is_empty() {
-                        subdir.to_string()
-                    } else {
-                        format!("{}/{}", dir_path, subdir)
-                    }
-                })
-                .collect();
-
-            let dir_paths_refs: Vec<&str> = full_subdir_paths.iter().map(|s| s.as_str()).collect();
-
-            let level_dir_commit_map = if !dir_paths_refs.is_empty() {
-                gitkyl::get_last_commits_batch(&config.repo, Some(branch), &dir_paths_refs)
-                    .unwrap_or_else(|e| {
-                        eprintln!(
-                            "Warning: Failed to lookup directory commits for branch {} dir {}: {:#}",
-                            branch, dir_path, e
-                        );
-                        std::collections::HashMap::new()
-                    })
-            } else {
-                std::collections::HashMap::new()
-            };
-
-            let tree_items = build_tree_items(
-                entries_at_level,
-                &subdirs_at_level,
-                dir_path,
-                &branch_commit_map,
-                &level_dir_commit_map,
-            );
-
-            let html_result = if dir_path.is_empty() {
-                let readme_html =
-                    gitkyl::pages::index::find_and_render_readme(&config.repo, branch, &tree_items)
-                        .ok()
-                        .flatten();
-
-                let depth = branch.matches('/').count() + 2;
-                Ok(gitkyl::pages::index::generate(IndexPageData {
-                    name: repo_info.name(),
-                    owner: repo_info.owner(),
-                    default_branch: branch,
-                    branches: repo_info.branches(),
-                    commit_count: branch_commits.len(),
-                    latest_commit: branch_latest_commit,
-                    items: &tree_items,
-                    readme_html: readme_html.as_deref(),
-                    depth,
-                }))
-            } else {
-                gitkyl::pages::tree::generate(
-                    &config.repo,
-                    branch,
-                    dir_path,
-                    repo_info.name(),
-                    &tree_items,
-                )
-            };
-
-            match html_result {
-                Ok(html) => {
-                    let tree_path = if dir_path.is_empty() {
-                        config.output.join("tree").join(branch).join("index.html")
-                    } else {
-                        config
-                            .output
-                            .join("tree")
-                            .join(branch)
-                            .join(format!("{}.html", dir_path))
-                    };
-
-                    if let Some(parent) = tree_path.parent() {
-                        fs::create_dir_all(parent).context("Failed to create tree directory")?;
-                    }
-
-                    fs::write(&tree_path, html.into_string()).with_context(|| {
-                        format!("Failed to write tree page {}", tree_path.display())
-                    })?;
-
-                    total_tree_pages += 1;
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to generate tree page for branch {} dir {}: {:#}",
-                        branch, dir_path, e
-                    );
-                }
-            }
-        }
-
-        println!(
-            "Generated tree pages for branch: {} ({} directories)",
+        // Generate all page types for branch
+        let branch_tree_count = generate_tree_pages_for_branch(
+            &config,
+            &repo_info,
             branch,
-            branch_directories.len()
-        );
+            &branch_tree,
+            &branch_commit_map,
+        )?;
 
-        println!("Generating blob pages for branch: {}", branch);
-        let mut branch_blob_count = 0;
-        let mut branch_markdown_count = 0;
+        let (branch_blob_count, branch_markdown_count) =
+            generate_blob_pages_for_branch(&config, branch, &branch_files)?;
 
-        for entry in &branch_files {
-            if let Some(path) = entry.path() {
-                if path.to_str().is_none() {
-                    eprintln!(
-                        "Warning: Skipping file with invalid UTF-8 path: {}",
-                        path.display()
-                    );
-                    continue;
-                }
+        let branch_commit_count = generate_commits_page_for_branch(&config, &repo_info, branch)?;
 
-                let result = if gitkyl::is_readme(path) {
-                    branch_markdown_count += 1;
-                    gitkyl::pages::blob::generate_markdown(
-                        &config.repo,
-                        branch,
-                        path,
-                        &config
-                            .project_name()
-                            .context("Failed to determine project name")?,
-                    )
-                } else {
-                    gitkyl::pages::blob::generate(
-                        &config.repo,
-                        branch,
-                        path,
-                        &config
-                            .project_name()
-                            .context("Failed to determine project name")?,
-                        &config.theme,
-                    )
-                };
-
-                match result {
-                    Ok(html) => {
-                        let blob_path = config
-                            .output
-                            .join("blob")
-                            .join(branch)
-                            .join(format!("{}.html", path.display()));
-
-                        if let Some(parent) = blob_path.parent() {
-                            fs::create_dir_all(parent)
-                                .context("Failed to create blob directory")?;
-                        }
-
-                        fs::write(&blob_path, html.into_string()).with_context(|| {
-                            format!("Failed to write blob page {}", blob_path.display())
-                        })?;
-
-                        branch_blob_count += 1;
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Warning: Failed to generate blob for branch {} file {}: {:#}",
-                            branch,
-                            path.display(),
-                            e
-                        );
-                    }
-                }
-            }
-        }
+        total_tree_pages += branch_tree_count;
 
         println!(
-            "Generated {} blob pages for branch: {} ({} markdown)",
-            branch_blob_count, branch, branch_markdown_count
-        );
-
-        let branch_commits_html =
-            gitkyl::pages::commits::generate(&branch_commits, branch, repo_info.name());
-
-        let branch_commits_dir = config.output.join("commits").join(branch);
-
-        fs::create_dir_all(&branch_commits_dir).context("Failed to create commits directory")?;
-
-        let branch_commits_path = branch_commits_dir.join("index.html");
-        fs::write(&branch_commits_path, branch_commits_html.into_string()).with_context(|| {
-            format!(
-                "Failed to write commits page to {}",
-                branch_commits_path.display()
-            )
-        })?;
-
-        println!(
-            "Generated commits page for branch: {} ({} commits)",
+            "Branch {}: {} trees, {} blobs ({} markdown), {} commits",
             branch,
-            branch_commits.len()
+            branch_tree_count,
+            branch_blob_count,
+            branch_markdown_count,
+            branch_commit_count
         );
     }
 
@@ -795,7 +689,6 @@ mod tests {
 
     #[test]
     fn test_setup_creates_directories() {
-        use std::path::PathBuf;
         use tempfile::TempDir;
 
         // Arrange: create temporary output directory
