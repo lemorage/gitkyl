@@ -20,6 +20,92 @@ fn validate_tree_path(path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Creates output directory structure and writes CSS assets.
+///
+/// Sets up required directories (output root, assets, tree, blob, commits)
+/// and writes all CSS bundles to assets directory.
+///
+/// # Arguments
+///
+/// * `output_dir`: Base output directory path
+///
+/// # Errors
+///
+/// Returns error if directory creation fails or CSS writing fails
+fn setup_output_directories(output_dir: &std::path::Path) -> Result<()> {
+    fs::create_dir_all(output_dir).context("Failed to create output directory")?;
+
+    let assets_dir = output_dir.join("assets");
+    fs::create_dir_all(&assets_dir).context("Failed to create assets directory")?;
+
+    gitkyl::write_css_assets(&assets_dir).context("Failed to write CSS assets")?;
+
+    Ok(())
+}
+
+/// Builds tree items from file entries and subdirectories.
+///
+/// Combines directory and file entries into a unified list of tree items,
+/// each annotated with last commit information from pre-fetched maps.
+///
+/// # Arguments
+///
+/// * `file_entries`: File entries at current level
+/// * `subdir_names`: Subdirectory names at current level
+/// * `dir_path`: Current directory path for constructing full paths
+/// * `file_commit_map`: Mapping of file paths to last commits
+/// * `dir_commit_map`: Mapping of directory paths to last commits
+///
+/// # Returns
+///
+/// Vector of tree items combining directories and files with commits
+fn build_tree_items(
+    file_entries: &[gitkyl::FileEntry],
+    subdir_names: &[&str],
+    dir_path: &str,
+    file_commit_map: &std::collections::HashMap<String, gitkyl::CommitInfo>,
+    dir_commit_map: &std::collections::HashMap<String, gitkyl::CommitInfo>,
+) -> Vec<TreeItem> {
+    let mut items = Vec::new();
+
+    // Build directory items with pre-fetched commits
+    for subdir in subdir_names {
+        let full_path = if dir_path.is_empty() {
+            subdir.to_string()
+        } else {
+            format!("{}/{}", dir_path, subdir)
+        };
+
+        if let Some(commit) = dir_commit_map.get(&full_path) {
+            items.push(TreeItem::Directory {
+                name: subdir.to_string(),
+                full_path,
+                commit: commit.clone(),
+            });
+        } else {
+            eprintln!("Warning: No commit found for directory {}", full_path);
+        }
+    }
+
+    // Build file items with pre-fetched commits
+    for entry in file_entries {
+        if let Some(path) = entry.path()
+            && let Some(path_str) = path.to_str()
+        {
+            if let Some(commit) = file_commit_map.get(path_str) {
+                items.push(TreeItem::File {
+                    entry: entry.clone(),
+                    commit: commit.clone(),
+                });
+            } else {
+                eprintln!("Warning: No commit found for file {}", path_str);
+            }
+        }
+    }
+
+    items
+}
+
 fn main() -> Result<()> {
     let config = Config::parse();
     config.validate().context("Invalid configuration")?;
@@ -27,11 +113,7 @@ fn main() -> Result<()> {
     let repo_info = gitkyl::analyze_repository(&config.repo, config.owner.clone())
         .context("Failed to analyze repository")?;
 
-    fs::create_dir_all(&config.output).context("Failed to create output directory")?;
-
-    let assets_dir = config.output.join("assets");
-    fs::create_dir_all(&assets_dir).context("Failed to create assets directory")?;
-    gitkyl::write_css_assets(&assets_dir)?;
+    setup_output_directories(&config.output)?;
 
     let latest_commit =
         gitkyl::list_commits(&config.repo, Some(repo_info.default_branch()), Some(1))
@@ -63,8 +145,6 @@ fn main() -> Result<()> {
     let top_level_files = tree.files_at("");
     let top_level_subdirs = tree.subdirs_at("");
 
-    let mut tree_items = Vec::new();
-
     // Batch lookup for root level directories
     let root_dir_commit_map = if !top_level_subdirs.is_empty() {
         gitkyl::get_last_commits_batch(
@@ -80,33 +160,13 @@ fn main() -> Result<()> {
         std::collections::HashMap::new()
     };
 
-    // Build tree items with pre-fetched commits
-    for subdir in &top_level_subdirs {
-        if let Some(commit) = root_dir_commit_map.get(*subdir) {
-            tree_items.push(TreeItem::Directory {
-                name: subdir.to_string(),
-                full_path: subdir.to_string(),
-                commit: commit.clone(),
-            });
-        } else {
-            eprintln!("Warning: No commit found for directory {}", subdir);
-        }
-    }
-
-    for file in top_level_files {
-        if let Some(path) = file.path()
-            && let Some(path_str) = path.to_str()
-        {
-            if let Some(commit) = commit_map.get(path_str) {
-                tree_items.push(TreeItem::File {
-                    entry: file.clone(),
-                    commit: commit.clone(),
-                });
-            } else {
-                eprintln!("Warning: No commit found for file {}", path_str);
-            }
-        }
-    }
+    let tree_items = build_tree_items(
+        top_level_files,
+        &top_level_subdirs,
+        "",
+        &commit_map,
+        &root_dir_commit_map,
+    );
 
     // Detect and render README file at repository root
     let readme_html = find_and_render_readme(&config.repo, repo_info.default_branch(), &tree_items)
@@ -250,7 +310,7 @@ fn main() -> Result<()> {
         let subdirs_at_this_level = tree.subdirs_at(&dir_path);
 
         // Build full subdir paths for directory commit lookup
-        let full_subdir_paths: Vec<String> = subdirs_at_this_level
+        let full_dir_paths: Vec<String> = subdirs_at_this_level
             .iter()
             .map(|subdir| {
                 if dir_path.is_empty() {
@@ -261,13 +321,13 @@ fn main() -> Result<()> {
             })
             .collect();
 
-        // Batch lookup for directories at this level
-        let dir_paths_refs: Vec<&str> = full_subdir_paths.iter().map(|s| s.as_str()).collect();
-        let level_dir_commit_map = if !dir_paths_refs.is_empty() {
+        let dir_path_refs: Vec<&str> = full_dir_paths.iter().map(|s| s.as_str()).collect();
+
+        let level_dir_commit_map = if !dir_path_refs.is_empty() {
             gitkyl::get_last_commits_batch(
                 &config.repo,
                 Some(repo_info.default_branch()),
-                &dir_paths_refs,
+                &dir_path_refs,
             )
             .unwrap_or_else(|e| {
                 eprintln!(
@@ -280,41 +340,13 @@ fn main() -> Result<()> {
             std::collections::HashMap::new()
         };
 
-        let mut tree_items_for_page = Vec::new();
-
-        // Build directory items with pre-fetched commits
-        for (i, subdir) in subdirs_at_this_level.iter().enumerate() {
-            let full_subdir_path = &full_subdir_paths[i];
-
-            if let Some(commit) = level_dir_commit_map.get(full_subdir_path.as_str()) {
-                tree_items_for_page.push(TreeItem::Directory {
-                    name: subdir.to_string(),
-                    full_path: full_subdir_path.clone(),
-                    commit: commit.clone(),
-                });
-            } else {
-                eprintln!(
-                    "Warning: No commit found for directory {}",
-                    full_subdir_path
-                );
-            }
-        }
-
-        // Build file items with pre-fetched commits
-        for entry in entries_at_this_level {
-            if let Some(path) = entry.path()
-                && let Some(path_str) = path.to_str()
-            {
-                if let Some(commit) = commit_map.get(path_str) {
-                    tree_items_for_page.push(TreeItem::File {
-                        entry: entry.clone(),
-                        commit: commit.clone(),
-                    });
-                } else {
-                    eprintln!("Warning: No commit found for file {}", path_str);
-                }
-            }
-        }
+        let tree_items_for_page = build_tree_items(
+            entries_at_this_level,
+            &subdirs_at_this_level,
+            &dir_path,
+            &commit_map,
+            &level_dir_commit_map,
+        );
 
         let html_result = if dir_path.is_empty() {
             let readme_html = gitkyl::pages::index::find_and_render_readme(
@@ -466,30 +498,13 @@ fn main() -> Result<()> {
                 std::collections::HashMap::new()
             };
 
-            let mut tree_items = Vec::new();
-
-            for (i, subdir) in subdirs_at_level.iter().enumerate() {
-                let full_subdir_path = &full_subdir_paths[i];
-                if let Some(commit) = level_dir_commit_map.get(full_subdir_path.as_str()) {
-                    tree_items.push(TreeItem::Directory {
-                        name: subdir.to_string(),
-                        full_path: full_subdir_path.clone(),
-                        commit: commit.clone(),
-                    });
-                }
-            }
-
-            for entry in entries_at_level {
-                if let Some(path) = entry.path()
-                    && let Some(path_str) = path.to_str()
-                    && let Some(commit) = branch_commit_map.get(path_str)
-                {
-                    tree_items.push(TreeItem::File {
-                        entry: entry.clone(),
-                        commit: commit.clone(),
-                    });
-                }
-            }
+            let tree_items = build_tree_items(
+                entries_at_level,
+                &subdirs_at_level,
+                dir_path,
+                &branch_commit_map,
+                &level_dir_commit_map,
+            );
 
             let html_result = if dir_path.is_empty() {
                 let readme_html =
@@ -776,5 +791,204 @@ mod tests {
         assert!(validate_tree_path("./../../etc/passwd").is_err());
         assert!(validate_tree_path("foo/./../../../bar").is_err());
         assert!(validate_tree_path("src/./../../sensitive").is_err());
+    }
+
+    #[test]
+    fn test_setup_creates_directories() {
+        use std::path::PathBuf;
+        use tempfile::TempDir;
+
+        // Arrange: create temporary output directory
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let output_path = temp_dir.path().join("output");
+
+        // Act: call setup function
+        let result = setup_output_directories(&output_path);
+
+        // Assert: directories should be created
+        assert!(
+            result.is_ok(),
+            "setup_output_directories failed: {:?}",
+            result.err()
+        );
+        assert!(output_path.exists(), "Output directory not created");
+        assert!(
+            output_path.join("assets").exists(),
+            "Assets directory not created"
+        );
+    }
+
+    #[test]
+    fn test_setup_writes_css_assets() {
+        use tempfile::TempDir;
+
+        // Arrange: create temporary output directory
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let output_path = temp_dir.path().join("output");
+
+        // Act: call setup function
+        let result = setup_output_directories(&output_path);
+
+        // Assert: CSS files should be written
+        assert!(
+            result.is_ok(),
+            "setup_output_directories failed: {:?}",
+            result.err()
+        );
+
+        let assets_dir = output_path.join("assets");
+        assert!(assets_dir.exists(), "Assets directory not created");
+
+        // Check that CSS assets were written by verifying files exist
+        let css_files = std::fs::read_dir(&assets_dir)
+            .expect("Failed to read assets dir")
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "css"))
+            .count();
+
+        assert!(css_files > 0, "No CSS files written to assets directory");
+    }
+
+    #[test]
+    fn test_build_tree_items_empty() {
+        use std::collections::HashMap;
+
+        // Arrange: empty inputs
+        let file_entries = vec![];
+        let subdir_names = vec![];
+        let dir_path = "";
+        let file_commit_map = HashMap::new();
+        let dir_commit_map = HashMap::new();
+
+        // Act: build tree items
+        let items = build_tree_items(
+            &file_entries,
+            &subdir_names,
+            dir_path,
+            &file_commit_map,
+            &dir_commit_map,
+        );
+
+        // Assert: should return empty vector
+        assert_eq!(items.len(), 0, "Expected empty tree items");
+    }
+
+    #[test]
+    fn test_build_tree_items_with_dirs() {
+        use std::collections::HashMap;
+
+        // Arrange: directories only
+        let file_entries = vec![];
+        let subdir_names = vec!["src", "docs"];
+        let dir_path = "";
+        let file_commit_map = HashMap::new();
+
+        let mut dir_commit_map = HashMap::new();
+        dir_commit_map.insert(
+            "src".to_string(),
+            gitkyl::CommitInfo::new(
+                "abc123".to_string(),
+                "Initial commit".to_string(),
+                "Initial commit\n\nFull message.".to_string(),
+                "Test Author".to_string(),
+                1704067200,
+            ),
+        );
+        dir_commit_map.insert(
+            "docs".to_string(),
+            gitkyl::CommitInfo::new(
+                "def456".to_string(),
+                "Add docs".to_string(),
+                "Add docs\n\nFull message.".to_string(),
+                "Test Author".to_string(),
+                1704153600,
+            ),
+        );
+
+        // Act: build tree items
+        let items = build_tree_items(
+            &file_entries,
+            &subdir_names,
+            dir_path,
+            &file_commit_map,
+            &dir_commit_map,
+        );
+
+        // Assert: should have two directory items
+        assert_eq!(items.len(), 2, "Expected 2 tree items");
+
+        match &items[0] {
+            TreeItem::Directory {
+                name,
+                full_path,
+                commit,
+            } => {
+                assert_eq!(name, "src");
+                assert_eq!(full_path, "src");
+                assert_eq!(commit.short_oid(), "abc123");
+            }
+            _ => panic!("Expected directory item"),
+        }
+
+        match &items[1] {
+            TreeItem::Directory {
+                name,
+                full_path,
+                commit,
+            } => {
+                assert_eq!(name, "docs");
+                assert_eq!(full_path, "docs");
+                assert_eq!(commit.short_oid(), "def456");
+            }
+            _ => panic!("Expected directory item"),
+        }
+    }
+
+    #[test]
+    fn test_build_tree_items_nested_path() {
+        use std::collections::HashMap;
+
+        // Arrange: nested directory path
+        let file_entries = vec![];
+        let subdir_names = vec!["utils"];
+        let dir_path = "src/lib";
+        let file_commit_map = HashMap::new();
+
+        let mut dir_commit_map = HashMap::new();
+        dir_commit_map.insert(
+            "src/lib/utils".to_string(),
+            gitkyl::CommitInfo::new(
+                "nested123".to_string(),
+                "Add utils".to_string(),
+                "Add utils\n\nFull message.".to_string(),
+                "Test Author".to_string(),
+                1704240000,
+            ),
+        );
+
+        // Act: build tree items
+        let items = build_tree_items(
+            &file_entries,
+            &subdir_names,
+            dir_path,
+            &file_commit_map,
+            &dir_commit_map,
+        );
+
+        // Assert: full path should be constructed correctly
+        assert_eq!(items.len(), 1, "Expected 1 tree item");
+
+        match &items[0] {
+            TreeItem::Directory {
+                name,
+                full_path,
+                commit,
+            } => {
+                assert_eq!(name, "utils");
+                assert_eq!(full_path, "src/lib/utils");
+                assert_eq!(commit.short_oid(), "nested1");
+            }
+            _ => panic!("Expected directory item"),
+        }
     }
 }
