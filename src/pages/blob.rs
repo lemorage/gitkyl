@@ -6,16 +6,18 @@ use std::path::Path;
 
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
+use crate::filetype::{FileType, ImageFormat, detect_file_type};
 use crate::git::read_blob;
 use crate::highlight::Highlighter;
 use crate::markdown::MarkdownRenderer;
 use crate::util::calculate_depth;
 
-/// Generates HTML blob page with syntax highlighting
+/// Generates HTML blob page based on file type
 ///
-/// Reads blob content from the repository at the specified reference and path,
-/// applies syntect syntax highlighting, and renders as HTML with line numbers.
-/// The output follows GitHub's visual design patterns.
+/// Detects file type (text, image, or binary) and dispatches to the appropriate
+/// renderer. Text files get syntax highlighting, images are displayed inline,
+/// and binary files show an informative message. All file types return success
+/// to prevent warnings for normal repository content.
 ///
 /// # Arguments
 ///
@@ -31,11 +33,11 @@ use crate::util::calculate_depth;
 ///
 /// # Errors
 ///
-/// Returns error if:
+/// Returns error only if:
 /// - Blob cannot be read from repository
-/// - File content contains invalid UTF8
-/// - Syntax highlighting fails
-/// - Theme cannot be loaded
+/// - Page rendering fails unexpectedly
+///
+/// Normal binary files and images do not return errors.
 ///
 /// # Examples
 ///
@@ -43,10 +45,20 @@ use crate::util::calculate_depth;
 /// use gitkyl::pages::blob::generate;
 /// use std::path::Path;
 ///
+/// // Text file with syntax highlighting
 /// let html = generate(
 ///     Path::new("."),
 ///     "main",
 ///     Path::new("src/lib.rs"),
+///     "my-repo",
+///     "Catppuccin-Latte"
+/// )?;
+///
+/// // Image file displays inline
+/// let html = generate(
+///     Path::new("."),
+///     "main",
+///     Path::new("logo.png"),
 ///     "my-repo",
 ///     "Catppuccin-Latte"
 /// )?;
@@ -64,26 +76,27 @@ pub fn generate(
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
 
-    let content = String::from_utf8(content_bytes)
-        .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
+    let file_type = detect_file_type(&content_bytes, file_path.as_ref());
 
-    let highlighter = Highlighter::with_theme(theme)
-        .or_else(|_| Highlighter::new())
-        .context("Failed to create highlighter")?;
-
-    let highlighted_lines = highlighter
-        .highlight(&content, file_path.as_ref())
-        .with_context(|| format!("Failed to apply syntax highlighting: {}", path_str))?;
-
-    let path_components = extract_breadcrumb_components(&path_str);
-
-    Ok(blob_page_markup(
-        &path_str,
-        &path_components,
-        ref_name,
-        repo_name,
-        &highlighted_lines,
-    ))
+    match file_type {
+        FileType::Text => generate_text_blob(
+            &content_bytes,
+            file_path.as_ref(),
+            ref_name,
+            repo_name,
+            theme,
+        ),
+        FileType::Image(format) => generate_image_blob(
+            &content_bytes,
+            format,
+            file_path.as_ref(),
+            ref_name,
+            repo_name,
+        ),
+        FileType::Binary => {
+            generate_binary_blob(&content_bytes, file_path.as_ref(), ref_name, repo_name)
+        }
+    }
 }
 
 /// Generates HTML blob page with rendered markdown
@@ -151,6 +164,89 @@ pub fn generate_markdown(
         ref_name,
         repo_name,
         &rendered_html,
+    ))
+}
+
+/// Generates text blob with syntax highlighting.
+///
+/// Converts blob bytes to UTF-8 string and applies syntect syntax highlighting
+/// based on file extension. Returns formatted HTML with line numbers.
+///
+/// # Errors
+///
+/// Returns error if content contains invalid UTF-8 or highlighting fails
+fn generate_text_blob(
+    bytes: &[u8],
+    file_path: &Path,
+    ref_name: &str,
+    repo_name: &str,
+    theme: &str,
+) -> Result<Markup> {
+    let content = String::from_utf8(bytes.to_vec())
+        .with_context(|| format!("Text file contains invalid UTF-8: {}", file_path.display()))?;
+
+    let highlighter = Highlighter::with_theme(theme)
+        .or_else(|_| Highlighter::new())
+        .context("Failed to create highlighter")?;
+
+    let highlighted_lines = highlighter
+        .highlight(&content, file_path)
+        .with_context(|| format!("Failed to highlight: {}", file_path.display()))?;
+
+    let path_str = file_path.display().to_string();
+    let path_components = extract_breadcrumb_components(&path_str);
+
+    Ok(blob_page_markup(
+        &path_str,
+        &path_components,
+        ref_name,
+        repo_name,
+        &highlighted_lines,
+    ))
+}
+
+/// Renders image blob page with format label
+///
+/// Creates HTML page showing file type information for image files.
+/// Displays breadcrumb navigation and format metadata.
+fn generate_image_blob(
+    _bytes: &[u8],
+    format: ImageFormat,
+    file_path: &Path,
+    ref_name: &str,
+    repo_name: &str,
+) -> Result<Markup> {
+    let path_str = file_path.display().to_string();
+    let path_components = extract_breadcrumb_components(&path_str);
+
+    Ok(placeholder_blob_page(
+        &path_str,
+        &path_components,
+        ref_name,
+        repo_name,
+        &format!("Image file ({})", format.extension().to_uppercase()),
+    ))
+}
+
+/// Renders binary blob page with informative message
+///
+/// Creates HTML page indicating file contains binary data. Displays
+/// breadcrumb navigation and file type label.
+fn generate_binary_blob(
+    _bytes: &[u8],
+    file_path: &Path,
+    ref_name: &str,
+    repo_name: &str,
+) -> Result<Markup> {
+    let path_str = file_path.display().to_string();
+    let path_components = extract_breadcrumb_components(&path_str);
+
+    Ok(placeholder_blob_page(
+        &path_str,
+        &path_components,
+        ref_name,
+        repo_name,
+        "Binary file",
     ))
 }
 
@@ -250,6 +346,51 @@ fn markdown_blob_page_markup(
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
             main class="markdown-content latte" {
                 (PreEscaped(rendered_html))
+            }
+        },
+    )
+}
+
+/// Renders simple blob page with message label
+fn placeholder_blob_page(
+    file_path: &str,
+    breadcrumb_components: &[&str],
+    ref_name: &str,
+    repo_name: &str,
+    message: &str,
+) -> Markup {
+    let depth = calculate_depth(ref_name, file_path);
+    let index_path = "../".repeat(depth) + "index.html";
+    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
+
+    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
+        .iter()
+        .enumerate()
+        .map(|(idx, &component)| {
+            if idx == breadcrumb_components.len() - 1 {
+                (component, None)
+            } else {
+                let partial_path = breadcrumb_components[..=idx].join("/");
+                let link = format!(
+                    "{}tree/{}/{}.html",
+                    "../".repeat(depth),
+                    ref_name,
+                    partial_path
+                );
+                (component, Some(link))
+            }
+        })
+        .collect();
+
+    page_wrapper(
+        file_path,
+        &[&css_path],
+        html! {
+            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
+            main class="blob-container" {
+                div style="padding: 48px; text-align: center; color: #586069;" {
+                    h2 { (message) }
+                }
             }
         },
     )

@@ -338,7 +338,7 @@ fn generate_blob_pages_for_branch(
                 }
                 Err(e) => {
                     let err_msg = format!("{:?}", e);
-                    if err_msg.contains("not a blob") || err_msg.contains("invalid UTF8") {
+                    if err_msg.contains("not a blob") {
                         continue;
                     }
                     return Err(e).with_context(|| {
