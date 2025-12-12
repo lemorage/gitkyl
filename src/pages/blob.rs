@@ -1,6 +1,7 @@
 //! Blob page generation for file content viewing
 
 use anyhow::{Context, Result};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
@@ -10,7 +11,7 @@ use crate::filetype::{FileType, ImageFormat, detect_file_type};
 use crate::git::read_blob;
 use crate::highlight::Highlighter;
 use crate::markdown::MarkdownRenderer;
-use crate::util::calculate_depth;
+use crate::util::{calculate_depth, format_file_size};
 
 /// Generates HTML blob page based on file type
 ///
@@ -205,12 +206,12 @@ fn generate_text_blob(
     ))
 }
 
-/// Renders image blob page with format label
+/// Renders image blob page with embedded image display
 ///
-/// Creates HTML page showing file type information for image files.
-/// Displays breadcrumb navigation and format metadata.
+/// Creates HTML page displaying the image with metadata. Image data is
+/// embedded as base64 data URL for self-contained static HTML.
 fn generate_image_blob(
-    _bytes: &[u8],
+    bytes: &[u8],
     format: ImageFormat,
     file_path: &Path,
     ref_name: &str,
@@ -219,12 +220,13 @@ fn generate_image_blob(
     let path_str = file_path.display().to_string();
     let path_components = extract_breadcrumb_components(&path_str);
 
-    Ok(placeholder_blob_page(
+    Ok(image_blob_page_markup(
         &path_str,
         &path_components,
         ref_name,
         repo_name,
-        &format!("Image file ({})", format.extension().to_uppercase()),
+        bytes,
+        format,
     ))
 }
 
@@ -351,6 +353,66 @@ fn markdown_blob_page_markup(
     )
 }
 
+/// Renders image blob page with embedded data URL
+fn image_blob_page_markup(
+    file_path: &str,
+    breadcrumb_components: &[&str],
+    ref_name: &str,
+    repo_name: &str,
+    image_bytes: &[u8],
+    format: ImageFormat,
+) -> Markup {
+    let depth = calculate_depth(ref_name, file_path);
+    let index_path = "../".repeat(depth) + "index.html";
+    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
+
+    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
+        .iter()
+        .enumerate()
+        .map(|(idx, &component)| {
+            if idx == breadcrumb_components.len() - 1 {
+                (component, None)
+            } else {
+                let partial_path = breadcrumb_components[..=idx].join("/");
+                let link = format!(
+                    "{}tree/{}/{}.html",
+                    "../".repeat(depth),
+                    ref_name,
+                    partial_path
+                );
+                (component, Some(link))
+            }
+        })
+        .collect();
+
+    let data_url = format!(
+        "data:{};base64,{}",
+        format.mime_type(),
+        STANDARD.encode(image_bytes)
+    );
+    let file_size = format_file_size(image_bytes.len());
+
+    page_wrapper(
+        file_path,
+        &[&css_path],
+        html! {
+            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
+            main class="blob-container image-blob" {
+                div class="image-meta" {
+                    span class="file-info" {
+                        strong { (format.extension().to_uppercase()) }
+                        " · "
+                        (file_size)
+                    }
+                }
+                div class="image-display" {
+                    img src=(data_url) alt=(file_path) loading="lazy" {}
+                }
+            }
+        },
+    )
+}
+
 /// Renders simple blob page with message label
 fn placeholder_blob_page(
     file_path: &str,
@@ -465,5 +527,51 @@ mod tests {
         assert!(html_str.contains("test-repo"));
         assert!(html_str.contains("README.md"));
         assert!(html_str.contains("<h1"));
+    }
+
+    #[test]
+    fn test_generate_image_png() {
+        let repo = create_test_repo().unwrap();
+        let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
+        fs::write(repo.path().join("test.png"), png_header).unwrap();
+        git_commit(repo.path()).unwrap();
+
+        let html = generate(
+            repo.path(),
+            "HEAD",
+            Path::new("test.png"),
+            "test-repo",
+            "base16-ocean.dark",
+        )
+        .unwrap();
+
+        let html_str = html.into_string();
+        assert!(html_str.contains("test-repo"));
+        assert!(html_str.contains("test.png"));
+        assert!(html_str.contains("image-blob"));
+        assert!(html_str.contains("data:image/png;base64,"));
+        assert!(html_str.contains("PNG"));
+    }
+
+    #[test]
+    fn test_generate_binary_file() {
+        let repo = create_test_repo().unwrap();
+        let binary_data = [0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD];
+        fs::write(repo.path().join("data.bin"), binary_data).unwrap();
+        git_commit(repo.path()).unwrap();
+
+        let html = generate(
+            repo.path(),
+            "HEAD",
+            Path::new("data.bin"),
+            "test-repo",
+            "base16-ocean.dark",
+        )
+        .unwrap();
+
+        let html_str = html.into_string();
+        assert!(html_str.contains("test-repo"));
+        assert!(html_str.contains("data.bin"));
+        assert!(html_str.contains("Binary file"));
     }
 }

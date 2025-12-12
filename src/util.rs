@@ -67,6 +67,41 @@ pub fn format_timestamp(seconds: i64) -> String {
     }
 }
 
+/// Formats byte count as human readable file size
+///
+/// Converts byte count to appropriate unit (bytes, KB, MB) with two decimal
+/// places for KB and MB. Uses binary prefixes.
+///
+/// # Arguments
+///
+/// * `bytes`: File size in bytes
+///
+/// # Returns
+///
+/// Formatted string like "512 bytes", "1.50 KB", or "2.00 MB"
+///
+/// # Examples
+///
+/// ```
+/// use gitkyl::util::format_file_size;
+///
+/// assert_eq!(format_file_size(512), "512 bytes");
+/// assert_eq!(format_file_size(1024), "1.00 KB");
+/// assert_eq!(format_file_size(1048576), "1.00 MB");
+/// ```
+pub fn format_file_size(bytes: usize) -> String {
+    const KB: usize = 1024;
+    const MB: usize = KB * 1024;
+
+    if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} bytes", bytes)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,5 +245,28 @@ mod tests {
 
         let sixty_sec = (now - 60) as i64;
         assert_eq!(format_timestamp(sixty_sec), "1 min ago");
+    }
+
+    #[test]
+    fn test_format_file_size_bytes() {
+        assert_eq!(format_file_size(0), "0 bytes");
+        assert_eq!(format_file_size(1), "1 bytes");
+        assert_eq!(format_file_size(512), "512 bytes");
+        assert_eq!(format_file_size(1023), "1023 bytes");
+    }
+
+    #[test]
+    fn test_format_file_size_kilobytes() {
+        assert_eq!(format_file_size(1024), "1.00 KB");
+        assert_eq!(format_file_size(1536), "1.50 KB");
+        assert_eq!(format_file_size(10240), "10.00 KB");
+        assert_eq!(format_file_size(1048575), "1024.00 KB");
+    }
+
+    #[test]
+    fn test_format_file_size_megabytes() {
+        assert_eq!(format_file_size(1048576), "1.00 MB");
+        assert_eq!(format_file_size(1572864), "1.50 MB");
+        assert_eq!(format_file_size(10485760), "10.00 MB");
     }
 }
