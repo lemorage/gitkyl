@@ -233,9 +233,9 @@ fn generate_image_blob(
 /// Renders binary blob page with informative message
 ///
 /// Creates HTML page indicating file contains binary data. Displays
-/// breadcrumb navigation and file type label.
+/// breadcrumb navigation, file icon, and file size.
 fn generate_binary_blob(
-    _bytes: &[u8],
+    bytes: &[u8],
     file_path: &Path,
     ref_name: &str,
     repo_name: &str,
@@ -243,12 +243,12 @@ fn generate_binary_blob(
     let path_str = file_path.display().to_string();
     let path_components = extract_breadcrumb_components(&path_str);
 
-    Ok(placeholder_blob_page(
+    Ok(binary_blob_page_markup(
         &path_str,
         &path_components,
         ref_name,
         repo_name,
-        "Binary file",
+        bytes.len(),
     ))
 }
 
@@ -413,13 +413,13 @@ fn image_blob_page_markup(
     )
 }
 
-/// Renders simple blob page with message label
-fn placeholder_blob_page(
+/// Renders binary blob page with file information
+fn binary_blob_page_markup(
     file_path: &str,
     breadcrumb_components: &[&str],
     ref_name: &str,
     repo_name: &str,
-    message: &str,
+    file_size_bytes: usize,
 ) -> Markup {
     let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
@@ -444,14 +444,26 @@ fn placeholder_blob_page(
         })
         .collect();
 
+    let file_size = format_file_size(file_size_bytes);
+
     page_wrapper(
         file_path,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            main class="blob-container" {
-                div style="padding: 48px; text-align: center; color: #586069;" {
-                    h2 { (message) }
+            main class="blob-container binary-blob" {
+                div class="binary-message" {
+                    div class="binary-icon" {
+                        i class="ph ph-file-x" {}
+                    }
+                    h2 { "Binary file" }
+                    p class="binary-info" {
+                        "This file contains binary data and cannot be displayed as text."
+                    }
+                    p class="file-details" {
+                        strong { "Size: " }
+                        (file_size)
+                    }
                 }
             }
         },
@@ -572,6 +584,9 @@ mod tests {
         let html_str = html.into_string();
         assert!(html_str.contains("test-repo"));
         assert!(html_str.contains("data.bin"));
+        assert!(html_str.contains("binary-blob"));
         assert!(html_str.contains("Binary file"));
+        assert!(html_str.contains("binary data"));
+        assert!(html_str.contains("7 bytes"));
     }
 }

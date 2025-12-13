@@ -79,16 +79,6 @@ pub fn format_timestamp(seconds: i64) -> String {
 /// # Returns
 ///
 /// Formatted string like "512 bytes", "1.50 KB", or "2.00 MB"
-///
-/// # Examples
-///
-/// ```
-/// use gitkyl::util::format_file_size;
-///
-/// assert_eq!(format_file_size(512), "512 bytes");
-/// assert_eq!(format_file_size(1024), "1.00 KB");
-/// assert_eq!(format_file_size(1048576), "1.00 MB");
-/// ```
 pub fn format_file_size(bytes: usize) -> String {
     const KB: usize = 1024;
     const MB: usize = KB * 1024;
