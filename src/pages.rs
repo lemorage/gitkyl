@@ -7,4 +7,5 @@
 pub mod blob;
 pub mod commits;
 pub mod index;
+pub mod tags;
 pub mod tree;

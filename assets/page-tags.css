@@ -1,0 +1,217 @@
+/* Tags Page Styles */
+
+/* Page Header */
+main h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+}
+
+.tag-count {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 1.5rem;
+}
+
+/* Empty State */
+.empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+}
+
+/* Tag List */
+.tag-list {
+    list-style: none;
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+}
+
+.tag-entry {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background-color 0.15s ease;
+}
+
+.tag-entry:last-child {
+    border-bottom: none;
+}
+
+.tag-entry:hover {
+    background-color: #FAFAFC;
+}
+
+/* Tag Header */
+.tag-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.tag-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.tag-name:hover {
+    color: var(--accent-hover);
+}
+
+.tag-commit {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: rgba(0, 113, 227, 0.1);
+    padding: 3px 8px;
+    border-radius: var(--radius-s);
+    font-weight: 500;
+}
+
+/* Tag Content */
+.tag-message {
+    color: var(--text-primary);
+    font-size: 14px;
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.tag-meta {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.tag-tagger {
+    font-weight: 500;
+}
+
+/* Tag Detail Page */
+.tag-info-card,
+.commit-info-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.tag-info-card h2,
+.commit-info-card h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+/* Info Grid */
+.info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+.info-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.info-value {
+    color: var(--text-primary);
+    font-size: 14px;
+    word-break: break-word;
+}
+
+code.info-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--bg-code);
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+}
+
+/* Commit Details */
+.commit-details {
+    padding: 16px;
+    background: var(--bg-body);
+    border-radius: var(--radius-m);
+}
+
+.commit-message-full {
+    font-size: 15px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+}
+
+.commit-meta-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.commit-author {
+    font-weight: 500;
+}
+
+.browse-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: color 0.2s;
+}
+
+.browse-link:hover {
+    color: var(--accent-hover);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .tag-entry {
+        padding: 14px 16px;
+    }
+
+    .tag-header {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .info-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .info-label {
+        font-size: 12px;
+    }
+
+    .tag-info-card,
+    .commit-info-card {
+        padding: 16px;
+    }
+}
