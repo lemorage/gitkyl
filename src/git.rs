@@ -158,6 +158,61 @@ impl CommitInfo {
     }
 }
 
+/// Git tag with metadata.
+#[derive(Debug, Clone)]
+pub struct TagInfo {
+    /// Tag name (e.g., "v1.0.0")
+    pub name: String,
+    /// Target commit OID
+    pub target_oid: String,
+    /// Short commit hash (7 characters)
+    pub short_oid: String,
+    /// Tag message (annotated tags only)
+    pub message: Option<String>,
+    /// Tagger name and email (annotated tags only)
+    pub tagger: Option<String>,
+    /// Tag creation date (Unix timestamp)
+    pub date: Option<i64>,
+}
+
+impl TagInfo {
+    /// Creates a new TagInfo instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: Tag name
+    /// * `target_oid`: Full commit hash that this tag points to
+    /// * `message`: Optional tag message (annotated tags)
+    /// * `tagger`: Optional tagger identity (annotated tags)
+    /// * `date`: Optional tag creation timestamp (annotated tags)
+    ///
+    /// # Returns
+    ///
+    /// A new TagInfo instance with derived short OID.
+    pub fn new(
+        name: String,
+        target_oid: String,
+        message: Option<String>,
+        tagger: Option<String>,
+        date: Option<i64>,
+    ) -> Self {
+        let short_oid = if target_oid.len() >= 7 {
+            target_oid[..7].to_string()
+        } else {
+            target_oid.clone()
+        };
+
+        Self {
+            name,
+            target_oid,
+            short_oid,
+            message,
+            tagger,
+            date,
+        }
+    }
+}
+
 /// Represents an item in a directory tree view.
 ///
 /// Distinguishes between regular files (git blobs) and directories (git trees)
@@ -468,6 +523,134 @@ pub fn list_commits(
     Ok(commits)
 }
 
+/// Lists all tags in the repository with metadata.
+///
+/// Retrieves all tags from the repository, extracting both lightweight and
+/// annotated tag information. For annotated tags, includes message, tagger,
+/// and creation date. Tags are sorted by date (newest first) for annotated
+/// tags, then by name for lightweight tags.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+///
+/// # Returns
+///
+/// Vector of TagInfo structs with metadata for each tag
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - References cannot be read
+/// - Tag objects cannot be resolved
+///
+/// # Examples
+///
+/// ```no_run
+/// use gitkyl::list_tags;
+/// use std::path::Path;
+///
+/// let tags = list_tags(Path::new("."))?;
+/// for tag in tags {
+///     println!("{}: {}", tag.name, tag.short_oid);
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn list_tags(repo_path: impl AsRef<Path>) -> Result<Vec<TagInfo>> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let references_platform = repo.references().context("Failed to read references")?;
+
+    let references = references_platform
+        .all()
+        .context("Failed to get all references")?;
+
+    let mut tags = Vec::new();
+
+    for reference_result in references {
+        let reference = match reference_result {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        let ref_name = reference.name();
+
+        if !ref_name.as_bstr().starts_with(b"refs/tags/") {
+            continue;
+        }
+
+        let tag_name = ref_name
+            .shorten()
+            .to_str()
+            .context("Tag name contains invalid UTF8")?
+            .to_string();
+
+        let peeled_id = reference
+            .into_fully_peeled_id()
+            .context("Failed to peel reference")?;
+
+        let target_commit = peeled_id
+            .object()
+            .context("Failed to resolve peeled object")?
+            .try_into_commit()
+            .map_err(|_| anyhow::anyhow!("Tag does not point to a commit"))?;
+
+        let target_oid = target_commit.id.to_hex().to_string();
+
+        // Try to get annotated tag information
+        let tag_ref_name = format!("refs/tags/{}", tag_name);
+        let tag_ref = repo
+            .find_reference(tag_ref_name.as_str())
+            .context("Failed to find tag reference")?;
+
+        let tag_object_id = tag_ref.id();
+        let tag_object = repo
+            .find_object(tag_object_id)
+            .context("Failed to find tag object")?;
+
+        // Check if this is an annotated tag
+        let (message, tagger, date) = if let Ok(tag_obj) = tag_object.try_into_tag() {
+            // Annotated tag: decode the tag data
+            let decoded = tag_obj.decode().context("Failed to decode tag object")?;
+
+            let tag_message = if decoded.message.is_empty() {
+                None
+            } else {
+                Some(decoded.message.to_str_lossy().to_string())
+            };
+
+            let tagger_info = decoded
+                .tagger
+                .as_ref()
+                .map(|t| format!("{} <{}>", t.name.to_str_lossy(), t.email.to_str_lossy()));
+
+            let tag_date = decoded.tagger.as_ref().map(|t| t.time.seconds);
+
+            (tag_message, tagger_info, tag_date)
+        } else {
+            // Lightweight tag: no message, tagger, or date
+            (None, None, None)
+        };
+
+        tags.push(TagInfo::new(tag_name, target_oid, message, tagger, date));
+    }
+
+    // Sort by date for annotated tags, then by name
+    tags.sort_by(|a, b| match (a.date, b.date) {
+        (Some(date_a), Some(date_b)) => date_b.cmp(&date_a),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => a.name.cmp(&b.name),
+    });
+
+    Ok(tags)
+}
+
 /// Extracts CommitInfo from gix commit object.
 fn extract_commit_info(commit: &gix::Commit) -> Result<CommitInfo> {
     let author = commit.author().context("Failed to read author")?;
@@ -689,6 +872,22 @@ mod tests {
             .unwrap()
             .trim()
             .to_string()
+    }
+
+    fn git_tag(repo_path: &Path, tag_name: &str) {
+        std::process::Command::new("git")
+            .args(["tag", tag_name])
+            .current_dir(repo_path)
+            .output()
+            .expect("Failed to create git tag");
+    }
+
+    fn git_tag_annotated(repo_path: &Path, tag_name: &str, message: &str) {
+        std::process::Command::new("git")
+            .args(["tag", "-a", tag_name, "-m", message])
+            .current_dir(repo_path)
+            .output()
+            .expect("Failed to create annotated git tag");
     }
 
     #[test]
@@ -1584,6 +1783,122 @@ mod tests {
             assert_eq!(result.len(), 1);
             assert!(result.contains_key("script.sh"));
             assert_eq!(result["script.sh"].message(), "Initial commit");
+        }
+    }
+
+    #[test]
+    fn test_list_tags_empty_repo() {
+        // Arrange: create repo with commit but no tags
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "content");
+        git_add(td.path());
+        git_commit(td.path(), "Initial commit");
+
+        // Act
+        let tags = list_tags(td.path()).expect("Should list tags");
+
+        // Assert
+        assert!(tags.is_empty(), "New repo should have no tags");
+    }
+
+    #[test]
+    fn test_list_tags_lightweight() {
+        // Arrange: create repo with lightweight tag
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "content");
+        git_add(td.path());
+        git_commit(td.path(), "Initial commit");
+        git_tag(td.path(), "v1.0.0");
+
+        // Act
+        let tags = list_tags(td.path()).expect("Should list tags");
+
+        // Assert
+        assert_eq!(tags.len(), 1, "Should have one tag");
+        let tag = &tags[0];
+        assert_eq!(tag.name, "v1.0.0", "Tag name should match");
+        assert!(!tag.target_oid.is_empty(), "Should have target OID");
+        assert_eq!(tag.short_oid.len(), 7, "Short OID should be 7 chars");
+        assert!(tag.message.is_none(), "Lightweight tag has no message");
+        assert!(tag.tagger.is_none(), "Lightweight tag has no tagger");
+        assert!(tag.date.is_none(), "Lightweight tag has no date");
+    }
+
+    #[test]
+    fn test_list_tags_annotated() {
+        // Arrange: create repo with annotated tag
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "content");
+        git_add(td.path());
+        git_commit(td.path(), "Initial commit");
+        git_tag_annotated(td.path(), "v2.0.0", "Release version 2.0.0");
+
+        // Act
+        let tags = list_tags(td.path()).expect("Should list tags");
+
+        // Assert
+        assert_eq!(tags.len(), 1, "Should have one tag");
+        let tag = &tags[0];
+        assert_eq!(tag.name, "v2.0.0", "Tag name should match");
+        assert!(!tag.target_oid.is_empty(), "Should have target OID");
+        assert_eq!(tag.short_oid.len(), 7, "Short OID should be 7 chars");
+        assert!(tag.message.is_some(), "Annotated tag should have message");
+        assert_eq!(
+            tag.message.as_ref().unwrap().trim(),
+            "Release version 2.0.0",
+            "Message should match"
+        );
+        assert!(tag.tagger.is_some(), "Annotated tag should have tagger");
+        assert!(
+            tag.tagger
+                .as_ref()
+                .unwrap()
+                .contains("Test User <test@example.com>"),
+            "Tagger should match test user"
+        );
+        assert!(tag.date.is_some(), "Annotated tag should have date");
+        assert!(tag.date.unwrap() > 0, "Date should be positive timestamp");
+    }
+
+    #[test]
+    fn test_list_tags_sorted_by_date() {
+        // Arrange: create repo with multiple tags at different times
+        let td = temp_repo();
+        write_file(td.path(), "test1.txt", "content1");
+        git_add(td.path());
+        git_commit(td.path(), "First commit");
+        git_tag_annotated(td.path(), "v1.0.0", "First release");
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        write_file(td.path(), "test2.txt", "content2");
+        git_add(td.path());
+        git_commit(td.path(), "Second commit");
+        git_tag_annotated(td.path(), "v2.0.0", "Second release");
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        write_file(td.path(), "test3.txt", "content3");
+        git_add(td.path());
+        git_commit(td.path(), "Third commit");
+        git_tag_annotated(td.path(), "v3.0.0", "Third release");
+
+        // Act
+        let tags = list_tags(td.path()).expect("Should list tags");
+
+        // Assert
+        assert_eq!(tags.len(), 3, "Should have three tags");
+        assert_eq!(tags[0].name, "v3.0.0", "Newest tag should be first");
+        assert_eq!(tags[1].name, "v2.0.0", "Second tag should be second");
+        assert_eq!(tags[2].name, "v1.0.0", "Oldest tag should be last");
+
+        for i in 0..tags.len() - 1 {
+            let current_date = tags[i].date.expect("Should have date");
+            let next_date = tags[i + 1].date.expect("Should have date");
+            assert!(
+                current_date >= next_date,
+                "Tags should be sorted by date (newest first)"
+            );
         }
     }
 }
