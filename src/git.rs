@@ -213,6 +213,38 @@ impl TagInfo {
     }
 }
 
+/// Paginated commits result with navigation metadata.
+#[derive(Debug, Clone)]
+pub struct PaginatedCommits {
+    /// Commits for current page
+    pub commits: Vec<CommitInfo>,
+    /// Current page number (1-indexed)
+    pub page: usize,
+    /// Commits per page
+    pub per_page: usize,
+    /// Whether more commits exist after this page
+    pub has_more: bool,
+}
+
+impl PaginatedCommits {
+    /// Creates a new PaginatedCommits instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `commits`: Commits for this page
+    /// * `page`: Current page number (1-indexed)
+    /// * `per_page`: Commits per page setting
+    /// * `has_more`: Whether additional pages exist
+    pub fn new(commits: Vec<CommitInfo>, page: usize, per_page: usize, has_more: bool) -> Self {
+        Self {
+            commits,
+            page,
+            per_page,
+            has_more,
+        }
+    }
+}
+
 /// Represents an item in a directory tree view.
 ///
 /// Distinguishes between regular files (git blobs) and directories (git trees)
@@ -521,6 +553,111 @@ pub fn list_commits(
     }
 
     Ok(commits)
+}
+
+/// Lists commits with pagination support.
+///
+/// Fetches commits for a specific page. Internally fetches one extra commit
+/// to determine if more pages exist (has_more flag).
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Reference to start from (branch/tag, None for HEAD)
+/// * `page`: Page number (1-indexed, must be >= 1)
+/// * `per_page`: Commits per page (must be >= 1)
+///
+/// # Returns
+///
+/// PaginatedCommits with commits for requested page and navigation metadata.
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Page or per_page is zero
+/// - Repository cannot be opened
+/// - Reference cannot be resolved
+/// - Commit history cannot be traversed
+///
+/// # Examples
+///
+/// ```no_run
+/// use gitkyl::list_commits_paginated;
+/// use std::path::Path;
+///
+/// let page1 = list_commits_paginated(Path::new("."), None, 1, 35)?;
+/// println!("Page {}: {} commits", page1.page, page1.commits.len());
+/// if page1.has_more {
+///     let page2 = list_commits_paginated(Path::new("."), None, 2, 35)?;
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn list_commits_paginated(
+    repo_path: impl AsRef<Path>,
+    ref_name: Option<&str>,
+    page: usize,
+    per_page: usize,
+) -> Result<PaginatedCommits> {
+    // Validate pagination parameters
+    if page == 0 {
+        anyhow::bail!("Page number must be >= 1, got 0");
+    }
+    if per_page == 0 {
+        anyhow::bail!("Per page count must be >= 1, got 0");
+    }
+
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit = resolve_commit(&repo, ref_name)?;
+
+    let skip = (page - 1) * per_page;
+    // Fetch one extra to detect if more pages exist
+    let fetch_count = per_page + 1;
+
+    let mut commits = Vec::new();
+    let walker = commit
+        .ancestors()
+        .all()
+        .context("Failed to create commit ancestor iterator")?;
+
+    for result in walker.skip(skip).take(fetch_count) {
+        let commit_info = result.context("Failed to traverse commit ancestor")?;
+        let commit_obj = commit_info
+            .object()
+            .context("Failed to read commit object")?;
+
+        let author = commit_obj.author().context("Failed to read author")?;
+        let committer = commit_obj.committer().context("Failed to read committer")?;
+        let message_bytes = commit_obj
+            .message_raw()
+            .context("Failed to read commit message")?;
+        let message_full = message_bytes.to_str_lossy().to_string();
+        let first_line = message_full.lines().next().unwrap_or("").to_string();
+
+        commits.push(CommitInfo {
+            oid: commit_obj.id.to_hex().to_string(),
+            short_oid: commit_obj.id.to_hex_with_len(7).to_string(),
+            author: author.name.to_str_lossy().to_string(),
+            author_email: author.email.to_str_lossy().to_string(),
+            committer: committer.name.to_str_lossy().to_string(),
+            date: author.time.seconds,
+            message: first_line,
+            message_full,
+        });
+    }
+
+    // Detect if more pages exist
+    let has_more = commits.len() > per_page;
+
+    // Take only per_page commits (not the extra one)
+    commits.truncate(per_page);
+
+    Ok(PaginatedCommits::new(commits, page, per_page, has_more))
 }
 
 /// Lists all tags in the repository with metadata.
@@ -1784,6 +1921,146 @@ mod tests {
             assert!(result.contains_key("script.sh"));
             assert_eq!(result["script.sh"].message(), "Initial commit");
         }
+    }
+
+    #[test]
+    fn test_list_commits_paginated_first_page() {
+        // Arrange: create repo with 10 commits
+        let td = temp_repo();
+        for i in 1..=10 {
+            write_file(
+                td.path(),
+                &format!("file{}.txt", i),
+                &format!("content{}", i),
+            );
+            git_add(td.path());
+            git_commit(td.path(), &format!("Commit {}", i));
+        }
+
+        // Act
+        let result = list_commits_paginated(td.path(), None, 1, 5).expect("Should list first page");
+
+        // Assert
+        assert_eq!(result.page, 1);
+        assert_eq!(result.per_page, 5);
+        assert_eq!(result.commits.len(), 5, "First page should have 5 commits");
+        assert!(result.has_more, "Should indicate more pages exist");
+        assert!(
+            result.commits[0].message.contains("Commit 10"),
+            "Newest commit should be first"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_paginated_middle_page() {
+        // Arrange: create repo with 15 commits
+        let td = temp_repo();
+        for i in 1..=15 {
+            write_file(
+                td.path(),
+                &format!("file{}.txt", i),
+                &format!("content{}", i),
+            );
+            git_add(td.path());
+            git_commit(td.path(), &format!("Commit {}", i));
+        }
+
+        // Act: page 2 of 3 with 5 per page
+        let result =
+            list_commits_paginated(td.path(), None, 2, 5).expect("Should list middle page");
+
+        // Assert
+        assert_eq!(result.page, 2);
+        assert_eq!(result.commits.len(), 5);
+        assert!(result.has_more, "Should have page 3");
+    }
+
+    #[test]
+    fn test_list_commits_paginated_last_page() {
+        // Arrange: create repo with 12 commits
+        let td = temp_repo();
+        for i in 1..=12 {
+            write_file(
+                td.path(),
+                &format!("file{}.txt", i),
+                &format!("content{}", i),
+            );
+            git_add(td.path());
+            git_commit(td.path(), &format!("Commit {}", i));
+        }
+
+        // Act: page 3, last page with only 2 commits
+        let result = list_commits_paginated(td.path(), None, 3, 5).expect("Should list last page");
+
+        // Assert
+        assert_eq!(result.page, 3);
+        assert_eq!(result.commits.len(), 2, "Last page has only 2 commits");
+        assert!(!result.has_more, "Should indicate no more pages");
+    }
+
+    #[test]
+    fn test_list_commits_paginated_exact_boundary() {
+        // Arrange: exactly 10 commits, 5 per page = 2 pages exactly
+        let td = temp_repo();
+        for i in 1..=10 {
+            write_file(
+                td.path(),
+                &format!("file{}.txt", i),
+                &format!("content{}", i),
+            );
+            git_add(td.path());
+            git_commit(td.path(), &format!("Commit {}", i));
+        }
+
+        // Act
+        let page2 = list_commits_paginated(td.path(), None, 2, 5).expect("Should list page 2");
+
+        // Assert
+        assert_eq!(page2.commits.len(), 5);
+        assert!(!page2.has_more, "Exactly at boundary, no more pages");
+    }
+
+    #[test]
+    fn test_list_commits_paginated_invalid_page_zero() {
+        // Arrange
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "content");
+        git_add(td.path());
+        git_commit(td.path(), "Initial commit");
+
+        // Act
+        let result = list_commits_paginated(td.path(), None, 0, 35);
+
+        // Assert
+        assert!(result.is_err(), "Page 0 should be invalid");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Page number must be >= 1"),
+            "Error should mention page constraint"
+        );
+    }
+
+    #[test]
+    fn test_list_commits_paginated_beyond_last_page() {
+        // Arrange: only 3 commits
+        let td = temp_repo();
+        for i in 1..=3 {
+            write_file(
+                td.path(),
+                &format!("file{}.txt", i),
+                &format!("content{}", i),
+            );
+            git_add(td.path());
+            git_commit(td.path(), &format!("Commit {}", i));
+        }
+
+        // Act: request page 2 with 5 per page, but only 3 commits exist
+        let result =
+            list_commits_paginated(td.path(), None, 2, 5).expect("Should handle beyond last page");
+
+        // Assert
+        assert_eq!(result.commits.len(), 0, "Beyond last page returns empty");
+        assert!(!result.has_more);
     }
 
     #[test]

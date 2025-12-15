@@ -16,8 +16,8 @@ pub use components::icons::is_readme;
 pub use config::Config;
 pub use filetype::{FileType, ImageFormat, detect_file_type};
 pub use git::{
-    CommitInfo, FileEntry, RepoInfo, TagInfo, TreeItem, analyze_repository, get_last_commits_batch,
-    list_commits, list_files, list_tags, read_blob,
+    CommitInfo, FileEntry, PaginatedCommits, RepoInfo, TagInfo, TreeItem, analyze_repository,
+    get_last_commits_batch, list_commits, list_commits_paginated, list_files, list_tags, read_blob,
 };
 pub use highlight::{Highlighter, highlight};
 pub use markdown::{LinkResolver, MarkdownRenderer};
