@@ -28,7 +28,7 @@ pub fn generate_list(repo_name: &str, tags: &[TagInfo]) -> Markup {
         &format!("Tags - {}", repo_name),
         &[css_path],
         html! {
-            (breadcrumb(repo_name, index_path, &[("Tags", None)], ""))
+            (breadcrumb(repo_name, index_path, &[("Tags", None)], "tags"))
 
             main {
                 h1 { "Tags" }
@@ -108,7 +108,7 @@ pub fn generate_detail(
                 repo_name,
                 index_path,
                 &[("Tags", Some("index.html".to_string())), (&tag.name, None)],
-                ""
+                &tag.name
             ))
 
             main {

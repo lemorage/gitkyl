@@ -219,6 +219,7 @@ fn generate_tree_pages_for_branch(
                 default_branch: branch,
                 branches: repo_info.branches(),
                 commit_count: commits.len(),
+                tag_count: 0,
                 latest_commit,
                 items: &tree_items_for_page,
                 readme_html: readme_html.as_deref(),
@@ -352,10 +353,11 @@ fn generate_blob_pages_for_branch(
     Ok((blob_count, markdown_count))
 }
 
-/// Generates commits log page for a branch.
+/// Generates commits log page for a branch with pagination.
 ///
-/// Creates an HTML page displaying the commit history for the specified
-/// branch, limited to DEFAULT_COMMIT_LIMIT entries.
+/// Creates HTML pages for each page of commit history for the specified
+/// branch, with pagination support. Each page displays up to DEFAULT_COMMIT_LIMIT
+/// entries with navigation to other pages.
 ///
 /// # Arguments
 ///
@@ -365,7 +367,7 @@ fn generate_blob_pages_for_branch(
 ///
 /// # Returns
 ///
-/// Count of commits displayed on the page
+/// Total count of commits across all pages
 ///
 /// # Errors
 ///
@@ -375,20 +377,33 @@ fn generate_commits_page_for_branch(
     repo_info: &gitkyl::RepoInfo,
     branch: &str,
 ) -> Result<usize> {
-    let commits = gitkyl::list_commits(&config.repo, Some(branch), Some(DEFAULT_COMMIT_LIMIT))
-        .context("Failed to list commits")?;
-
-    let commits_html = gitkyl::pages::commits::generate(&commits, branch, repo_info.name());
-
     let commits_dir = config.output.join("commits").join(branch);
-
     fs::create_dir_all(&commits_dir).context("Failed to create commits directory")?;
 
-    let commits_path = commits_dir.join("index.html");
-    fs::write(&commits_path, commits_html.into_string())
-        .with_context(|| format!("Failed to write commits page to {}", commits_path.display()))?;
+    let mut total_commits = 0;
+    let mut page = 1;
 
-    Ok(commits.len())
+    loop {
+        let paginated =
+            gitkyl::list_commits_paginated(&config.repo, Some(branch), page, DEFAULT_COMMIT_LIMIT)
+                .context("Failed to list paginated commits")?;
+
+        total_commits += paginated.commits.len();
+
+        let commits_html = gitkyl::pages::commits::generate(&paginated, branch, repo_info.name());
+
+        let page_path = commits_dir.join(format!("page-{}.html", page));
+        fs::write(&page_path, commits_html.into_string())
+            .with_context(|| format!("Failed to write commits page to {}", page_path.display()))?;
+
+        if !paginated.has_more {
+            break;
+        }
+
+        page += 1;
+    }
+
+    Ok(total_commits)
 }
 
 /// Generates all pages for a single branch.
@@ -441,6 +456,66 @@ fn generate_all_pages_for_branch(
         blob_pages,
         markdown_pages,
     })
+}
+
+/// Generates tags listing and detail pages.
+///
+/// Creates a tags index page listing all repository tags, plus individual
+/// detail pages for each tag showing commit information.
+///
+/// # Arguments
+///
+/// * `config`: Application configuration containing repository and output paths
+/// * `repo_info`: Repository metadata including name
+///
+/// # Returns
+///
+/// Count of tags processed
+///
+/// # Errors
+///
+/// Returns error if tag listing or page generation fails
+fn generate_tags_pages(config: &Config, repo_info: &gitkyl::RepoInfo) -> Result<usize> {
+    let tags = gitkyl::list_tags(&config.repo).context("Failed to list tags")?;
+
+    if tags.is_empty() {
+        return Ok(0);
+    }
+
+    let tags_dir = config.output.join("tags");
+    fs::create_dir_all(&tags_dir).context("Failed to create tags directory")?;
+
+    let tags_index_html = gitkyl::pages::tags::generate_list(repo_info.name(), &tags);
+    let index_path = tags_dir.join("index.html");
+    fs::write(&index_path, tags_index_html.into_string())
+        .with_context(|| format!("Failed to write tags index to {}", index_path.display()))?;
+
+    for tag in &tags {
+        let commits =
+            gitkyl::list_commits(&config.repo, Some(&tag.name), Some(1)).unwrap_or_else(|e| {
+                eprintln!(
+                    "Warning: Failed to get commit for tag {}: {:#}",
+                    tag.name, e
+                );
+                vec![]
+            });
+
+        if let Some(commit) = commits.first() {
+            let tag_html = gitkyl::pages::tags::generate_detail(
+                repo_info.name(),
+                tag,
+                commit.message(),
+                commit.author(),
+                commit.date(),
+            );
+
+            let tag_path = tags_dir.join(format!("{}.html", tag.name));
+            fs::write(&tag_path, tag_html.into_string())
+                .with_context(|| format!("Failed to write tag page to {}", tag_path.display()))?;
+        }
+    }
+
+    Ok(tags.len())
 }
 
 fn main() -> Result<()> {
@@ -508,6 +583,10 @@ fn main() -> Result<()> {
             None
         });
 
+    let tag_count = gitkyl::list_tags(&config.repo)
+        .map(|tags| tags.len())
+        .unwrap_or(0);
+
     let html = index_page(IndexPageData {
         name: &config
             .project_name()
@@ -516,6 +595,7 @@ fn main() -> Result<()> {
         default_branch: repo_info.default_branch(),
         branches: repo_info.branches(),
         commit_count: repo_info.commit_count(),
+        tag_count,
         latest_commit: latest_commit.as_ref(),
         items: &tree_items,
         readme_html: readme_html.as_deref(),
@@ -565,9 +645,14 @@ fn main() -> Result<()> {
         }
     }
 
+    let tags_count = generate_tags_pages(&config, &repo_info).unwrap_or_else(|e| {
+        eprintln!("Warning: Failed to generate tags pages: {:#}", e);
+        0
+    });
+
     println!(
-        "✓ Generated {} trees, {} blobs ({} branches)",
-        total_trees, total_blobs, branch_count
+        "✓ Generated {} trees, {} blobs ({} branches, {} tags)",
+        total_trees, total_blobs, branch_count, tags_count
     );
 
     if !config.no_open {

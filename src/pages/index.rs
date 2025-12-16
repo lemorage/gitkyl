@@ -25,6 +25,7 @@ pub struct IndexPageData<'a> {
     pub default_branch: &'a str,
     pub branches: &'a [String],
     pub commit_count: usize,
+    pub tag_count: usize,
     pub latest_commit: Option<&'a CommitInfo>,
     pub items: &'a [TreeItem],
     pub readme_html: Option<&'a str>,
@@ -87,13 +88,25 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                     }
 
                     @let commits_href = if data.depth == 0 {
-                        format!("commits/{}/index.html", data.default_branch)
+                        format!("commits/{}/page-1.html", data.default_branch)
                     } else {
-                        format!("{}commits/{}/index.html", "../".repeat(data.depth), data.default_branch)
+                        format!("{}commits/{}/page-1.html", "../".repeat(data.depth), data.default_branch)
                     };
                     a href=(commits_href) class="history-link" {
                         i class="ph ph-clock-counter-clockwise" {}
                         " " (data.commit_count) " commits"
+                    }
+
+                    @if data.tag_count > 0 {
+                        @let tags_href = if data.depth == 0 {
+                            "tags/index.html".to_string()
+                        } else {
+                            format!("{}tags/index.html", "../".repeat(data.depth))
+                        };
+                        a href=(tags_href) class="history-link" {
+                            i class="ph ph-tag" {}
+                            " " (data.tag_count) " " (if data.tag_count == 1 { "tag" } else { "tags" })
+                        }
                     }
                 }
 
@@ -244,6 +257,7 @@ mod tests {
             default_branch,
             branches: &branches,
             commit_count,
+            tag_count: 0,
             latest_commit: None,
             items: &items,
             readme_html: None,
@@ -286,6 +300,7 @@ mod tests {
             default_branch,
             branches: &branches,
             commit_count,
+            tag_count: 0,
             latest_commit: Some(&mock_commit),
             items: &items,
             readme_html: None,
@@ -350,6 +365,7 @@ mod tests {
             default_branch,
             branches: &branches,
             commit_count,
+            tag_count: 0,
             latest_commit: None,
             items: &items,
             readme_html: None,
@@ -364,8 +380,8 @@ mod tests {
         );
         assert!(html_string.contains("file-row"), "Should contain file rows");
         assert!(
-            html_string.contains("file-link"),
-            "Should contain file link"
+            html_string.contains("file-name-cell"),
+            "Should contain file name cell"
         );
         assert!(
             html_string.contains("commit-date"),
@@ -400,6 +416,7 @@ mod tests {
             default_branch: "main",
             branches: &branches,
             commit_count: 1,
+            tag_count: 0,
             latest_commit: None,
             items: &items,
             readme_html: None,
@@ -408,14 +425,13 @@ mod tests {
         let html_string = html.into_string();
 
         // Assert: Check HTML structure elements are present
-        assert!(html_string.contains("file-link"), "Should have file link");
+        assert!(
+            html_string.contains("file-name-cell"),
+            "Should have file name cell"
+        );
         assert!(
             html_string.contains("commit-date"),
             "Should have commit date"
-        );
-        assert!(
-            html_string.contains("class=\"icon-box\""),
-            "Should have icon container element"
         );
         assert!(
             html_string.contains("class=\"ph ") || html_string.contains("class=\"ph-"),
@@ -442,6 +458,7 @@ mod tests {
             default_branch,
             branches: &branches,
             commit_count,
+            tag_count: 0,
             latest_commit: None,
             items: &items,
             readme_html,
@@ -486,6 +503,7 @@ mod tests {
             default_branch,
             branches: &branches,
             commit_count,
+            tag_count: 0,
             latest_commit: None,
             items: &items,
             readme_html: None,

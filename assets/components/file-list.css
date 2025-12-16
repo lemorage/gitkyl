@@ -8,9 +8,9 @@
 
 .file-row {
     display: grid;
-    grid-template-columns: auto minmax(120px, 200px) 1fr auto;
+    grid-template-columns: 240px 1fr 120px;
     gap: 16px;
-    padding: 14px 24px;
+    padding: 12px 24px;
     border-bottom: 1px solid var(--border-subtle);
     align-items: center;
     transition: background-color 0.15s ease;
@@ -22,7 +22,7 @@
 }
 
 .file-row:hover {
-    background-color: #FAFAFC;
+    background-color: #F5F5F7;
 }
 
 .file-row:focus-visible {
@@ -56,6 +56,22 @@
     color: var(--icon-config);
 }
 
+.file-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 0;
+}
+
+.file-name-cell span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .file-link {
     color: var(--text-primary);
     text-decoration: none;
@@ -65,7 +81,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
-    margin-left: -12px;
 }
 
 .file-link .dir-path {
@@ -79,24 +94,26 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-left: 32px;
+    padding-right: 24px;
+    transition: color 0.15s ease;
 }
 
-.commit-message:hover {
+.file-row:hover .commit-message {
     color: var(--text-primary);
 }
 
 .commit-date {
-    color: var(--text-secondary);
-    font-size: 13px;
+    color: var(--text-tertiary);
+    font-size: 12px;
     white-space: nowrap;
     text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
     .file-row {
-        grid-template-columns: auto 1fr auto;
+        grid-template-columns: 1fr auto;
         gap: 8px;
         padding: 12px 16px;
     }

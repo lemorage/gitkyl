@@ -770,8 +770,12 @@ pub fn list_tags(repo_path: impl AsRef<Path>) -> Result<Vec<TagInfo>> {
 
             (tag_message, tagger_info, tag_date)
         } else {
-            // Lightweight tag: no message, tagger, or date
-            (None, None, None)
+            // Lightweight tag: use commit date for sorting
+            let commit_date = target_commit
+                .committer()
+                .ok()
+                .map(|c| c.time.seconds);
+            (None, None, commit_date)
         };
 
         tags.push(TagInfo::new(tag_name, target_oid, message, tagger, date));

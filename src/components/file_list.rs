@@ -50,8 +50,10 @@ pub fn file_row(
 ) -> Markup {
     html! {
         a href=(href) class="file-row" {
-            (icon)
-            div class="file-link" { (name) }
+            div class="file-name-cell" {
+                (icon)
+                span { (name) }
+            }
             div class="commit-message" title=(commit_msg_full) {
                 (commit_msg)
             }
