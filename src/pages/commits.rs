@@ -38,7 +38,7 @@ pub fn generate(paginated: &PaginatedCommits, ref_name: &str, repo_name: &str) -
     let css_path = format!("{}assets/commits.css", "../".repeat(depth));
     let index_path = format!("{}index.html", "../".repeat(depth));
 
-    let title = format!("Commits - {}", repo_name);
+    let title = format!("{}/{}: commits", repo_name, ref_name);
 
     page_wrapper(
         &title,

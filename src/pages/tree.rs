@@ -82,9 +82,9 @@ pub fn generate(
     };
 
     let title = if tree_path.is_empty() {
-        repo_name.to_string()
+        format!("{}/{}", repo_name, ref_name)
     } else {
-        format!("{} - {}", tree_path, repo_name)
+        format!("{}/{}: {}", repo_name, ref_name, tree_path)
     };
 
     let css_path = format!("{}assets/tree.css", "../".repeat(depth));

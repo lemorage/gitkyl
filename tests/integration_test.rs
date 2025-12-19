@@ -1253,8 +1253,8 @@ mod tree_page_tests {
         let html = result.into_string();
 
         assert!(
-            html.contains("<title>awesome-project - Gitkyl</title>"),
-            "Root title should be repo name with Gitkyl suffix"
+            html.contains("<title>awesome-project/HEAD</title>"),
+            "Root title should be repo/branch format"
         );
 
         Ok(())

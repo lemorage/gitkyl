@@ -25,7 +25,7 @@ pub fn generate_list(repo_name: &str, tags: &[TagInfo]) -> Markup {
     let index_path = "../index.html";
 
     page_wrapper(
-        &format!("Tags - {}", repo_name),
+        &format!("{}: tags", repo_name),
         &[css_path],
         html! {
             (breadcrumb(repo_name, index_path, &[("Tags", None)], "tags"))
@@ -101,7 +101,7 @@ pub fn generate_detail(
     let index_path = "../index.html";
 
     page_wrapper(
-        &format!("{} - {}", tag.name, repo_name),
+        &format!("{}: {}", repo_name, tag.name),
         &[css_path],
         html! {
             (breadcrumb(

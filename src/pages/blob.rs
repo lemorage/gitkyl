@@ -284,8 +284,10 @@ fn blob_page_markup(
         })
         .collect();
 
+    let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
+
     page_wrapper(
-        file_path,
+        &title,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
@@ -341,8 +343,10 @@ fn markdown_blob_page_markup(
         })
         .collect();
 
+    let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
+
     page_wrapper(
-        file_path,
+        &title,
         &[&css_path, &markdown_css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
@@ -391,9 +395,10 @@ fn image_blob_page_markup(
         STANDARD.encode(image_bytes)
     );
     let file_size = format_file_size(image_bytes.len());
+    let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
     page_wrapper(
-        file_path,
+        &title,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
@@ -445,9 +450,10 @@ fn binary_blob_page_markup(
         .collect();
 
     let file_size = format_file_size(file_size_bytes);
+    let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
     page_wrapper(
-        file_path,
+        &title,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))

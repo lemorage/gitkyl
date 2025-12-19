@@ -26,7 +26,7 @@ pub fn page_wrapper(title: &str, stylesheets: &[&str], body: Markup) -> Markup {
             head {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
-                title { (title) " - Gitkyl" }
+                title { (title) }
                 script src="https://unpkg.com/@phosphor-icons/web" {}
                 @for stylesheet in stylesheets {
                     link rel="stylesheet" href=(stylesheet);

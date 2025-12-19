@@ -59,9 +59,10 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
         ]
     };
     let css_path_refs: Vec<&str> = css_paths.iter().map(|s| s.as_str()).collect();
+    let title = format!("{}/{}", data.name, data.default_branch);
 
     page_wrapper(
-        data.name,
+        &title,
         &css_path_refs,
         html! {
             @let tags_href = if data.tag_count > 0 {
