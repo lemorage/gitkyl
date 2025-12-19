@@ -321,7 +321,7 @@ fn test_file_row_contains_file_name() {
     let html_output = result.into_string();
 
     assert!(html_output.contains("src/"));
-    assert!(html_output.contains("file-link"));
+    assert!(html_output.contains("file-name-cell"));
 }
 
 #[test]
@@ -416,7 +416,7 @@ fn test_file_row_proper_html_structure() {
     let html_output = result.into_string();
 
     assert!(html_output.starts_with("<a"));
-    assert!(html_output.contains("<div class=\"file-link\">"));
+    assert!(html_output.contains("<div class=\"file-name-cell\">"));
     assert!(html_output.contains("<div class=\"commit-message\""));
     assert!(html_output.contains("<div class=\"commit-date\">"));
     assert!(html_output.ends_with("</a>"));
@@ -513,12 +513,14 @@ fn test_file_table_and_file_row_integration() {
 
 #[test]
 fn test_repo_header_with_owner_contains_separator() {
-    use gitkyl::components::metadata::repo_header;
+    use gitkyl::components::metadata::{RepoHeaderData, repo_header};
 
-    let owner = "lemorage";
-    let repo = "gitkyl";
-
-    let html = repo_header(repo, Some(owner));
+    let html = repo_header(RepoHeaderData {
+        name: "gitkyl",
+        owner: Some("lemorage"),
+        tag_count: 0,
+        tags_href: None,
+    });
     let html_str = html.into_string();
 
     assert!(
@@ -529,12 +531,14 @@ fn test_repo_header_with_owner_contains_separator() {
 
 #[test]
 fn test_repo_header_with_owner_contains_both_names() {
-    use gitkyl::components::metadata::repo_header;
+    use gitkyl::components::metadata::{RepoHeaderData, repo_header};
 
-    let owner = "torvalds";
-    let repo = "linux";
-
-    let html = repo_header(repo, Some(owner));
+    let html = repo_header(RepoHeaderData {
+        name: "linux",
+        owner: Some("torvalds"),
+        tag_count: 0,
+        tags_href: None,
+    });
     let html_str = html.into_string();
 
     assert!(
@@ -549,11 +553,14 @@ fn test_repo_header_with_owner_contains_both_names() {
 
 #[test]
 fn test_repo_header_without_owner_displays_only_repo() {
-    use gitkyl::components::metadata::repo_header;
+    use gitkyl::components::metadata::{RepoHeaderData, repo_header};
 
-    let repo = "gitkyl";
-
-    let html = repo_header(repo, None);
+    let html = repo_header(RepoHeaderData {
+        name: "gitkyl",
+        owner: None,
+        tag_count: 0,
+        tags_href: None,
+    });
     let html_str = html.into_string();
 
     assert!(
@@ -564,11 +571,14 @@ fn test_repo_header_without_owner_displays_only_repo() {
 
 #[test]
 fn test_repo_header_without_owner_no_separator() {
-    use gitkyl::components::metadata::repo_header;
+    use gitkyl::components::metadata::{RepoHeaderData, repo_header};
 
-    let repo = "linux";
-
-    let html = repo_header(repo, None);
+    let html = repo_header(RepoHeaderData {
+        name: "linux",
+        owner: None,
+        tag_count: 0,
+        tags_href: None,
+    });
     let html_str = html.into_string();
 
     assert!(
@@ -579,11 +589,14 @@ fn test_repo_header_without_owner_no_separator() {
 
 #[test]
 fn test_repo_header_contains_proper_html_structure() {
-    use gitkyl::components::metadata::repo_header;
+    use gitkyl::components::metadata::{RepoHeaderData, repo_header};
 
-    let repo = "gitkyl";
-
-    let html = repo_header(repo, Some("lemorage"));
+    let html = repo_header(RepoHeaderData {
+        name: "gitkyl",
+        owner: Some("lemorage"),
+        tag_count: 0,
+        tags_href: None,
+    });
     let html_str = html.into_string();
 
     assert!(

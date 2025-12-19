@@ -8,7 +8,7 @@ use crate::components::commit::commit_meta;
 use crate::components::file_list::{file_row, file_table};
 use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
-use crate::components::metadata::{branch_selector, repo_header};
+use crate::components::metadata::{RepoHeaderData, branch_selector, repo_header};
 use crate::git::{CommitInfo, TreeItem};
 use crate::util::format_timestamp;
 
@@ -64,26 +64,40 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
         data.name,
         &css_path_refs,
         html! {
-            (repo_header(data.name, data.owner))
+            @let tags_href = if data.tag_count > 0 {
+                Some(if data.depth == 0 {
+                    "tags/index.html".to_string()
+                } else {
+                    format!("{}tags/index.html", "../".repeat(data.depth))
+                })
+            } else {
+                None
+            };
+            (repo_header(RepoHeaderData {
+                name: data.name,
+                owner: data.owner,
+                tag_count: data.tag_count,
+                tags_href: tags_href.as_deref(),
+            }))
 
             main class="repo-card" {
                 div class="repo-controls" {
-                    div class="commit-info-group" {
+                    div class="control-left" {
                         @let branch_strs: Vec<&str> = data.branches.iter().map(|s| s.as_str()).collect();
                         (branch_selector(&branch_strs, data.default_branch, MIN_BRANCHES_FOR_SELECTOR, data.depth))
+                    }
 
-                        @if let Some(commit) = data.latest_commit {
-                            div class="commit-info-wrapper" {
-                                div class="commit-line" {
-                                    span class="avatar-placeholder" {}
-                                    span class="repo-commit-message" { (commit.message()) }
-                                }
-                                (commit_meta(
-                                    commit.author(),
-                                    commit.short_oid(),
-                                    &format_timestamp(commit.date())
-                                ))
+                    @if let Some(commit) = data.latest_commit {
+                        div class="commit-info-wrapper" {
+                            div class="commit-line" {
+                                span class="avatar-placeholder" {}
+                                span class="repo-commit-message" { (commit.message()) }
                             }
+                            (commit_meta(
+                                commit.author(),
+                                commit.short_oid(),
+                                &format_timestamp(commit.date())
+                            ))
                         }
                     }
 
@@ -95,18 +109,6 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                     a href=(commits_href) class="history-link" {
                         i class="ph ph-clock-counter-clockwise" {}
                         " " (data.commit_count) " commits"
-                    }
-
-                    @if data.tag_count > 0 {
-                        @let tags_href = if data.depth == 0 {
-                            "tags/index.html".to_string()
-                        } else {
-                            format!("{}tags/index.html", "../".repeat(data.depth))
-                        };
-                        a href=(tags_href) class="history-link" {
-                            i class="ph ph-tag" {}
-                            " " (data.tag_count) " " (if data.tag_count == 1 { "tag" } else { "tags" })
-                        }
                     }
                 }
 
@@ -310,8 +312,8 @@ mod tests {
 
         // Assert
         assert!(
-            html_string.contains("commit-info-group"),
-            "Should have commit info group"
+            html_string.contains("commit-info-wrapper"),
+            "Should have commit info wrapper"
         );
         assert!(
             html_string.contains("abc123d"),

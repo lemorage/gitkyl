@@ -771,10 +771,7 @@ pub fn list_tags(repo_path: impl AsRef<Path>) -> Result<Vec<TagInfo>> {
             (tag_message, tagger_info, tag_date)
         } else {
             // Lightweight tag: use commit date for sorting
-            let commit_date = target_commit
-                .committer()
-                .ok()
-                .map(|c| c.time.seconds);
+            let commit_date = target_commit.committer().ok().map(|c| c.time.seconds);
             (None, None, commit_date)
         };
 
@@ -2102,7 +2099,8 @@ mod tests {
         assert_eq!(tag.short_oid.len(), 7, "Short OID should be 7 chars");
         assert!(tag.message.is_none(), "Lightweight tag has no message");
         assert!(tag.tagger.is_none(), "Lightweight tag has no tagger");
-        assert!(tag.date.is_none(), "Lightweight tag has no date");
+        // Lightweight tags use commit date for sorting
+        assert!(tag.date.is_some(), "Lightweight tag uses commit date");
     }
 
     #[test]

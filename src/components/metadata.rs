@@ -2,26 +2,40 @@
 
 use maud::{Markup, html};
 
-/// Renders repository header with name and owner
-///
-/// Displays repository name prominently with optional owner prefix.
-/// Used at top of index page.
+/// Data for repository header rendering
+pub struct RepoHeaderData<'a> {
+    pub name: &'a str,
+    pub owner: Option<&'a str>,
+    pub tag_count: usize,
+    pub tags_href: Option<&'a str>,
+}
+
+/// Renders repository header with name, owner, and tag count
 ///
 /// # Arguments
 ///
-/// * `name`: Repository name
-/// * `owner`: Optional owner name (appears before slash)
+/// * `data`: Header data containing name, owner, and tag info
 ///
 /// # Returns
 ///
 /// Repository header markup
-pub fn repo_header(name: &str, owner: Option<&str>) -> Markup {
+pub fn repo_header(data: RepoHeaderData<'_>) -> Markup {
     html! {
         header class="repo-header" {
-            @if let Some(owner_name) = owner {
-                span class="repo-owner" { (owner_name) " / " }
+            h1 class="repo-title" {
+                @if let Some(owner_name) = data.owner {
+                    span class="repo-owner" { (owner_name) " / " }
+                }
+                span class="repo-name" { (data.name) }
             }
-            h1 class="repo-name" { (name) }
+            @if data.tag_count > 0 {
+                @if let Some(href) = data.tags_href {
+                    a href=(href) class="repo-tags-link" {
+                        i class="ph ph-tag" {}
+                        (data.tag_count)
+                    }
+                }
+            }
         }
     }
 }
