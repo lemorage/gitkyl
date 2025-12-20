@@ -9,14 +9,12 @@ use crate::util::{calculate_depth, format_timestamp};
 
 /// Generates HTML page displaying commit log for a reference
 ///
-/// Creates a commit history page showing commit metadata in reverse
-/// chronological order with relative timestamps and pagination controls.
-///
 /// # Arguments
 ///
 /// * `paginated`: Paginated commit data with page metadata
 /// * `ref_name`: Reference name (branch/tag) for page title
 /// * `repo_name`: Repository name for navigation
+/// * `total_commits`: Total commit count for display
 ///
 /// # Returns
 ///
@@ -30,15 +28,23 @@ use crate::util::{calculate_depth, format_timestamp};
 /// use std::path::Path;
 ///
 /// let paginated = list_commits_paginated(Path::new("."), Some("main"), 1, 35)?;
-/// let html = generate(&paginated, "main", "my-repo");
+/// let html = generate(&paginated, "main", "my-repo", 142);
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub fn generate(paginated: &PaginatedCommits, ref_name: &str, repo_name: &str) -> Markup {
+pub fn generate(
+    paginated: &PaginatedCommits,
+    ref_name: &str,
+    repo_name: &str,
+    total_commits: usize,
+) -> Markup {
     let depth = calculate_depth(ref_name, "");
     let css_path = format!("{}assets/commits.css", "../".repeat(depth));
     let index_path = format!("{}index.html", "../".repeat(depth));
 
     let title = format!("{}/{}: commits", repo_name, ref_name);
+
+    let start = (paginated.page - 1) * paginated.per_page + 1;
+    let end = start + paginated.commits.len() - 1;
 
     page_wrapper(
         &title,
@@ -48,7 +54,7 @@ pub fn generate(paginated: &PaginatedCommits, ref_name: &str, repo_name: &str) -
             main {
                         h1 { "Commit History" }
                         div class="commit-count" {
-                            "Showing " (paginated.commits.len()) " commits"
+                            (start) "–" (end) " of " (total_commits)
                         }
                         @if paginated.commits.is_empty() {
                             p class="empty-state" { "No commits found" }
@@ -170,9 +176,10 @@ mod tests {
         let paginated = PaginatedCommits::new(mock_commits.clone(), 1, 100, false);
         let branch_name = "main";
         let repo_name = "test-repo";
+        let total_commits = 3;
 
         // Act
-        let html = generate(&paginated, branch_name, repo_name);
+        let html = generate(&paginated, branch_name, repo_name, total_commits);
 
         let commits_dir = output.join("commits").join(branch_name);
         fs::create_dir_all(&commits_dir).expect("Should create commits directory");

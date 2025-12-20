@@ -355,19 +355,11 @@ fn generate_blob_pages_for_branch(
 
 /// Generates commits log page for a branch with pagination.
 ///
-/// Creates HTML pages for each page of commit history for the specified
-/// branch, with pagination support. Each page displays up to DEFAULT_COMMIT_LIMIT
-/// entries with navigation to other pages.
-///
 /// # Arguments
 ///
 /// * `config`: Application configuration containing output path
-/// * `repo_info`: Repository metadata including name
+/// * `repo_info`: Repository metadata including name and commit count
 /// * `branch`: Branch name to generate commits page for
-///
-/// # Returns
-///
-/// Total count of commits across all pages
 ///
 /// # Errors
 ///
@@ -376,11 +368,11 @@ fn generate_commits_page_for_branch(
     config: &Config,
     repo_info: &gitkyl::RepoInfo,
     branch: &str,
-) -> Result<usize> {
+) -> Result<()> {
     let commits_dir = config.output.join("commits").join(branch);
     fs::create_dir_all(&commits_dir).context("Failed to create commits directory")?;
 
-    let mut total_commits = 0;
+    let total_commits = repo_info.commit_count();
     let mut page = 1;
 
     loop {
@@ -388,9 +380,8 @@ fn generate_commits_page_for_branch(
             gitkyl::list_commits_paginated(&config.repo, Some(branch), page, DEFAULT_COMMIT_LIMIT)
                 .context("Failed to list paginated commits")?;
 
-        total_commits += paginated.commits.len();
-
-        let commits_html = gitkyl::pages::commits::generate(&paginated, branch, repo_info.name());
+        let commits_html =
+            gitkyl::pages::commits::generate(&paginated, branch, repo_info.name(), total_commits);
 
         let page_path = commits_dir.join(format!("page-{}.html", page));
         fs::write(&page_path, commits_html.into_string())
@@ -403,7 +394,7 @@ fn generate_commits_page_for_branch(
         page += 1;
     }
 
-    Ok(total_commits)
+    Ok(())
 }
 
 /// Generates all pages for a single branch.
@@ -449,7 +440,7 @@ fn generate_all_pages_for_branch(
     let (blob_pages, markdown_pages) =
         generate_blob_pages_for_branch(config, repo_info, branch, &files)?;
 
-    let _commit_count = generate_commits_page_for_branch(config, repo_info, branch)?;
+    generate_commits_page_for_branch(config, repo_info, branch)?;
 
     Ok(BranchStats {
         tree_pages,
