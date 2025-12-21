@@ -17,6 +17,7 @@ gitkyl . -o site                               # custom output
 gitkyl --name "My Project" --owner "username"  # custom metadata
 gitkyl --theme Catppuccin-Mocha                # dark theme
 gitkyl --theme base16-ocean.light              # built-in theme
+gitkyl --no-open                               # skip auto-open browser
 ```
 
 ### Theme Options
@@ -37,11 +38,12 @@ gitkyl --theme path/to/custom.tmTheme   # External .tmTheme file
 
 ```
 dist/
-├── index.html                    # Root with top-level files/folders
-├── tree/master/src.html          # Directory listings
-├── blob/master/main.rs.html      # Code files (syntax highlighted)
-├── blob/master/README.md.html    # Markdown files (rendered as HTML)
-└── commits/master/index.html     # Commit history
+├── index.html                    # Repository home
+├── assets/                       # CSS bundles
+├── tree/master/src.html          # Directory listing
+├── blob/master/src/main.rs.html  # Code file (highlighted)
+├── commits/master/page-1.html    # Commit history (paginated)
+└── tags/index.html               # Tag listing
 ```
 
 ## Build
@@ -49,6 +51,8 @@ dist/
 ```bash
 cargo build --release     # target/release/gitkyl
 cargo test                # run all tests
+cargo fmt                 # format code
+cargo clippy              # lint
 ```
 
 ---
