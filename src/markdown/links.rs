@@ -6,10 +6,12 @@ use std::path::{Path, PathBuf};
 /// Resolves relative links in markdown to static blob/tree pages.
 ///
 /// Transforms repository internal links (./file.rs, ../docs/) into
-/// URLs pointing to generated static pages (/blob/branch/file.rs.html).
+/// relative URLs pointing to generated static pages (blob/branch/file.rs.html).
+/// Uses relative paths for file:// protocol compatibility.
 pub struct LinkResolver {
     branch: String,
     current_path: PathBuf,
+    depth: usize,
 }
 
 impl LinkResolver {
@@ -23,17 +25,40 @@ impl LinkResolver {
         Self {
             branch: branch.into(),
             current_path: current_path.as_ref().to_path_buf(),
+            depth: 0,
         }
     }
 
-    /// Resolves link to absolute URL for static site.
+    /// Creates link resolver with specified depth for relative path generation.
+    ///
+    /// Depth determines how many `../` prefixes are needed to reach site root.
+    /// For index.html at root, depth is 0. For tree/branch/dir.html, depth is 2.
+    ///
+    /// # Arguments
+    ///
+    /// * `branch`: Git branch name for link resolution
+    /// * `current_path`: Path to current markdown file being rendered
+    /// * `depth`: Directory depth of rendered page from site root
+    pub fn with_depth(
+        branch: impl Into<String>,
+        current_path: impl AsRef<Path>,
+        depth: usize,
+    ) -> Self {
+        Self {
+            branch: branch.into(),
+            current_path: current_path.as_ref().to_path_buf(),
+            depth,
+        }
+    }
+
+    /// Resolves link to relative URL for static site.
     ///
     /// Handles different link types:
     /// - Absolute URLs (http://, https://) remain unchanged
     /// - Anchor links (#section) remain unchanged
-    /// - Relative paths (./file.rs) resolve to /blob/branch/path.html
+    /// - Relative paths (./file.rs) resolve to blob/branch/path.html
     /// - Parent paths (../file.rs) resolve relative to current file
-    /// - Directory links (./dir/) resolve to /tree/branch/dir.html
+    /// - Directory links (./dir/) resolve to tree/branch/dir.html
     ///
     /// # Arguments
     ///
@@ -42,7 +67,7 @@ impl LinkResolver {
     ///
     /// # Returns
     ///
-    /// Resolved absolute URL for static site
+    /// Resolved relative URL for static site
     ///
     /// # Errors
     ///
@@ -69,18 +94,21 @@ impl LinkResolver {
 
         let path_str = normalized.to_str().context("Path contains invalid UTF8")?;
 
+        // Build relative prefix based on depth
+        let prefix = "../".repeat(self.depth);
+
         // Check if directory (ends with /)
         if link.ends_with('/') {
-            return Ok(format!("/tree/{}/{}.html", self.branch, path_str));
+            return Ok(format!("{}tree/{}/{}.html", prefix, self.branch, path_str));
         }
 
         // Regular file: blob page
         if is_image {
             // Images: raw file path without .html
-            Ok(format!("/blob/{}/{}", self.branch, path_str))
+            Ok(format!("{}blob/{}/{}", prefix, self.branch, path_str))
         } else {
             // Links: HTML page
-            Ok(format!("/blob/{}/{}.html", self.branch, path_str))
+            Ok(format!("{}blob/{}/{}.html", prefix, self.branch, path_str))
         }
     }
 
@@ -132,14 +160,14 @@ mod tests {
 
     #[test]
     fn test_resolve_relative_link() {
-        // Arrange
+        // Arrange: depth 0 (root level)
         let resolver = LinkResolver::new("main", "docs/guide.md");
 
         // Act
         let result = resolver.resolve("./api.md", false).expect("Should resolve");
 
-        // Assert
-        assert_eq!(result, "/blob/main/docs/api.md.html");
+        // Assert: relative path without leading /
+        assert_eq!(result, "blob/main/docs/api.md.html");
     }
 
     #[test]
@@ -153,7 +181,7 @@ mod tests {
             .expect("Should resolve");
 
         // Assert
-        assert_eq!(result, "/blob/main/README.md.html");
+        assert_eq!(result, "blob/main/README.md.html");
     }
 
     #[test]
@@ -196,7 +224,7 @@ mod tests {
 
         // Assert
         assert_eq!(
-            result, "/blob/main/docs/assets/logo.png",
+            result, "blob/main/docs/assets/logo.png",
             "Images should not have .html extension"
         );
     }
@@ -235,7 +263,7 @@ mod tests {
             .expect("Should resolve from root");
 
         // Assert
-        assert_eq!(result, "/blob/main/src/main.rs.html");
+        assert_eq!(result, "blob/main/src/main.rs.html");
     }
 
     #[test]
@@ -249,7 +277,7 @@ mod tests {
             .expect("Should resolve nested path");
 
         // Assert
-        assert_eq!(result, "/blob/develop/src/lib.rs.html");
+        assert_eq!(result, "blob/develop/src/lib.rs.html");
     }
 
     #[test]
@@ -264,8 +292,8 @@ mod tests {
 
         // Assert
         assert_eq!(
-            result, "/tree/main/src.html",
-            "Directory links should use /tree/ prefix"
+            result, "tree/main/src.html",
+            "Directory links should use tree/ prefix"
         );
     }
 
@@ -294,7 +322,7 @@ mod tests {
             .expect("Should resolve sibling");
 
         // Assert
-        assert_eq!(result, "/blob/main/docs/tutorial.md.html");
+        assert_eq!(result, "blob/main/docs/tutorial.md.html");
     }
 
     #[test]
@@ -308,7 +336,7 @@ mod tests {
             .expect("Should handle current directory marker");
 
         // Assert
-        assert_eq!(result, "/blob/main/src/config.rs.html");
+        assert_eq!(result, "blob/main/src/config.rs.html");
     }
 
     #[test]
@@ -322,6 +350,34 @@ mod tests {
             .expect("Should resolve multiple parent dirs");
 
         // Assert
-        assert_eq!(result, "/blob/main/README.md.html");
+        assert_eq!(result, "blob/main/README.md.html");
+    }
+
+    #[test]
+    fn test_resolve_with_depth() {
+        // Arrange: depth 2 (e.g., tree/branch/dir.html)
+        let resolver = LinkResolver::with_depth("main", "README.md", 2);
+
+        // Act
+        let result = resolver
+            .resolve("./src/lib.rs", false)
+            .expect("Should resolve with depth prefix");
+
+        // Assert: should have ../ prefix for depth
+        assert_eq!(result, "../../blob/main/src/lib.rs.html");
+    }
+
+    #[test]
+    fn test_resolve_image_with_depth() {
+        // Arrange: depth 3 (e.g., blob/branch/dir/file.html)
+        let resolver = LinkResolver::with_depth("dev", "assets/logo.png", 3);
+
+        // Act
+        let result = resolver
+            .resolve("./icon.png", true)
+            .expect("Should resolve image with depth");
+
+        // Assert
+        assert_eq!(result, "../../../blob/dev/assets/icon.png");
     }
 }

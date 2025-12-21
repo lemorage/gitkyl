@@ -204,15 +204,16 @@ fn generate_tree_pages_for_branch(
         );
 
         let html_result = if dir_path.is_empty() {
+            let depth = branch.matches('/').count() + 2;
             let readme_html = gitkyl::pages::index::find_and_render_readme(
                 &config.repo,
                 branch,
                 &tree_items_for_page,
+                depth,
             )
             .ok()
             .flatten();
 
-            let depth = branch.matches('/').count() + 2;
             Ok(gitkyl::pages::index::generate(IndexPageData {
                 name: repo_info.name(),
                 owner: repo_info.owner(),
@@ -271,7 +272,9 @@ fn generate_tree_pages_for_branch(
 ///
 /// Creates HTML pages for all files in the specified branch, with special
 /// handling for markdown files. README files are rendered with full markdown
-/// processing, while code files receive syntax highlighting.
+/// processing, while code files receive syntax highlighting. Image files
+/// are copied as raw files alongside their HTML viewer pages for use in
+/// markdown image references.
 ///
 /// # Arguments
 ///
@@ -334,6 +337,22 @@ fn generate_blob_pages_for_branch(
                     fs::write(&blob_path, html.into_string()).with_context(|| {
                         format!("Failed to write blob page {}", blob_path.display())
                     })?;
+
+                    // Copy raw image files for markdown image references
+                    if let Ok(bytes) = gitkyl::read_blob(&config.repo, Some(branch), path)
+                        && let gitkyl::FileType::Image(_) = gitkyl::detect_file_type(&bytes, path)
+                    {
+                        let raw_path = config.output.join("blob").join(branch).join(path);
+
+                        if let Some(parent) = raw_path.parent() {
+                            fs::create_dir_all(parent)
+                                .context("Failed to create raw image directory")?;
+                        }
+
+                        fs::write(&raw_path, &bytes).with_context(|| {
+                            format!("Failed to write raw image {}", raw_path.display())
+                        })?;
+                    }
 
                     blob_count += 1;
                 }
@@ -568,11 +587,12 @@ fn main() -> Result<()> {
         &root_dir_commit_map,
     );
 
-    let readme_html = find_and_render_readme(&config.repo, repo_info.default_branch(), &tree_items)
-        .unwrap_or_else(|e| {
-            eprintln!("Warning: Failed to render README: {:#}", e);
-            None
-        });
+    let readme_html =
+        find_and_render_readme(&config.repo, repo_info.default_branch(), &tree_items, 0)
+            .unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to render README: {:#}", e);
+                None
+            });
 
     let tag_count = gitkyl::list_tags(&config.repo)
         .map(|tags| tags.len())

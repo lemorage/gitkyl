@@ -187,6 +187,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
 /// * `repo_path`: Path to git repository
 /// * `ref_name`: Git reference (branch/tag/commit)
 /// * `tree_items`: Tree items at repository root
+/// * `depth`: Directory depth of rendered page from site root
 ///
 /// # Returns
 ///
@@ -199,6 +200,7 @@ pub fn find_and_render_readme(
     repo_path: impl AsRef<Path>,
     ref_name: &str,
     tree_items: &[TreeItem],
+    depth: usize,
 ) -> Result<Option<String>> {
     const README_VARIANTS: &[&str] = &["README.md", "README", "readme.md", "Readme.md"];
 
@@ -226,7 +228,8 @@ pub fn find_and_render_readme(
 
         let content = String::from_utf8(content_bytes).context("README contains invalid UTF8")?;
 
-        let renderer = crate::markdown::MarkdownRenderer::with_link_resolver(ref_name, path);
+        let renderer =
+            crate::markdown::MarkdownRenderer::with_link_resolver_depth(ref_name, path, depth);
         let rendered = renderer
             .render(&content)
             .context("Failed to render README markdown")?;
@@ -558,7 +561,7 @@ mod tests {
         }];
 
         // Act
-        let result = find_and_render_readme(&repo_path, ref_name, &tree_items);
+        let result = find_and_render_readme(&repo_path, ref_name, &tree_items, 0);
 
         // Assert
         assert!(result.is_ok(), "Should successfully render README");
@@ -580,7 +583,7 @@ mod tests {
         let tree_items = vec![];
 
         // Act
-        let result = find_and_render_readme(&repo_path, ref_name, &tree_items);
+        let result = find_and_render_readme(&repo_path, ref_name, &tree_items, 0);
 
         // Assert
         assert!(result.is_ok(), "Should handle missing README gracefully");
@@ -632,7 +635,7 @@ mod tests {
         }
 
         // Act
-        let result = find_and_render_readme(&repo_path, ref_name, &tree_items);
+        let result = find_and_render_readme(&repo_path, ref_name, &tree_items, 0);
 
         // Assert
         assert!(result.is_ok(), "Should handle multiple README files");

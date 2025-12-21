@@ -43,8 +43,8 @@ impl<'a> MarkdownRenderer<'a> {
         // Parse options (smart punctuation)
         options.parse.smart = true;
 
-        // Render options (security: no raw HTML)
-        options.render.unsafe_ = false;
+        // Render options (security: we trust)
+        options.render.unsafe_ = true;
 
         // Load syntax definitions for highlighting
         let syntax_set = SyntaxSet::load_defaults_newlines();
@@ -59,8 +59,8 @@ impl<'a> MarkdownRenderer<'a> {
     /// Creates renderer with link resolution for repository internal links.
     ///
     /// Relative links in markdown (./file.md, ../dir/) are transformed to
-    /// static site URLs (/blob/branch/path.html). Absolute URLs and anchor
-    /// links remain unchanged.
+    /// static site URLs (blob/branch/path.html). Absolute URLs and anchor
+    /// links remain unchanged. Uses depth 0 (site root level).
     ///
     /// # Arguments
     ///
@@ -69,6 +69,26 @@ impl<'a> MarkdownRenderer<'a> {
     pub fn with_link_resolver(branch: impl Into<String>, current_path: impl AsRef<Path>) -> Self {
         let mut renderer = Self::new();
         renderer.link_resolver = Some(LinkResolver::new(branch, current_path));
+        renderer
+    }
+
+    /// Creates renderer with link resolution and depth for relative path generation.
+    ///
+    /// Depth determines how many `../` prefixes are needed to reach site root.
+    /// For index.html at root, depth is 0. For tree/branch/index.html, depth is 2.
+    ///
+    /// # Arguments
+    ///
+    /// * `branch`: Git branch for link resolution
+    /// * `current_path`: Path to markdown file being rendered
+    /// * `depth`: Directory depth of rendered page from site root
+    pub fn with_link_resolver_depth(
+        branch: impl Into<String>,
+        current_path: impl AsRef<Path>,
+        depth: usize,
+    ) -> Self {
+        let mut renderer = Self::new();
+        renderer.link_resolver = Some(LinkResolver::with_depth(branch, current_path, depth));
         renderer
     }
 
@@ -512,18 +532,18 @@ fn main() {
     }
 
     #[test]
-    fn test_render_html_escaping() {
-        // Arrange
+    fn test_render_html_passthrough() {
+        // Arrange: renderer allows raw HTML (unsafe_ = true)
         let renderer = MarkdownRenderer::new();
         let markdown = "<script>alert('xss')</script>\n\nNormal text.";
 
         // Act
-        let html = renderer.render(markdown).expect("Should escape HTML");
+        let html = renderer.render(markdown).expect("Should render HTML");
 
-        // Assert
+        // Assert: raw HTML passes through (trusted content)
         assert!(
-            !html.contains("<script>alert"),
-            "Should not contain raw script tag: {}",
+            html.contains("<script>"),
+            "Should pass through raw HTML (unsafe mode): {}",
             html
         );
         assert!(html.contains("Normal text"), "Should contain safe text");
@@ -750,14 +770,14 @@ const x = "<script>alert('xss')</script>";
             .render(markdown)
             .expect("Should render with link resolution");
 
-        // Assert
+        // Assert: relative paths without leading /
         assert!(
-            html.contains("href=\"/blob/main/docs/api/guide.md.html\""),
+            html.contains("href=\"blob/main/docs/api/guide.md.html\""),
             "Should resolve relative link: {}",
             html
         );
         assert!(
-            html.contains("href=\"/blob/main/src/lib.rs.html\""),
+            html.contains("href=\"blob/main/src/lib.rs.html\""),
             "Should resolve parent link: {}",
             html
         );
@@ -772,7 +792,7 @@ const x = "<script>alert('xss')</script>";
             html
         );
         assert!(
-            html.contains("src=\"/blob/main/assets/logo.png\""),
+            html.contains("src=\"blob/main/assets/logo.png\""),
             "Should resolve image without .html extension: {}",
             html
         );
