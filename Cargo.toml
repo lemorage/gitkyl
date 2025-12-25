@@ -9,6 +9,7 @@ repository = "https://github.com/lemorage/gitkyl"
 readme = "README.md"
 keywords = ["git", "static-site", "code-viewer"]
 categories = ["command-line-utilities", "development-tools"]
+include = ["src/**/*", "assets/**/*", "themes/**/*", "LICENSE", "README.md"]
 
 [dependencies]
 gix = { version = "0.64", default-features = false, features = ["max-performance"] }
