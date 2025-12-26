@@ -69,6 +69,7 @@ pub fn generate(
                                             span class="commit-message" { (commit.message()) }
                                         }
                                         div class="commit-meta" {
+                                            (crate::avatar::render(commit.author(), 20))
                                             span class="commit-author" {
                                                 (commit.author())
                                             }

@@ -91,7 +91,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                     @if let Some(commit) = data.latest_commit {
                         div class="commit-info-wrapper" {
                             div class="commit-line" {
-                                span class="avatar-placeholder" {}
+                                (crate::avatar::render(commit.author(), 24))
                                 span class="repo-commit-message" { (commit.message()) }
                             }
                             (commit_meta(

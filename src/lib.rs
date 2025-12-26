@@ -1,6 +1,7 @@
 //! Static site generator for Git repositories.
 
 mod assets;
+pub mod avatar;
 pub mod components;
 mod config;
 mod filetype;
@@ -12,6 +13,7 @@ mod tree;
 mod util;
 
 pub use assets::write_css_assets;
+pub use avatar::render;
 pub use components::icons::is_readme;
 pub use config::Config;
 pub use filetype::{FileType, ImageFormat, detect_file_type};
