@@ -656,6 +656,27 @@ fn main() -> Result<()> {
         }
     }
 
+    // Generate tree and blob pages for tags to enable file browsing
+    let tags = gitkyl::list_tags(&config.repo).unwrap_or_default();
+    for tag in &tags {
+        match generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
+            Ok(stats) => {
+                println!(
+                    "→ {}: {} trees, {} blobs ({} md)",
+                    tag.name,
+                    stats.tree_pages,
+                    stats.total_blobs(),
+                    stats.markdown_pages
+                );
+                total_trees += stats.tree_pages;
+                total_blobs += stats.total_blobs();
+            }
+            Err(e) => {
+                eprintln!("✗ tag {}: {:#}", tag.name, e);
+            }
+        }
+    }
+
     let tags_count = generate_tags_pages(&config, &repo_info).unwrap_or_else(|e| {
         eprintln!("Warning: Failed to generate tags pages: {:#}", e);
         0
