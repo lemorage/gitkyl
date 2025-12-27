@@ -96,7 +96,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                             }
                             (commit_meta(
                                 commit.author(),
-                                commit.short_oid(),
+                                commit.oid(),
                                 &format_timestamp(commit.date())
                             ))
                         }

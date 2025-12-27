@@ -64,7 +64,7 @@ pub fn generate(
                                     li class="commit-entry" {
                                         div class="commit-header" {
                                             span class="commit-hash" {
-                                                code { (commit.short_oid()) }
+                                                code data-full=(commit.oid()) { (commit.short_oid()) }
                                             }
                                             span class="commit-message" { (commit.message()) }
                                         }

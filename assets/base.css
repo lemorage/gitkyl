@@ -73,6 +73,42 @@ body {
     background-color: rgba(0, 113, 227, 0.3);
 }
 
+/* Commit Hash Tooltip */
+code[data-full] {
+    position: relative;
+}
+
+code[data-full]::after {
+    content: attr(data-full);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 4px);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    white-space: nowrap;
+    color: var(--text-primary);
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.4) 0%,
+        rgba(255, 255, 255, 0.2) 100%
+    );
+    backdrop-filter: blur(16px);
+    border-radius: var(--radius-s);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s, visibility 0.15s;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+code[data-full]:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     body {

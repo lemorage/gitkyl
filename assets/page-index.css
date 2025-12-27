@@ -58,7 +58,6 @@
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-card);
     border: 1px solid rgba(255, 255, 255, 0.5);
-    overflow: hidden;
 }
 
 /* Card Headers with Backdrop */
@@ -236,7 +235,6 @@
     justify-content: center;
     flex: 1;
     min-width: 0;
-    overflow: hidden;
 }
 
 .avatar {
