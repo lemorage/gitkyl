@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
-use crate::components::commit::commit_meta;
+use crate::components::commit::{attribution, commit_hash};
 use crate::components::file_list::{file_row, file_table};
 use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
@@ -94,11 +94,13 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                                 (crate::avatar::render(commit.author(), 24))
                                 span class="repo-commit-message" { (commit.message()) }
                             }
-                            (commit_meta(
-                                commit.author(),
-                                commit.oid(),
-                                &format_timestamp(commit.date())
-                            ))
+                            div class="commit-meta" {
+                                (attribution(commit))
+                                span { "·" }
+                                (commit_hash(commit.oid()))
+                                span { "·" }
+                                span { (format_timestamp(commit.date())) }
+                            }
                         }
                     }
 
@@ -131,8 +133,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                                                     &href,
                                                     file_icon(path_str),
                                                     path_str,
-                                                    commit.message(),
-                                                    commit.message_full(),
+                                                    Some(commit),
                                                     &format_timestamp(commit.date())
                                                 ))
                                             }
@@ -148,8 +149,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                                                 &href,
                                                 file_icon(&format!("{}/", display_path)),
                                                 name,
-                                                commit.message(),
-                                                commit.message_full(),
+                                                Some(commit),
                                                 &format_timestamp(commit.date())
                                             ))
                                         }

@@ -2,6 +2,7 @@
 
 use maud::{Markup, html};
 
+use crate::components::commit::{attribution, commit_hash};
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
 use crate::git::PaginatedCommits;
@@ -64,15 +65,13 @@ pub fn generate(
                                     li class="commit-entry" {
                                         div class="commit-header" {
                                             span class="commit-hash" {
-                                                code data-full=(commit.oid()) { (commit.short_oid()) }
+                                                (commit_hash(commit.oid()))
                                             }
                                             span class="commit-message" { (commit.message()) }
                                         }
                                         div class="commit-meta" {
                                             (crate::avatar::render(commit.author(), 20))
-                                            span class="commit-author" {
-                                                (commit.author())
-                                            }
+                                            (attribution(commit))
                                             span class="commit-date" {
                                                 (format_timestamp(commit.date()))
                                             }

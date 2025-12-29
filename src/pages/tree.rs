@@ -115,8 +115,7 @@ pub fn generate(
                                 &parent_href,
                                 html! { div class="icon-box" { i class="ph ph-arrow-up icon-folder" {} } },
                                 "..",
-                                "",
-                                "",
+                                None,
                                 ""
                             ))
                         }
@@ -139,8 +138,7 @@ pub fn generate(
                                             &href,
                                             file_icon(&display_name),
                                             &display_name,
-                                            commit.message(),
-                                            commit.message_full(),
+                                            Some(commit),
                                             &format_timestamp(commit.date())
                                         ))
                                     }
@@ -151,8 +149,7 @@ pub fn generate(
                                         &href,
                                         file_icon(&format!("{}/", full_path)),
                                         name,
-                                        commit.message(),
-                                        commit.message_full(),
+                                        Some(commit),
                                         &format_timestamp(commit.date())
                                     ))
                                 }

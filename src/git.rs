@@ -70,6 +70,7 @@ pub struct CommitInfo {
     author: String,
     author_email: String,
     committer: String,
+    co_authors: Vec<String>,
     date: i64,
     message: String,
     message_full: String,
@@ -104,6 +105,7 @@ impl CommitInfo {
         } else {
             oid.clone()
         };
+        let co_authors = parse_co_authors(&message_full);
 
         Self {
             oid,
@@ -111,6 +113,7 @@ impl CommitInfo {
             author: author.clone(),
             author_email: String::new(),
             committer: author,
+            co_authors,
             date,
             message,
             message_full,
@@ -156,6 +159,33 @@ impl CommitInfo {
     pub fn message_full(&self) -> &str {
         &self.message_full
     }
+
+    /// Co-authors from commit message trailers.
+    pub fn co_authors(&self) -> &[String] {
+        &self.co_authors
+    }
+}
+
+/// Parses Co-authored-by trailers from commit message (case insensitive).
+fn parse_co_authors(message: &str) -> Vec<String> {
+    message
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            let lower = line.to_lowercase();
+            if let Some(idx) = lower.find("co-authored-by:") {
+                let rest = &line[idx + "co-authored-by:".len()..];
+                let name = rest.trim();
+                if let Some(email_start) = name.find('<') {
+                    Some(name[..email_start].trim().to_string())
+                } else {
+                    Some(name.to_string())
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// Git tag with metadata.
@@ -539,6 +569,7 @@ pub fn list_commits(
             .context("Failed to read commit message")?;
         let message_full = message_bytes.to_str_lossy().to_string();
         let first_line = message_full.lines().next().unwrap_or("").to_string();
+        let co_authors = parse_co_authors(&message_full);
 
         commits.push(CommitInfo {
             oid: commit_obj.id.to_hex().to_string(),
@@ -546,6 +577,7 @@ pub fn list_commits(
             author: author.name.to_str_lossy().to_string(),
             author_email: author.email.to_str_lossy().to_string(),
             committer: committer.name.to_str_lossy().to_string(),
+            co_authors,
             date: author.time.seconds,
             message: first_line,
             message_full,
@@ -638,6 +670,7 @@ pub fn list_commits_paginated(
             .context("Failed to read commit message")?;
         let message_full = message_bytes.to_str_lossy().to_string();
         let first_line = message_full.lines().next().unwrap_or("").to_string();
+        let co_authors = parse_co_authors(&message_full);
 
         commits.push(CommitInfo {
             oid: commit_obj.id.to_hex().to_string(),
@@ -645,6 +678,7 @@ pub fn list_commits_paginated(
             author: author.name.to_str_lossy().to_string(),
             author_email: author.email.to_str_lossy().to_string(),
             committer: committer.name.to_str_lossy().to_string(),
+            co_authors,
             date: author.time.seconds,
             message: first_line,
             message_full,
@@ -798,6 +832,7 @@ fn extract_commit_info(commit: &gix::Commit) -> Result<CommitInfo> {
         .context("Failed to read commit message")?;
     let message_full = message_bytes.to_str_lossy().to_string();
     let first_line = message_full.lines().next().unwrap_or("").to_string();
+    let co_authors = parse_co_authors(&message_full);
 
     Ok(CommitInfo {
         oid: commit.id.to_hex().to_string(),
@@ -805,6 +840,7 @@ fn extract_commit_info(commit: &gix::Commit) -> Result<CommitInfo> {
         author: author.name.to_str_lossy().to_string(),
         author_email: author.email.to_str_lossy().to_string(),
         committer: committer.name.to_str_lossy().to_string(),
+        co_authors,
         date: author.time.seconds,
         message: first_line,
         message_full,
@@ -1026,6 +1062,23 @@ mod tests {
             .current_dir(repo_path)
             .output()
             .expect("Failed to create annotated git tag");
+    }
+
+    #[test]
+    fn test_parse_co_authors_none() {
+        assert!(parse_co_authors("Add feature\n\nDetails here.").is_empty());
+    }
+
+    #[test]
+    fn test_parse_co_authors_extracts_name() {
+        let msg = "Fix\n\nCo-authored-by: Alice <alice@example.com>";
+        assert_eq!(parse_co_authors(msg), vec!["Alice"]);
+    }
+
+    #[test]
+    fn test_parse_co_authors_case_insensitive() {
+        let msg = "Fix\n\nCo-Authored-By: Alice <a@x.com>\nco-authored-by: Bob";
+        assert_eq!(parse_co_authors(msg), vec!["Alice", "Bob"]);
     }
 
     #[test]

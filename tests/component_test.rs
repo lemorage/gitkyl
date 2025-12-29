@@ -2,60 +2,62 @@
 //!
 //! Tests UI components for correct HTML generation and content.
 
-use gitkyl::components::commit::commit_meta;
+use gitkyl::CommitInfo;
+use gitkyl::components::commit::{attribution, commit_hash};
 use gitkyl::components::file_list::{file_row, file_table};
 use gitkyl::components::footer::footer;
 use gitkyl::components::layout::page_wrapper;
 use maud::html;
 
 #[test]
-fn test_commit_meta_contains_all_elements() {
-    let author = "lemorage";
-    let hash = "abc1234";
-    let time = "5 minutes ago";
+fn test_attribution_simple_case() {
+    let commit = CommitInfo::new(
+        "abc1234def5678".to_string(),
+        "Test commit".to_string(),
+        "Test commit".to_string(),
+        "lemorage".to_string(),
+        1234567890,
+    );
 
-    let html = commit_meta(author, hash, time).into_string();
+    let html = attribution(&commit).into_string();
 
     assert!(html.contains("lemorage"));
-    assert!(html.contains("abc1234"));
-    assert!(html.contains("5 minutes ago"));
-    assert!(html.contains("·"));
+    assert!(!html.contains("attribution-indicator"));
 }
 
 #[test]
-fn test_commit_meta_handles_long_author_name() {
-    let author = "John Jacob Jingleheimer Schmidt III";
-    let hash = "def5678";
-    let time = "2 hours ago";
+fn test_commit_hash_contains_short_and_full() {
+    let hash = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
 
-    let html = commit_meta(author, hash, time).into_string();
+    let html = commit_hash(hash).into_string();
 
-    assert!(html.contains("John Jacob Jingleheimer Schmidt III"));
-    assert!(html.contains("def5678"));
-    assert!(html.contains("2 hours ago"));
+    assert!(html.contains("a1b2c3d"));
+    assert!(html.contains("data-full"));
+    assert!(html.contains(hash));
 }
 
 #[test]
-fn test_commit_meta_handles_full_hash() {
-    let author = "lemorage";
-    let hash = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8";
-    let time = "1 day ago";
+fn test_commit_hash_short_input() {
+    let hash = "abc12";
 
-    let html = commit_meta(author, hash, time).into_string();
+    let html = commit_hash(hash).into_string();
 
-    assert!(html.contains("a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8"));
+    assert!(html.contains("abc12"));
 }
 
 #[test]
-fn test_commit_meta_handles_special_characters_in_author() {
-    let author = "Müller <mueller@example.com>";
-    let hash = "abc1234";
-    let time = "3 weeks ago";
+fn test_attribution_handles_special_characters() {
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Test".to_string(),
+        "Test".to_string(),
+        "Müller".to_string(),
+        1234567890,
+    );
 
-    let html = commit_meta(author, hash, time).into_string();
+    let html = attribution(&commit).into_string();
 
     assert!(html.contains("Müller"));
-    assert!(html.contains("mueller@example.com"));
 }
 
 #[test]
@@ -275,13 +277,19 @@ fn test_file_table_with_empty_rows() {
 #[test]
 fn test_file_row_contains_href_link() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234def5678".to_string(),
+        "Initial commit".to_string(),
+        "Initial commit: add main.rs with basic structure".to_string(),
+        "lemorage".to_string(),
+        1734393600,
+    );
 
     let result = file_row(
         "/repo/blob/main/src/main.rs",
         test_icon,
         "main.rs",
-        "Initial commit",
-        "Initial commit: add main.rs with basic structure",
+        Some(&commit),
         "2025-12-17",
     );
     let html_output = result.into_string();
@@ -292,13 +300,19 @@ fn test_file_row_contains_href_link() {
 #[test]
 fn test_file_row_contains_file_row_class() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Update docs".to_string(),
+        "Update documentation".to_string(),
+        "lemorage".to_string(),
+        1734307200,
+    );
 
     let result = file_row(
         "/repo/main/README.md",
         test_icon,
         "README.md",
-        "Update docs",
-        "Update documentation",
+        Some(&commit),
         "2025-12-16",
     );
     let html_output = result.into_string();
@@ -309,13 +323,19 @@ fn test_file_row_contains_file_row_class() {
 #[test]
 fn test_file_row_contains_file_name() {
     let test_icon = html! { i class="ph-fill ph-folder" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Add source directory".to_string(),
+        "Add source directory structure".to_string(),
+        "lemorage".to_string(),
+        1734220800,
+    );
 
     let result = file_row(
         "/repo/tree/main/src/",
         test_icon,
         "src/",
-        "Add source directory",
-        "Add source directory structure",
+        Some(&commit),
         "2025-12-15",
     );
     let html_output = result.into_string();
@@ -327,13 +347,19 @@ fn test_file_row_contains_file_name() {
 #[test]
 fn test_file_row_contains_commit_message() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Fix configuration defaults".to_string(),
+        "Fix configuration defaults for production deployment".to_string(),
+        "lemorage".to_string(),
+        1734134400,
+    );
 
     let result = file_row(
         "/repo/blob/dev/config.toml",
         test_icon,
         "config.toml",
-        "Fix configuration defaults",
-        "Fix configuration defaults for production deployment",
+        Some(&commit),
         "2025-12-14",
     );
     let html_output = result.into_string();
@@ -345,13 +371,19 @@ fn test_file_row_contains_commit_message() {
 #[test]
 fn test_file_row_contains_commit_date() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Add BSD-3-Clause license".to_string(),
+        "Add BSD-3-Clause license file".to_string(),
+        "lemorage".to_string(),
+        1734048000,
+    );
 
     let result = file_row(
         "/repo/blob/main/LICENSE",
         test_icon,
         "LICENSE",
-        "Add BSD-3-Clause license",
-        "Add BSD-3-Clause license file",
+        Some(&commit),
         "2025-12-13",
     );
     let html_output = result.into_string();
@@ -367,13 +399,19 @@ fn test_file_row_contains_icon_markup() {
             i class="ph-fill ph-file-rs icon-rust" {}
         }
     };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Implement core logic".to_string(),
+        "Implement core library logic with tests".to_string(),
+        "lemorage".to_string(),
+        1733961600,
+    );
 
     let result = file_row(
         "/repo/blob/main/lib.rs",
         test_icon,
         "lib.rs",
-        "Implement core logic",
-        "Implement core library logic with tests",
+        Some(&commit),
         "2025-12-12",
     );
     let html_output = result.into_string();
@@ -383,34 +421,45 @@ fn test_file_row_contains_icon_markup() {
 }
 
 #[test]
-fn test_file_row_has_title_attribute_with_full_message() {
+fn test_file_row_has_title_with_author_info() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234def5678901234567890123456789012".to_string(),
+        "Add comprehensive tests".to_string(),
+        "Add comprehensive test suite covering edge cases".to_string(),
+        "lemorage".to_string(),
+        1733875200,
+    );
 
     let result = file_row(
         "/repo/blob/feature/test.rs",
         test_icon,
         "test.rs",
-        "Add comprehensive tests",
-        "Add comprehensive test suite covering edge cases and error conditions",
+        Some(&commit),
         "2025-12-11",
     );
     let html_output = result.into_string();
 
-    assert!(html_output.contains(
-        "title=\"Add comprehensive test suite covering edge cases and error conditions\""
-    ));
+    assert!(html_output.contains("title="));
+    assert!(html_output.contains("lemorage"));
 }
 
 #[test]
 fn test_file_row_proper_html_structure() {
     let test_icon = html! { i class="ph-fill ph-folder" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Add test directory".to_string(),
+        "Add test directory with initial test files".to_string(),
+        "lemorage".to_string(),
+        1733788800,
+    );
 
     let result = file_row(
         "/repo/tree/main/tests/",
         test_icon,
         "tests/",
-        "Add test directory",
-        "Add test directory with initial test files",
+        Some(&commit),
         "2025-12-10",
     );
     let html_output = result.into_string();
@@ -425,13 +474,19 @@ fn test_file_row_proper_html_structure() {
 #[test]
 fn test_file_row_handles_special_characters_in_filename() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Update versioned file".to_string(),
+        "Update versioned file with new features".to_string(),
+        "lemorage".to_string(),
+        1733702400,
+    );
 
     let result = file_row(
         "/repo/blob/main/my-file_v2.0.rs",
         test_icon,
         "my-file_v2.0.rs",
-        "Update versioned file",
-        "Update versioned file with new features",
+        Some(&commit),
         "2025-12-09",
     );
     let html_output = result.into_string();
@@ -443,13 +498,19 @@ fn test_file_row_handles_special_characters_in_filename() {
 fn test_file_row_handles_long_commit_messages() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
     let long_message = "This is a very long commit message that describes in detail all the changes that were made to the file including implementation details and reasoning";
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        long_message.to_string(),
+        long_message.to_string(),
+        "lemorage".to_string(),
+        1733616000,
+    );
 
     let result = file_row(
         "/repo/blob/main/complex.rs",
         test_icon,
         "complex.rs",
-        long_message,
-        long_message,
+        Some(&commit),
         "2025-12-08",
     );
     let html_output = result.into_string();
@@ -460,13 +521,19 @@ fn test_file_row_handles_long_commit_messages() {
 #[test]
 fn test_file_row_handles_unicode_in_filenames() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit = CommitInfo::new(
+        "abc1234".to_string(),
+        "Add Chinese readme".to_string(),
+        "Add Chinese language documentation".to_string(),
+        "lemorage".to_string(),
+        1733529600,
+    );
 
     let result = file_row(
         "/repo/blob/main/README_中文.md",
         test_icon,
         "README_中文.md",
-        "Add Chinese readme",
-        "Add Chinese language documentation",
+        Some(&commit),
         "2025-12-07",
     );
     let html_output = result.into_string();
@@ -477,13 +544,26 @@ fn test_file_row_handles_unicode_in_filenames() {
 #[test]
 fn test_file_table_and_file_row_integration() {
     let test_icon = html! { i class="ph-fill ph-file" {} };
+    let commit1 = CommitInfo::new(
+        "abc1234".to_string(),
+        "First commit".to_string(),
+        "First commit message".to_string(),
+        "lemorage".to_string(),
+        1733443200,
+    );
+    let commit2 = CommitInfo::new(
+        "def5678".to_string(),
+        "Second commit".to_string(),
+        "Second commit message".to_string(),
+        "lemorage".to_string(),
+        1733356800,
+    );
 
     let row1 = file_row(
         "/repo/blob/main/file1.rs",
         test_icon.clone(),
         "file1.rs",
-        "First commit",
-        "First commit message",
+        Some(&commit1),
         "2025-12-06",
     );
 
@@ -491,8 +571,7 @@ fn test_file_table_and_file_row_integration() {
         "/repo/blob/main/file2.rs",
         test_icon,
         "file2.rs",
-        "Second commit",
-        "Second commit message",
+        Some(&commit2),
         "2025-12-05",
     );
 
@@ -509,6 +588,18 @@ fn test_file_table_and_file_row_integration() {
     assert!(html_output.contains("file2.rs"));
     assert!(html_output.contains("First commit"));
     assert!(html_output.contains("Second commit"));
+}
+
+#[test]
+fn test_file_row_none_commit_shows_empty_message() {
+    let test_icon = html! { i class="ph-fill ph-folder" {} };
+
+    let result = file_row("/repo/tree/main/parent/", test_icon, "..", None, "");
+    let html_output = result.into_string();
+
+    assert!(html_output.contains("class=\"file-row\""));
+    assert!(html_output.contains(".."));
+    assert!(!html_output.contains("title="));
 }
 
 #[test]
