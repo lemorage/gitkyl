@@ -19,6 +19,7 @@
 
 .file-row:last-child {
     border-bottom: none;
+    border-radius: 0 0 var(--radius-l) var(--radius-l);
 }
 
 .file-row:hover {

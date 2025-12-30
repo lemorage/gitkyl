@@ -78,6 +78,7 @@
     position: sticky;
     top: 0;
     z-index: 10;
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
 }
 
 .control-left {
@@ -88,6 +89,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
 }
 
 @supports not (backdrop-filter: blur(20px)) {
@@ -347,6 +349,7 @@
 .readme-content {
     padding: 24px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    border-radius: 0 0 var(--radius-l) var(--radius-l);
 }
 
 .readme-content.latte {
