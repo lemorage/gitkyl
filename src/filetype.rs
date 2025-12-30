@@ -164,27 +164,94 @@ fn detect_image_by_magic(bytes: &[u8]) -> Option<ImageFormat> {
         return Some(ImageFormat::Gif);
     }
 
-    // SVG: <?xml or <svg (text-based but rendered as image)
-    if bytes.starts_with(b"<?xml") || bytes.starts_with(b"<svg") {
-        return Some(ImageFormat::Svg);
-    }
-
     // WebP: RIFF....WEBP
     if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
         return Some(ImageFormat::Webp);
     }
 
-    // BMP: BM
-    if bytes.starts_with(b"BM") {
+    // SVG: Root element must be <svg
+    if is_svg_root_element(bytes) {
+        return Some(ImageFormat::Svg);
+    }
+
+    // BMP: BM + valid file size in header
+    if is_valid_bmp(bytes) {
         return Some(ImageFormat::Bmp);
     }
 
-    // ICO: 00 00 01 00
-    if bytes.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
+    // ICO: 00 00 01 00 + reasonable image count (1-20)
+    if is_valid_ico(bytes) {
         return Some(ImageFormat::Ico);
     }
 
     None
+}
+
+/// Checks if content has SVG as root element.
+///
+/// Validates that `<svg` appears as the root element after optional
+/// XML declaration and DOCTYPE, not just anywhere in the content.
+fn is_svg_root_element(bytes: &[u8]) -> bool {
+    let check_len = bytes.len().min(1024);
+    let Ok(text) = std::str::from_utf8(&bytes[..check_len]) else {
+        return false;
+    };
+
+    let mut content = text.trim_start();
+
+    // Skip XML declaration: <?xml ... ?>
+    if let Some(rest) = content.strip_prefix("<?xml") {
+        if let Some(end) = rest.find("?>") {
+            content = rest[end + 2..].trim_start();
+        } else {
+            return false;
+        }
+    }
+
+    // Skip DOCTYPE: <!DOCTYPE ... >
+    if let Some(rest) = content.strip_prefix("<!DOCTYPE") {
+        if let Some(end) = rest.find('>') {
+            content = rest[end + 1..].trim_start();
+        } else {
+            return false;
+        }
+    }
+
+    // Root element must be <svg
+    content.starts_with("<svg")
+}
+
+/// Validates BMP file structure.
+///
+/// BMP files start with "BM" followed by a 4-byte little-endian file size.
+/// We validate that the size is at least the minimum header size (54 bytes).
+fn is_valid_bmp(bytes: &[u8]) -> bool {
+    if bytes.len() < 6 || !bytes.starts_with(b"BM") {
+        return false;
+    }
+
+    let file_size = u32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]);
+
+    // 14 file header + 40 DIB header
+    file_size >= 54
+}
+
+/// Validates ICO file structure.
+///
+/// ICO files start with 00 00 01 00 followed by image count (1-2 bytes).
+/// Valid ICO files typically contain 1-20 images.
+fn is_valid_ico(bytes: &[u8]) -> bool {
+    if bytes.len() < 6 {
+        return false;
+    }
+
+    if !bytes.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
+        return false;
+    }
+
+    let image_count = u16::from_le_bytes([bytes[4], bytes[5]]);
+
+    (1..=20).contains(&image_count)
 }
 
 #[cfg(test)]
@@ -256,18 +323,72 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_svg_by_magic_bytes() {
-        let svg_xml = b"<?xml version=\"1.0\"?><svg></svg>";
+    fn test_detect_svg_direct_tag() {
+        let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>";
         assert_eq!(
-            detect_file_type(svg_xml, Path::new("unknown")),
+            detect_file_type(svg, Path::new("unknown")),
             FileType::Image(ImageFormat::Svg)
         );
+    }
 
-        let svg_direct = b"<svg></svg>";
+    #[test]
+    fn test_detect_svg_with_xml_declaration() {
+        let svg = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><svg></svg>";
         assert_eq!(
-            detect_file_type(svg_direct, Path::new("unknown")),
+            detect_file_type(svg, Path::new("unknown")),
             FileType::Image(ImageFormat::Svg)
         );
+    }
+
+    #[test]
+    fn test_detect_svg_with_xml_and_doctype() {
+        let svg = b"<?xml version=\"1.0\"?><!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\"><svg></svg>";
+        assert_eq!(
+            detect_file_type(svg, Path::new("unknown")),
+            FileType::Image(ImageFormat::Svg)
+        );
+    }
+
+    #[test]
+    fn test_detect_svg_with_whitespace() {
+        let svg = b"  \n\t<?xml version=\"1.0\"?>\n  <svg></svg>";
+        assert_eq!(
+            detect_file_type(svg, Path::new("unknown")),
+            FileType::Image(ImageFormat::Svg)
+        );
+    }
+
+    #[test]
+    fn test_detect_text_for_xml_plist() {
+        let plist = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\"><plist version=\"1.0\"><dict></dict></plist>";
+        assert_eq!(
+            detect_file_type(plist, Path::new("theme.tmTheme")),
+            FileType::Text
+        );
+    }
+
+    #[test]
+    fn test_detect_text_for_html_with_embedded_svg() {
+        let html = b"<!DOCTYPE html><html><body><svg></svg></body></html>";
+        assert_eq!(
+            detect_file_type(html, Path::new("page.html")),
+            FileType::Text
+        );
+    }
+
+    #[test]
+    fn test_detect_text_for_xml_config() {
+        let xml = b"<?xml version=\"1.0\"?><configuration><setting name=\"foo\"/></configuration>";
+        assert_eq!(
+            detect_file_type(xml, Path::new("config.xml")),
+            FileType::Text
+        );
+    }
+
+    #[test]
+    fn test_detect_text_for_markdown_mentioning_svg() {
+        let md = b"# SVG Guide\n\nTo create an SVG, use `<svg>` tags.";
+        assert_eq!(detect_file_type(md, Path::new("guide.md")), FileType::Text);
     }
 
     #[test]
@@ -280,8 +401,14 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_bmp_by_magic_bytes() {
-        let bmp = b"BM\x36\x00\x00\x00\x00\x00\xFF\xFE";
+    fn test_detect_webp_rejects_non_webp_riff() {
+        let wav = b"RIFF\x00\x00\x00\x00WAVEfmt ";
+        assert_eq!(detect_image_by_magic(wav), None);
+    }
+
+    #[test]
+    fn test_detect_bmp_valid_header() {
+        let bmp = b"BM\x36\x00\x00\x00\x00\x00\x00\x00";
         assert_eq!(
             detect_file_type(bmp, Path::new("unknown")),
             FileType::Image(ImageFormat::Bmp)
@@ -289,11 +416,63 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_ico_by_magic_bytes() {
-        let ico = [0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x20, 0x20, 0xFF, 0xFE];
+    fn test_detect_bmp_large_size() {
+        let bmp = b"BM\xe8\x03\x00\x00\x00\x00\x00\x00";
+        assert_eq!(
+            detect_file_type(bmp, Path::new("unknown")),
+            FileType::Image(ImageFormat::Bmp)
+        );
+    }
+
+    #[test]
+    fn test_detect_bmp_rejects_small_file_size() {
+        assert!(!is_valid_bmp(b"BM\x10\x00\x00\x00"));
+    }
+
+    #[test]
+    fn test_is_valid_bmp_rejects_short_input() {
+        assert!(!is_valid_bmp(b"BM"));
+        assert!(!is_valid_bmp(b"BM\x36\x00"));
+    }
+
+    #[test]
+    fn test_is_valid_bmp_rejects_wrong_magic() {
+        assert!(!is_valid_bmp(b"XX\x36\x00\x00\x00"));
+    }
+
+    #[test]
+    fn test_detect_ico_valid_header() {
+        let ico = [0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x20, 0x20];
         assert_eq!(
             detect_file_type(&ico, Path::new("unknown")),
             FileType::Image(ImageFormat::Ico)
+        );
+    }
+
+    #[test]
+    fn test_detect_ico_multiple_images() {
+        let ico = [0x00, 0x00, 0x01, 0x00, 0x05, 0x00, 0x20, 0x20];
+        assert_eq!(
+            detect_file_type(&ico, Path::new("unknown")),
+            FileType::Image(ImageFormat::Ico)
+        );
+    }
+
+    #[test]
+    fn test_detect_ico_rejects_zero_images() {
+        let invalid = [0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x20, 0x20];
+        assert_eq!(
+            detect_file_type(&invalid, Path::new("unknown")),
+            FileType::Binary
+        );
+    }
+
+    #[test]
+    fn test_detect_ico_rejects_too_many_images() {
+        let invalid = [0x00, 0x00, 0x01, 0x00, 0x64, 0x00, 0x20, 0x20];
+        assert_eq!(
+            detect_file_type(&invalid, Path::new("unknown")),
+            FileType::Binary
         );
     }
 
@@ -311,6 +490,10 @@ mod tests {
         assert_eq!(
             detect_file_type(bytes, Path::new("test.GIF")),
             FileType::Image(ImageFormat::Gif)
+        );
+        assert_eq!(
+            detect_file_type(bytes, Path::new("test.SVG")),
+            FileType::Image(ImageFormat::Svg)
         );
     }
 
@@ -356,8 +539,25 @@ mod tests {
     }
 
     #[test]
+    fn test_no_extension() {
+        let text = b"Makefile contents";
+        assert_eq!(
+            detect_file_type(text, Path::new("Makefile")),
+            FileType::Text
+        );
+    }
+
+    #[test]
+    fn test_dotfile() {
+        let text = b"gitignore contents";
+        assert_eq!(
+            detect_file_type(text, Path::new(".gitignore")),
+            FileType::Text
+        );
+    }
+
+    #[test]
     fn test_detect_binary_by_nul_byte() {
-        // File with NUL byte should be binary regardless of extension
         let with_nul = b"some\x00binary\x00data";
         assert_eq!(
             detect_file_type(with_nul, Path::new("file.txt")),
@@ -385,7 +585,6 @@ mod tests {
 
     #[test]
     fn test_detect_binary_invalid_utf8_no_nul() {
-        // Invalid UTF-8 without NUL bytes still detected as binary
         let invalid_utf8 = [0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8];
         assert_eq!(
             detect_file_type(&invalid_utf8, Path::new("unknown")),
@@ -395,7 +594,6 @@ mod tests {
 
     #[test]
     fn test_detect_binary_typical_executable() {
-        // ELF header (Linux executable) contains NUL bytes
         let elf_header = [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01, 0x01, 0x00];
         assert_eq!(
             detect_file_type(&elf_header, Path::new("program")),
@@ -405,7 +603,6 @@ mod tests {
 
     #[test]
     fn test_detect_binary_typical_archive() {
-        // ZIP header contains NUL bytes
         let zip_header = [0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00];
         assert_eq!(
             detect_file_type(&zip_header, Path::new("archive.zip")),
@@ -420,21 +617,37 @@ mod tests {
     }
 
     #[test]
-    fn test_no_extension() {
-        let text = b"Makefile contents";
-        assert_eq!(
-            detect_file_type(text, Path::new("Makefile")),
-            FileType::Text
-        );
+    fn test_is_svg_root_element_rejects_incomplete_xml() {
+        let incomplete = b"<?xml version=\"1.0\"<svg></svg>";
+        assert!(!is_svg_root_element(incomplete));
     }
 
     #[test]
-    fn test_dotfile() {
-        let text = b"gitignore contents";
-        assert_eq!(
-            detect_file_type(text, Path::new(".gitignore")),
-            FileType::Text
-        );
+    fn test_is_svg_root_element_rejects_incomplete_doctype() {
+        let incomplete = b"<?xml version=\"1.0\"?><!DOCTYPE svg<svg></svg>";
+        assert!(!is_svg_root_element(incomplete));
+    }
+
+    #[test]
+    fn test_is_svg_root_element_detects_direct_tag() {
+        assert!(is_svg_root_element(b"<svg></svg>"));
+        assert!(is_svg_root_element(b"<svg xmlns=\"...\">"));
+        assert!(is_svg_root_element(b"  <svg>"));
+    }
+
+    #[test]
+    fn test_is_svg_root_element_detects_with_xml_decl() {
+        assert!(is_svg_root_element(b"<?xml version=\"1.0\"?><svg>"));
+        assert!(is_svg_root_element(
+            b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg>"
+        ));
+    }
+
+    #[test]
+    fn test_is_svg_root_element_rejects_non_svg_root() {
+        assert!(!is_svg_root_element(b"<html><svg></svg></html>"));
+        assert!(!is_svg_root_element(b"<?xml?><plist></plist>"));
+        assert!(!is_svg_root_element(b"not xml at all"));
     }
 
     #[test]
