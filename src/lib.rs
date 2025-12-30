@@ -14,7 +14,7 @@ mod util;
 
 pub use assets::write_css_assets;
 pub use avatar::render;
-pub use components::icons::is_readme;
+pub use components::icons::{is_markdown, is_readme};
 pub use config::Config;
 pub use filetype::{FileType, ImageFormat, detect_file_type};
 pub use git::{

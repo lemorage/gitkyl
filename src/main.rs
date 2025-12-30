@@ -309,7 +309,7 @@ fn generate_blob_pages_for_branch(
                 continue;
             }
 
-            let result = if gitkyl::is_readme(path) {
+            let result = if gitkyl::is_markdown(path) {
                 markdown_count += 1;
                 gitkyl::pages::blob::generate_markdown(&config.repo, branch, path, repo_info.name())
             } else {

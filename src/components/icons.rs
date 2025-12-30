@@ -87,6 +87,28 @@ pub fn is_readme(path: impl AsRef<Path>) -> bool {
         .unwrap_or(false)
 }
 
+/// Checks if file path is a markdown file
+///
+/// Detects markdown files by extension (.md or .markdown), case insensitive.
+///
+/// # Arguments
+///
+/// * `path`: File path to check
+///
+/// # Returns
+///
+/// True if file is a markdown file, false otherwise
+pub fn is_markdown(path: impl AsRef<Path>) -> bool {
+    path.as_ref()
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| {
+            let lower = ext.to_lowercase();
+            lower == "md" || lower == "markdown"
+        })
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,5 +190,34 @@ mod tests {
 
         assert_eq!(doc_icon, "ph ph-file", "Other markdown uses generic icon");
         assert_eq!(doc_mod, None, "Other markdown has no modifier");
+    }
+
+    #[test]
+    fn test_is_markdown_detects_md_extension() {
+        assert!(is_markdown(Path::new("README.md")));
+        assert!(is_markdown(Path::new("CONTRIBUTING.md")));
+        assert!(is_markdown(Path::new("docs/guide.md")));
+        assert!(is_markdown(Path::new("CODE_OF_CONDUCT.md")));
+    }
+
+    #[test]
+    fn test_is_markdown_detects_markdown_extension() {
+        assert!(is_markdown(Path::new("guide.markdown")));
+        assert!(is_markdown(Path::new("docs/tutorial.markdown")));
+    }
+
+    #[test]
+    fn test_is_markdown_case_insensitive() {
+        assert!(is_markdown(Path::new("file.MD")));
+        assert!(is_markdown(Path::new("file.Md")));
+        assert!(is_markdown(Path::new("file.MARKDOWN")));
+    }
+
+    #[test]
+    fn test_is_markdown_rejects_non_markdown() {
+        assert!(!is_markdown(Path::new("file.txt")));
+        assert!(!is_markdown(Path::new("file.rs")));
+        assert!(!is_markdown(Path::new("README")));
+        assert!(!is_markdown(Path::new("file.mdx")));
     }
 }
