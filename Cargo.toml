@@ -1,6 +1,6 @@
 [package]
 name = "gitkyl"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Glenn Miao (lemorage) <one.lemorage@gmail.com>"]
 license = "BSD-3-Clause"
