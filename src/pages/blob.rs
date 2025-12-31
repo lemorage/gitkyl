@@ -345,13 +345,179 @@ fn markdown_blob_page_markup(
 
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
+    let file_name = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+    let source_link = format!("{}.source.html", file_name);
+
     page_wrapper(
         &title,
         &[&css_path, &markdown_css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            main class="markdown-content latte" {
-                (PreEscaped(rendered_html))
+            div class="blob-card" {
+                div class="blob-header" {
+                    div class="blob-header-left" {
+                        i class="ph ph-file-md" {}
+                        span class="blob-filename" { (file_name) }
+                    }
+                    div class="view-toggle" {
+                        span class="view-tab active" {
+                            i class="ph ph-eye" {}
+                            " Preview"
+                        }
+                        a href=(source_link) class="view-tab" {
+                            i class="ph ph-code" {}
+                            " Code"
+                        }
+                    }
+                }
+                main class="markdown-content latte" {
+                    (PreEscaped(rendered_html))
+                }
+            }
+        },
+    )
+}
+
+/// Generates HTML blob page with syntax highlighted markdown source
+///
+/// Creates a source view of markdown files with syntax highlighting,
+/// complementing the rendered view. Includes a link back to the rendered version.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Git reference (branch/tag/commit)
+/// * `file_path`: Path to markdown file within repository tree
+/// * `repo_name`: Repository name for breadcrumb navigation
+/// * `theme`: Syntax highlighting theme name
+///
+/// # Returns
+///
+/// HTML markup with syntax highlighted markdown source
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Blob cannot be read from repository
+/// - File content contains invalid UTF8
+/// - Syntax highlighting fails
+pub fn generate_markdown_source(
+    repo_path: impl AsRef<Path>,
+    ref_name: &str,
+    file_path: impl AsRef<Path>,
+    repo_name: &str,
+    theme: &str,
+) -> Result<Markup> {
+    let path_str = file_path.as_ref().display().to_string();
+
+    let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
+        .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
+
+    let content = String::from_utf8(content_bytes)
+        .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
+
+    let highlighter = Highlighter::with_theme(theme)
+        .or_else(|_| Highlighter::new())
+        .context("Failed to create highlighter")?;
+
+    let highlighted_lines = highlighter
+        .highlight(&content, file_path.as_ref())
+        .with_context(|| format!("Failed to highlight: {}", path_str))?;
+
+    let path_components = extract_breadcrumb_components(&path_str);
+
+    Ok(markdown_source_page_markup(
+        &path_str,
+        &path_components,
+        ref_name,
+        repo_name,
+        &highlighted_lines,
+    ))
+}
+
+/// Renders markdown source page HTML structure with link to rendered view
+fn markdown_source_page_markup(
+    file_path: &str,
+    breadcrumb_components: &[&str],
+    ref_name: &str,
+    repo_name: &str,
+    highlighted_lines: &[String],
+) -> Markup {
+    let line_count = highlighted_lines.len().max(1);
+    let depth = calculate_depth(ref_name, file_path);
+    let index_path = "../".repeat(depth) + "index.html";
+    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
+
+    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
+        .iter()
+        .enumerate()
+        .map(|(idx, &component)| {
+            if idx == breadcrumb_components.len() - 1 {
+                (component, None)
+            } else {
+                let partial_path = breadcrumb_components[..=idx].join("/");
+                let link = format!(
+                    "{}tree/{}/{}.html",
+                    "../".repeat(depth),
+                    ref_name,
+                    partial_path
+                );
+                (component, Some(link))
+            }
+        })
+        .collect();
+
+    let title = format!("{}/{}: {} (source)", repo_name, ref_name, file_path);
+
+    // Rendered file link: README.md.html (we're at README.md.source.html)
+    let file_name = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+    let rendered_link = format!("{}.html", file_name);
+
+    page_wrapper(
+        &title,
+        &[&css_path],
+        html! {
+            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
+            div class="blob-card" {
+                div class="blob-header" {
+                    div class="blob-header-left" {
+                        i class="ph ph-file-md" {}
+                        span class="blob-filename" { (file_name) }
+                        span class="blob-lines" { (line_count) " lines" }
+                    }
+                    div class="view-toggle" {
+                        a href=(rendered_link) class="view-tab" {
+                            i class="ph ph-eye" {}
+                            " Preview"
+                        }
+                        span class="view-tab active" {
+                            i class="ph ph-code" {}
+                            " Code"
+                        }
+                    }
+                }
+                div class="blob-code" {
+                    div class="line-numbers" {
+                        @for line_num in 1..=line_count {
+                            a href=(format!("#L{}", line_num)) class="line-number" { (line_num) }
+                        }
+                    }
+                    pre class="code-content latte" {
+                        code {
+                            @for (idx, line) in highlighted_lines.iter().enumerate() {
+                                span class="code-line" id=(format!("L{}", idx + 1)) {
+                                    (PreEscaped(line))
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
     )

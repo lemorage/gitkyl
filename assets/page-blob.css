@@ -5,7 +5,109 @@ header {
     margin-bottom: 2rem;
 }
 
-/* Blob Container */
+/* Blob Card Container */
+.blob-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+}
+
+/* Blob Header */
+.blob-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-subtle);
+    gap: 16px;
+}
+
+@supports not (backdrop-filter: blur(12px)) {
+    .blob-header {
+        background: #f9f9fa;
+    }
+}
+
+.blob-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.blob-header-left > i {
+    font-size: 16px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.blob-filename {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.blob-lines {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    padding-left: 8px;
+    border-left: 1px solid var(--border-subtle);
+    margin-left: 4px;
+}
+
+/* View Toggle Tabs */
+.view-toggle {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+    padding: 3px;
+    flex-shrink: 0;
+}
+
+.view-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.view-tab:hover:not(.active) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.view-tab.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.view-tab i {
+    font-size: 13px;
+}
+
+/* Blob Code Container (for source view) */
+.blob-code {
+    display: flex;
+    overflow: hidden;
+}
 .blob-container {
     display: flex;
     background: var(--bg-card);
@@ -195,4 +297,32 @@ pre {
 
 .file-details strong {
     color: var(--text-primary);
+}
+
+/* Markdown Content inside blob card */
+.blob-card .markdown-content {
+    padding: 24px 32px;
+    background: var(--bg-card);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .blob-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .blob-header-left {
+        width: 100%;
+    }
+
+    .view-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .blob-card .markdown-content {
+        padding: 16px;
+    }
 }

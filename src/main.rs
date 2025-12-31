@@ -311,7 +311,50 @@ fn generate_blob_pages_for_branch(
 
             let result = if gitkyl::is_markdown(path) {
                 markdown_count += 1;
-                gitkyl::pages::blob::generate_markdown(&config.repo, branch, path, repo_info.name())
+
+                // Generate rendered markdown view
+                let rendered = gitkyl::pages::blob::generate_markdown(
+                    &config.repo,
+                    branch,
+                    path,
+                    repo_info.name(),
+                )?;
+
+                let blob_path = config
+                    .output
+                    .join("blob")
+                    .join(branch)
+                    .join(format!("{}.html", path.display()));
+
+                if let Some(parent) = blob_path.parent() {
+                    fs::create_dir_all(parent).context("Failed to create blob directory")?;
+                }
+
+                fs::write(&blob_path, rendered.into_string()).with_context(|| {
+                    format!("Failed to write blob page {}", blob_path.display())
+                })?;
+
+                // Generate source view for markdown files
+                let source = gitkyl::pages::blob::generate_markdown_source(
+                    &config.repo,
+                    branch,
+                    path,
+                    repo_info.name(),
+                    &config.theme,
+                )?;
+
+                let source_path = config
+                    .output
+                    .join("blob")
+                    .join(branch)
+                    .join(format!("{}.source.html", path.display()));
+
+                fs::write(&source_path, source.into_string()).with_context(|| {
+                    format!("Failed to write source page {}", source_path.display())
+                })?;
+
+                blob_count += 1;
+                continue;
             } else {
                 gitkyl::pages::blob::generate(
                     &config.repo,
