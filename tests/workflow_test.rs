@@ -151,13 +151,13 @@ fn test_workflow_full_pipeline_rust_file() -> Result<()> {
     // Assert: generated HTML contains expected elements
     assert!(html.contains("<!DOCTYPE html>"), "Should be valid HTML5");
     assert!(
-        html.contains("blob-container"),
-        "Should contain blob container class"
+        html.contains("blob-card"),
+        "Should contain blob card container class"
     );
     assert!(html.contains("line-number"), "Should contain line numbers");
     assert!(
-        html.contains("code-content"),
-        "Should contain code content section"
+        html.contains("line-content"),
+        "Should contain line content cells"
     );
     assert!(
         html.contains(
@@ -227,8 +227,8 @@ fn test_workflow_multiple_file_types() -> Result<()> {
             let html_str = html.into_string();
             assert!(html_str.contains("Cargo.toml"), "Should contain filename");
             assert!(
-                html_str.contains("blob-container"),
-                "Should have standard blob structure"
+                html_str.contains("blob-card"),
+                "Should have blob card structure"
             );
             assert!(
                 html_str.contains("test-repo"),

@@ -25,6 +25,9 @@ header {
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle);
     gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 @supports not (backdrop-filter: blur(12px)) {
@@ -55,6 +58,16 @@ header {
     text-overflow: ellipsis;
 }
 
+/* File metadata (lines, loc, size) */
+.blob-meta {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    padding-left: 12px;
+    border-left: 1px solid var(--border-subtle);
+    margin-left: 8px;
+}
+
 .blob-lines {
     font-size: 12px;
     color: var(--text-tertiary);
@@ -62,6 +75,74 @@ header {
     padding-left: 8px;
     border-left: 1px solid var(--border-subtle);
     margin-left: 4px;
+}
+
+/* Action buttons */
+.blob-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.action-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.action-btn:hover {
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.15) 0%,
+        rgba(255, 255, 255, 0.08) 100%
+    );
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.action-btn:active {
+    transform: scale(0.95);
+}
+
+.action-btn i {
+    font-size: 15px;
+    color: var(--text-secondary);
+    transition: color 0.15s ease;
+}
+
+.action-btn:hover i {
+    color: var(--text-primary);
+}
+
+/* Copy button success state */
+.action-btn.copied {
+    background: linear-gradient(
+        135deg,
+        rgba(34, 197, 94, 0.15) 0%,
+        rgba(34, 197, 94, 0.08) 100%
+    );
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.action-btn.copied i {
+    color: #22c55e;
 }
 
 /* View Toggle Tabs */
@@ -103,108 +184,87 @@ header {
     font-size: 13px;
 }
 
-/* Blob Code Container (for source view) */
-.blob-code {
-    display: flex;
-    overflow: hidden;
-}
-.blob-container {
-    display: flex;
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    overflow: hidden;
-}
-
-/* Line Numbers */
-.line-numbers {
-    background: var(--bg-lines);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 16px 12px;
-    text-align: right;
-    user-select: none;
-    border-right: 1px solid var(--border-subtle);
-    min-width: 56px;
-}
-
-/* Fallback for browsers without backdrop-filter support */
-@supports not (backdrop-filter: blur(20px)) {
-    .line-numbers {
-        background: #f9f9fa;
-    }
-}
-
-.line-number {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 20px;
-    color: var(--text-secondary);
-    display: block;
-    text-decoration: none;
-    transition: color 0.15s;
-}
-
-.line-number:hover {
-    color: var(--accent);
-    cursor: pointer;
-}
-
-/* Code Content */
-.code-content {
-    flex: 1;
+/* Table layout for code display */
+.blob-code-wrapper {
     overflow-x: auto;
     background: var(--bg-card);
 }
 
-pre {
-    margin: 0;
-    padding: 16px;
-}
-
-.blob-container code,
-.code-content code {
+table.blob-code {
+    width: 100%;
+    border-collapse: collapse;
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 20px;
-    display: block;
-    color: var(--text-code);
+    tab-size: 4;
 }
 
-.code-line {
-    display: block;
-    min-height: 20px;
+/* Code Line Row */
+tr.code-line {
     scroll-margin-top: 100px;
-    position: relative;
 }
 
-.code-line:target {
+tr.code-line:target,
+tr.code-line.highlighted {
+    background-color: rgba(255, 223, 93, 0.25);
+}
+
+tr.code-line:target td.line-number,
+tr.code-line.highlighted td.line-number {
     background-color: rgba(255, 223, 93, 0.4);
 }
 
-.code-line:target::before {
+/* Line Number Cell */
+td.line-number {
+    width: 1%;
+    min-width: 50px;
+    padding: 0 12px;
+    text-align: right;
+    vertical-align: top;
+    user-select: none;
+    background: var(--bg-lines);
+    border-right: 1px solid var(--border-subtle);
+    position: sticky;
+    left: 0;
+}
+
+td.line-number a {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 20px;
+    color: var(--text-tertiary);
+    text-decoration: none;
+    display: block;
+}
+
+td.line-number:hover a {
+    color: var(--accent);
+    cursor: pointer;
+}
+
+/* Code Content Cell */
+td.line-content {
+    padding: 0 16px;
+    white-space: pre;
+    color: var(--text-code);
+    vertical-align: top;
+}
+
+/* Highlight left border indicator on targeted line */
+tr.code-line:target td.line-number::before {
     content: '';
     position: absolute;
-    left: -16px;
+    left: 0;
     top: 0;
     bottom: 0;
-    width: 1px;
-    background-color: #FFD700;
-    z-index: 10;
+    width: 3px;
+    background-color: #f9a825;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .line-numbers {
-        min-width: 48px;
-        padding: 12px 8px;
-    }
-
-    pre {
-        padding: 12px;
-    }
+td.line-number {
+    position: relative;
 }
+
 
 /* Image Blob Styles */
 .image-blob {
@@ -315,6 +375,20 @@ pre {
 
     .blob-header-left {
         width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .blob-meta {
+        flex-basis: 100%;
+        padding-left: 0;
+        border-left: none;
+        margin-left: 0;
+        margin-top: 4px;
+    }
+
+    .blob-actions {
+        width: 100%;
+        justify-content: flex-start;
     }
 
     .view-toggle {
@@ -324,5 +398,14 @@ pre {
 
     .blob-card .markdown-content {
         padding: 16px;
+    }
+
+    td.line-number {
+        min-width: 40px;
+        padding: 0 8px;
+    }
+
+    td.line-content {
+        padding: 0 12px;
     }
 }

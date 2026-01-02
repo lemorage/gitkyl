@@ -13,6 +13,37 @@ use crate::highlight::Highlighter;
 use crate::markdown::MarkdownRenderer;
 use crate::util::{calculate_depth, format_file_size};
 
+/// File metadata for display in blob header
+struct FileMetadata {
+    line_count: usize,
+    sloc: usize,
+    file_size: usize,
+}
+
+impl FileMetadata {
+    /// Creates metadata from file content
+    fn from_content(content: &str, raw_size: usize) -> Self {
+        let lines: Vec<&str> = content.lines().collect();
+        let line_count = lines.len().max(1);
+        let sloc = lines.iter().filter(|l| !l.trim().is_empty()).count();
+        Self {
+            line_count,
+            sloc,
+            file_size: raw_size,
+        }
+    }
+
+    /// Formats metadata for display (e.g., "270 lines (214 loc) · 6.8 KB")
+    fn display(&self) -> String {
+        format!(
+            "{} lines ({} loc) · {}",
+            self.line_count,
+            self.sloc,
+            format_file_size(self.file_size)
+        )
+    }
+}
+
 /// Generates HTML blob page based on file type
 ///
 /// Detects file type (text, image, or binary) and dispatches to the appropriate
@@ -183,8 +214,11 @@ fn generate_text_blob(
     repo_name: &str,
     theme: &str,
 ) -> Result<Markup> {
+    let raw_size = bytes.len();
     let content = String::from_utf8(bytes.to_vec())
         .with_context(|| format!("Text file contains invalid UTF-8: {}", file_path.display()))?;
+
+    let metadata = FileMetadata::from_content(&content, raw_size);
 
     let highlighter = Highlighter::with_theme(theme)
         .or_else(|_| Highlighter::new())
@@ -203,6 +237,7 @@ fn generate_text_blob(
         ref_name,
         repo_name,
         &highlighted_lines,
+        &metadata,
     ))
 }
 
@@ -259,8 +294,8 @@ fn blob_page_markup(
     ref_name: &str,
     repo_name: &str,
     highlighted_lines: &[String],
+    metadata: &FileMetadata,
 ) -> Markup {
-    let line_count = highlighted_lines.len().max(1);
     let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
@@ -286,26 +321,66 @@ fn blob_page_markup(
 
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
+    let file_name = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+
     page_wrapper(
         &title,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            main class="blob-container" {
-                div class="line-numbers" {
-                    @for line_num in 1..=line_count {
-                        a href=(format!("#L{}", line_num)) class="line-number" { (line_num) }
+            div class="blob-card" {
+                div class="blob-header" {
+                    div class="blob-header-left" {
+                        i class="ph ph-file-code" {}
+                        span class="blob-filename" { (file_name) }
+                        span class="blob-meta" { (metadata.display()) }
+                    }
+                    div class="blob-actions" {
+                        button class="action-btn copy-btn" type="button" title="Copy file contents" {
+                            i class="ph ph-copy" {}
+                        }
                     }
                 }
-                pre class="code-content latte" {
-                    code {
-                        @for (idx, line) in highlighted_lines.iter().enumerate() {
-                            span class="code-line" id=(format!("L{}", idx + 1)) {
-                                (PreEscaped(line))
+                div class="blob-code-wrapper" {
+                    table class="blob-code" {
+                        tbody id="blob-code" {
+                            @for (idx, line) in highlighted_lines.iter().enumerate() {
+                                @let line_num = idx + 1;
+                                tr id=(format!("L{}", line_num)) class="code-line" {
+                                    td class="line-number" data-line=(line_num) {
+                                        a href=(format!("#L{}", line_num)) { (line_num) }
+                                    }
+                                    td class="line-content" {
+                                        (PreEscaped(line))
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
+            script {
+                (PreEscaped(r#"
+document.querySelector('.copy-btn')?.addEventListener('click', async function() {
+    const rows = document.querySelectorAll('#blob-code .line-content');
+    const code = Array.from(rows).map(r => r.textContent).join('\n');
+    if (code) {
+        try {
+            await navigator.clipboard.writeText(code);
+            this.classList.add('copied');
+            const icon = this.querySelector('i');
+            icon.className = 'ph ph-check';
+            setTimeout(() => {
+                this.classList.remove('copied');
+                icon.className = 'ph ph-copy';
+            }, 2000);
+        } catch (e) { console.error('Copy failed:', e); }
+    }
+});
+"#))
             }
         },
     )
@@ -502,17 +577,18 @@ fn markdown_source_page_markup(
                         }
                     }
                 }
-                div class="blob-code" {
-                    div class="line-numbers" {
-                        @for line_num in 1..=line_count {
-                            a href=(format!("#L{}", line_num)) class="line-number" { (line_num) }
-                        }
-                    }
-                    pre class="code-content latte" {
-                        code {
+                div class="blob-code-wrapper" {
+                    table class="blob-code" {
+                        tbody {
                             @for (idx, line) in highlighted_lines.iter().enumerate() {
-                                span class="code-line" id=(format!("L{}", idx + 1)) {
-                                    (PreEscaped(line))
+                                @let line_num = idx + 1;
+                                tr id=(format!("L{}", line_num)) class="code-line" {
+                                    td class="line-number" data-line=(line_num) {
+                                        a href=(format!("#L{}", line_num)) { (line_num) }
+                                    }
+                                    td class="line-content" {
+                                        (PreEscaped(line))
+                                    }
                                 }
                             }
                         }
