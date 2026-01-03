@@ -188,6 +188,7 @@ header {
 .blob-code-wrapper {
     overflow-x: auto;
     background: var(--bg-card);
+    border-radius: 0 0 var(--radius-m) var(--radius-m);
 }
 
 table.blob-code {
@@ -206,39 +207,40 @@ tr.code-line {
 
 tr.code-line:target,
 tr.code-line.highlighted {
-    background-color: rgba(255, 223, 93, 0.25);
-}
-
-tr.code-line:target td.line-number,
-tr.code-line.highlighted td.line-number {
-    background-color: rgba(255, 223, 93, 0.4);
+    background-color: rgba(255, 223, 93, 0.2);
 }
 
 /* Line Number Cell */
 td.line-number {
     width: 1%;
-    min-width: 50px;
-    padding: 0 12px;
+    min-width: 40px;
+    padding: 0 16px 0 12px;
     text-align: right;
     vertical-align: top;
     user-select: none;
-    background: var(--bg-lines);
-    border-right: 1px solid var(--border-subtle);
     position: sticky;
     left: 0;
+    border-left: 2px solid transparent;
+}
+
+/* Highlight bar on targeted line */
+tr.code-line:target td.line-number,
+tr.code-line.highlighted td.line-number {
+    border-left-color: #f9a825;
 }
 
 td.line-number a {
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 20px;
-    color: var(--text-tertiary);
+    color: rgba(110, 118, 129, 0.4);
     text-decoration: none;
     display: block;
+    transition: color 0.15s ease;
 }
 
 td.line-number:hover a {
-    color: var(--accent);
+    color: rgba(110, 118, 129, 1);
     cursor: pointer;
 }
 
@@ -250,20 +252,6 @@ td.line-content {
     vertical-align: top;
 }
 
-/* Highlight left border indicator on targeted line */
-tr.code-line:target td.line-number::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background-color: #f9a825;
-}
-
-td.line-number {
-    position: relative;
-}
 
 
 /* Image Blob Styles */
@@ -401,8 +389,8 @@ td.line-number {
     }
 
     td.line-number {
-        min-width: 40px;
-        padding: 0 8px;
+        min-width: 30px;
+        padding: 0 8px 0 4px;
     }
 
     td.line-content {
