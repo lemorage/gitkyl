@@ -18,13 +18,12 @@ header {
 .blob-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 12px 16px;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle);
-    gap: 16px;
+    gap: 12px;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -41,6 +40,7 @@ header {
     align-items: center;
     gap: 8px;
     min-width: 0;
+    flex: 1;
 }
 
 .blob-header-left > i {
@@ -66,23 +66,6 @@ header {
     padding-left: 12px;
     border-left: 1px solid var(--border-subtle);
     margin-left: 8px;
-}
-
-.blob-lines {
-    font-size: 12px;
-    color: var(--text-tertiary);
-    white-space: nowrap;
-    padding-left: 8px;
-    border-left: 1px solid var(--border-subtle);
-    margin-left: 4px;
-}
-
-/* Action buttons */
-.blob-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
 }
 
 .action-btn {
@@ -374,14 +357,8 @@ td.line-content {
         margin-top: 4px;
     }
 
-    .blob-actions {
-        width: 100%;
-        justify-content: flex-start;
-    }
-
     .view-toggle {
-        width: 100%;
-        justify-content: center;
+        flex: 1;
     }
 
     .blob-card .markdown-content {

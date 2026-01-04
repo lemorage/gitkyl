@@ -5,6 +5,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
+use crate::components::code::{code_table, copy_button_script};
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
 use crate::filetype::{FileType, ImageFormat, detect_file_type};
@@ -338,50 +339,13 @@ fn blob_page_markup(
                         span class="blob-filename" { (file_name) }
                         span class="blob-meta" { (metadata.display()) }
                     }
-                    div class="blob-actions" {
-                        button class="action-btn copy-btn" type="button" title="Copy file contents" {
-                            i class="ph ph-copy" {}
-                        }
+                    button class="action-btn copy-btn" type="button" title="Copy file contents" {
+                        i class="ph ph-copy" {}
                     }
                 }
-                div class="blob-code-wrapper" {
-                    table class="blob-code" {
-                        tbody id="blob-code" {
-                            @for (idx, line) in highlighted_lines.iter().enumerate() {
-                                @let line_num = idx + 1;
-                                tr id=(format!("L{}", line_num)) class="code-line" {
-                                    td class="line-number" data-line=(line_num) {
-                                        a href=(format!("#L{}", line_num)) { (line_num) }
-                                    }
-                                    td class="line-content" {
-                                        (PreEscaped(line))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                (code_table(highlighted_lines))
             }
-            script {
-                (PreEscaped(r#"
-document.querySelector('.copy-btn')?.addEventListener('click', async function() {
-    const rows = document.querySelectorAll('#blob-code .line-content');
-    const code = Array.from(rows).map(r => r.textContent).join('\n');
-    if (code) {
-        try {
-            await navigator.clipboard.writeText(code);
-            this.classList.add('copied');
-            const icon = this.querySelector('i');
-            icon.className = 'ph ph-check';
-            setTimeout(() => {
-                this.classList.remove('copied');
-                icon.className = 'ph ph-copy';
-            }, 2000);
-        } catch (e) { console.error('Copy failed:', e); }
-    }
-});
-"#))
-            }
+            (copy_button_script())
         },
     )
 }
@@ -491,8 +455,12 @@ pub fn generate_markdown_source(
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
 
+    let raw_size = content_bytes.len();
+
     let content = String::from_utf8(content_bytes)
         .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
+
+    let metadata = FileMetadata::from_content(&content, raw_size);
 
     let highlighter = Highlighter::with_theme(theme)
         .or_else(|_| Highlighter::new())
@@ -510,6 +478,7 @@ pub fn generate_markdown_source(
         ref_name,
         repo_name,
         &highlighted_lines,
+        &metadata,
     ))
 }
 
@@ -520,8 +489,8 @@ fn markdown_source_page_markup(
     ref_name: &str,
     repo_name: &str,
     highlighted_lines: &[String],
+    metadata: &FileMetadata,
 ) -> Markup {
-    let line_count = highlighted_lines.len().max(1);
     let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
@@ -564,7 +533,7 @@ fn markdown_source_page_markup(
                     div class="blob-header-left" {
                         i class="ph ph-file-md" {}
                         span class="blob-filename" { (file_name) }
-                        span class="blob-lines" { (line_count) " lines" }
+                        span class="blob-meta" { (metadata.display()) }
                     }
                     div class="view-toggle" {
                         a href=(rendered_link) class="view-tab" {
@@ -576,25 +545,13 @@ fn markdown_source_page_markup(
                             " Code"
                         }
                     }
-                }
-                div class="blob-code-wrapper" {
-                    table class="blob-code" {
-                        tbody {
-                            @for (idx, line) in highlighted_lines.iter().enumerate() {
-                                @let line_num = idx + 1;
-                                tr id=(format!("L{}", line_num)) class="code-line" {
-                                    td class="line-number" data-line=(line_num) {
-                                        a href=(format!("#L{}", line_num)) { (line_num) }
-                                    }
-                                    td class="line-content" {
-                                        (PreEscaped(line))
-                                    }
-                                }
-                            }
-                        }
+                    button class="action-btn copy-btn" type="button" title="Copy file contents" {
+                        i class="ph ph-copy" {}
                     }
                 }
+                (code_table(highlighted_lines))
             }
+            (copy_button_script())
         },
     )
 }

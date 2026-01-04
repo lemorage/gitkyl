@@ -5,6 +5,7 @@
 //! elements with consistent styling and behavior, eliminating duplication
 //! across generator functions.
 
+pub mod code;
 pub mod commit;
 pub mod file_list;
 pub mod footer;
