@@ -578,7 +578,7 @@ pub fn list_commits(
             author_email: author.email.to_str_lossy().to_string(),
             committer: committer.name.to_str_lossy().to_string(),
             co_authors,
-            date: author.time.seconds,
+            date: author.seconds(),
             message: first_line,
             message_full,
         });
@@ -679,7 +679,7 @@ pub fn list_commits_paginated(
             author_email: author.email.to_str_lossy().to_string(),
             committer: committer.name.to_str_lossy().to_string(),
             co_authors,
-            date: author.time.seconds,
+            date: author.seconds(),
             message: first_line,
             message_full,
         });
@@ -795,17 +795,17 @@ pub fn list_tags(repo_path: impl AsRef<Path>) -> Result<Vec<TagInfo>> {
                 Some(decoded.message.to_str_lossy().to_string())
             };
 
-            let tagger_info = decoded
-                .tagger
+            let tagger_sig = decoded.tagger().ok().flatten();
+            let tagger_info = tagger_sig
                 .as_ref()
                 .map(|t| format!("{} <{}>", t.name.to_str_lossy(), t.email.to_str_lossy()));
 
-            let tag_date = decoded.tagger.as_ref().map(|t| t.time.seconds);
+            let tag_date = tagger_sig.as_ref().map(|t| t.seconds());
 
             (tag_message, tagger_info, tag_date)
         } else {
             // Lightweight tag: use commit date for sorting
-            let commit_date = target_commit.committer().ok().map(|c| c.time.seconds);
+            let commit_date = target_commit.committer().ok().map(|c| c.seconds());
             (None, None, commit_date)
         };
 
@@ -841,7 +841,7 @@ fn extract_commit_info(commit: &gix::Commit) -> Result<CommitInfo> {
         author_email: author.email.to_str_lossy().to_string(),
         committer: committer.name.to_str_lossy().to_string(),
         co_authors,
-        date: author.time.seconds,
+        date: author.seconds(),
         message: first_line,
         message_full,
     })
