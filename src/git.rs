@@ -988,9 +988,153 @@ pub fn get_last_commits_batch(
     Ok(results)
 }
 
+/// Single line of blame output with commit attribution.
+#[derive(Debug, Clone)]
+pub struct BlameLine {
+    /// Line number (1-indexed)
+    pub line_num: usize,
+    /// Line content
+    pub content: String,
+    /// Full commit hash
+    pub commit_id: String,
+    /// Short commit hash (7 chars)
+    pub short_id: String,
+    /// Author name
+    pub author: String,
+    /// Author email
+    pub author_email: String,
+    /// Commit timestamp
+    pub timestamp: i64,
+    /// First line of commit message
+    pub summary: String,
+}
+
+/// Blame result with lines and metadata.
+#[derive(Debug, Clone)]
+pub struct BlameResult {
+    /// Blame lines in order
+    pub lines: Vec<BlameLine>,
+}
+
+/// Computes blame for a file, attributing each line to its originating commit.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Reference name (branch/tag/commit), defaults to HEAD if None
+/// * `file_path`: Path to file within repository tree
+///
+/// # Returns
+///
+/// BlameResult containing attribution for each line
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Reference cannot be resolved
+/// - File does not exist in tree
+/// - Blame computation fails
+pub fn blame_file(
+    repo_path: impl AsRef<Path>,
+    ref_name: Option<&str>,
+    file_path: impl AsRef<Path>,
+) -> Result<BlameResult> {
+    use gix::bstr::BStr;
+    use std::collections::HashMap;
+
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit = resolve_commit(&repo, ref_name)?;
+    let commit_id = commit.id;
+
+    let file_path_str = file_path.as_ref().to_string_lossy();
+    let file_path_bstr: &BStr = file_path_str.as_bytes().as_ref();
+
+    let outcome = repo
+        .blame_file(
+            file_path_bstr,
+            commit_id,
+            gix::repository::blame_file::Options::default(),
+        )
+        .with_context(|| {
+            format!(
+                "Failed to compute blame for {}",
+                file_path.as_ref().display()
+            )
+        })?;
+
+    // Cache commit info to avoid repeated lookups
+    let mut commit_cache: HashMap<gix::ObjectId, (String, String, String, i64, String)> =
+        HashMap::new();
+
+    let mut lines = Vec::new();
+    let mut line_num = 1usize;
+
+    for (entry, content_lines) in outcome.entries_with_lines() {
+        // Get or fetch commit info
+        let commit_info = if let Some(info) = commit_cache.get(&entry.commit_id) {
+            info.clone()
+        } else {
+            let blame_commit = repo
+                .find_object(entry.commit_id)
+                .context("Failed to find blame commit")?
+                .try_into_commit()
+                .map_err(|_| anyhow::anyhow!("Blame entry does not point to commit"))?;
+
+            let author = blame_commit.author().context("Failed to read author")?;
+            let message_bytes = blame_commit
+                .message_raw()
+                .context("Failed to read commit message")?;
+            let message_full = message_bytes.to_str_lossy().to_string();
+            let summary = message_full.lines().next().unwrap_or("").to_string();
+
+            let info = (
+                author.name.to_str_lossy().to_string(),
+                author.email.to_str_lossy().to_string(),
+                summary,
+                author.seconds(),
+                entry.commit_id.to_hex().to_string(),
+            );
+            commit_cache.insert(entry.commit_id, info.clone());
+            info
+        };
+
+        let (author_name, author_email, summary, timestamp, full_id) = commit_info;
+        let short_id = if full_id.len() >= 7 {
+            full_id[..7].to_string()
+        } else {
+            full_id.clone()
+        };
+
+        for line_content in content_lines {
+            let content_str = line_content.to_str_lossy();
+            lines.push(BlameLine {
+                line_num,
+                content: content_str.trim_end_matches('\n').to_string(),
+                commit_id: full_id.clone(),
+                short_id: short_id.clone(),
+                author: author_name.clone(),
+                author_email: author_email.clone(),
+                timestamp,
+                summary: summary.clone(),
+            });
+            line_num += 1;
+        }
+    }
+
+    Ok(BlameResult { lines })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use std::path::{Path, PathBuf};
 
     fn temp_repo() -> tempfile::TempDir {
@@ -2232,5 +2376,87 @@ mod tests {
                 "Tags should be sorted by date (newest first)"
             );
         }
+    }
+
+    #[test]
+    fn test_blame_file_single_commit() {
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "line1\nline2\nline3");
+        git_add(td.path());
+        let commit_hash = git_commit(td.path(), "Initial commit");
+
+        let result =
+            blame_file(td.path(), None, Path::new("test.txt")).expect("Should compute blame");
+
+        assert_eq!(result.lines.len(), 3, "Should have 3 lines");
+        for (i, line) in result.lines.iter().enumerate() {
+            assert_eq!(line.line_num, i + 1, "Line numbers should be 1-indexed");
+            assert_eq!(line.commit_id, commit_hash, "All lines from same commit");
+            assert_eq!(line.author, "Test User", "Should have author");
+            assert_eq!(line.summary, "Initial commit", "Should have summary");
+        }
+        assert_eq!(result.lines[0].content, "line1");
+        assert_eq!(result.lines[1].content, "line2");
+        assert_eq!(result.lines[2].content, "line3");
+    }
+
+    #[test]
+    fn test_blame_file_multiple_commits() {
+        let td = temp_repo();
+
+        // First commit: create file with two lines
+        write_file(td.path(), "test.txt", "line1\nline2\n");
+        git_add(td.path());
+        git_commit(td.path(), "First commit");
+
+        // Second commit: append a third line
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(td.path().join("test.txt"))
+            .unwrap()
+            .write_all(b"line3\n")
+            .unwrap();
+        git_add(td.path());
+        let second_commit = git_commit(td.path(), "Second commit");
+
+        let result =
+            blame_file(td.path(), None, Path::new("test.txt")).expect("Should compute blame");
+
+        assert_eq!(result.lines.len(), 3);
+        // Verify line content
+        assert_eq!(result.lines[0].content, "line1");
+        assert_eq!(result.lines[1].content, "line2");
+        assert_eq!(result.lines[2].content, "line3");
+        // Third line should be from second commit
+        assert_eq!(result.lines[2].commit_id, second_commit);
+        assert_eq!(result.lines[2].summary, "Second commit");
+        // First two lines should be from first commit
+        assert_eq!(result.lines[0].summary, "First commit");
+        assert_eq!(result.lines[1].summary, "First commit");
+    }
+
+    #[test]
+    fn test_blame_file_nonexistent() {
+        let td = temp_repo();
+        write_file(td.path(), "exists.txt", "content");
+        git_add(td.path());
+        git_commit(td.path(), "Initial commit");
+
+        let result = blame_file(td.path(), None, Path::new("nonexistent.txt"));
+        assert!(result.is_err(), "Should fail for nonexistent file");
+    }
+
+    #[test]
+    fn test_blame_file_with_ref() {
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "original");
+        git_add(td.path());
+        git_commit(td.path(), "Initial commit");
+
+        let result = blame_file(td.path(), Some("HEAD"), Path::new("test.txt"))
+            .expect("Should compute blame with ref");
+
+        assert_eq!(result.lines.len(), 1);
+        assert_eq!(result.lines[0].content, "original");
     }
 }
