@@ -5,6 +5,7 @@
 //! elements with consistent styling and behavior, eliminating duplication
 //! across generator functions.
 
+pub mod blame;
 pub mod code;
 pub mod commit;
 pub mod file_list;
@@ -13,3 +14,4 @@ pub mod icons;
 pub mod layout;
 pub mod metadata;
 pub mod nav;
+pub mod view_toggle;
