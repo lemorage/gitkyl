@@ -268,13 +268,43 @@ fn generate_tree_pages_for_branch(
     Ok(count)
 }
 
+/// Writes blame page for a file if blame generation succeeds
+fn write_blame_page(
+    config: &Config,
+    repo_info: &gitkyl::RepoInfo,
+    branch: &str,
+    path: &std::path::Path,
+) {
+    if let Ok(blame) = gitkyl::pages::blob::generate_blame(
+        &config.repo,
+        branch,
+        path,
+        repo_info.name(),
+        &config.theme,
+    ) {
+        let blame_path = config
+            .output
+            .join("blob")
+            .join(branch)
+            .join(format!("{}.blame.html", path.display()));
+
+        if let Err(e) = fs::write(&blame_path, blame.into_string()) {
+            eprintln!(
+                "Warning: Failed to write blame page {}: {}",
+                blame_path.display(),
+                e
+            );
+        }
+    }
+}
+
 /// Generates blob pages for all files in a branch.
 ///
 /// Creates HTML pages for all files in the specified branch, with special
 /// handling for markdown files. README files are rendered with full markdown
 /// processing, while code files receive syntax highlighting. Image files
 /// are copied as raw files alongside their HTML viewer pages for use in
-/// markdown image references.
+/// markdown image references. Text files also get blame views.
 ///
 /// # Arguments
 ///
@@ -353,6 +383,8 @@ fn generate_blob_pages_for_branch(
                     format!("Failed to write source page {}", source_path.display())
                 })?;
 
+                write_blame_page(config, repo_info, branch, path);
+
                 blob_count += 1;
                 continue;
             } else {
@@ -395,6 +427,10 @@ fn generate_blob_pages_for_branch(
                         fs::write(&raw_path, &bytes).with_context(|| {
                             format!("Failed to write raw image {}", raw_path.display())
                         })?;
+                    } else if let Ok(bytes) = gitkyl::read_blob(&config.repo, Some(branch), path)
+                        && gitkyl::detect_file_type(&bytes, path) == gitkyl::FileType::Text
+                    {
+                        write_blame_page(config, repo_info, branch, path);
                     }
 
                     blob_count += 1;

@@ -5,11 +5,14 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
+use crate::components::blame::blame_table;
 use crate::components::code::{code_table, copy_button_script};
+use crate::components::icons::is_markdown;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
+use crate::components::view_toggle::{ViewTab, view_toggle};
 use crate::filetype::{FileType, ImageFormat, detect_file_type};
-use crate::git::read_blob;
+use crate::git::{BlameLine, read_blob};
 use crate::highlight::Highlighter;
 use crate::markdown::MarkdownRenderer;
 use crate::util::{calculate_depth, format_file_size};
@@ -42,6 +45,64 @@ impl FileMetadata {
             self.sloc,
             format_file_size(self.file_size)
         )
+    }
+}
+
+/// Active view in the blob viewer
+enum ActiveView {
+    Preview,
+    Code,
+    Blame,
+}
+
+/// Builds view toggle tabs for blob pages
+fn build_view_tabs(file_path: &Path, active: ActiveView) -> Vec<ViewTab> {
+    let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+    if is_markdown(file_path) {
+        let preview = format!("{}.html", file_name);
+        let code = format!("{}.source.html", file_name);
+        let blame = format!("{}.blame.html", file_name);
+
+        match active {
+            ActiveView::Preview => vec![
+                ViewTab::Preview { link: None },
+                ViewTab::Code { link: Some(code) },
+                ViewTab::Blame { link: Some(blame) },
+            ],
+            ActiveView::Code => vec![
+                ViewTab::Preview {
+                    link: Some(preview),
+                },
+                ViewTab::Code { link: None },
+                ViewTab::Blame { link: Some(blame) },
+            ],
+            ActiveView::Blame => vec![
+                ViewTab::Preview {
+                    link: Some(preview),
+                },
+                ViewTab::Code { link: Some(code) },
+                ViewTab::Blame { link: None },
+            ],
+        }
+    } else {
+        let code = format!("{}.html", file_name);
+        let blame = format!("{}.blame.html", file_name);
+
+        match active {
+            ActiveView::Preview => vec![
+                ViewTab::Code { link: Some(code) },
+                ViewTab::Blame { link: Some(blame) },
+            ],
+            ActiveView::Code => vec![
+                ViewTab::Code { link: None },
+                ViewTab::Blame { link: Some(blame) },
+            ],
+            ActiveView::Blame => vec![
+                ViewTab::Code { link: Some(code) },
+                ViewTab::Blame { link: None },
+            ],
+        }
     }
 }
 
@@ -322,10 +383,13 @@ fn blob_page_markup(
 
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
-    let file_name = Path::new(file_path)
+    let file_path_obj = Path::new(file_path);
+    let file_name = file_path_obj
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or(file_path);
+
+    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Code);
 
     page_wrapper(
         &title,
@@ -339,6 +403,7 @@ fn blob_page_markup(
                         span class="blob-filename" { (file_name) }
                         span class="blob-meta" { (metadata.display()) }
                     }
+                    (view_toggle(&view_tabs))
                     button class="action-btn copy-btn" type="button" title="Copy file contents" {
                         i class="ph ph-copy" {}
                     }
@@ -384,11 +449,13 @@ fn markdown_blob_page_markup(
 
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
-    let file_name = Path::new(file_path)
+    let file_path_obj = Path::new(file_path);
+    let file_name = file_path_obj
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or(file_path);
-    let source_link = format!("{}.source.html", file_name);
+
+    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Preview);
 
     page_wrapper(
         &title,
@@ -401,16 +468,7 @@ fn markdown_blob_page_markup(
                         i class="ph ph-file-md" {}
                         span class="blob-filename" { (file_name) }
                     }
-                    div class="view-toggle" {
-                        span class="view-tab active" {
-                            i class="ph ph-eye" {}
-                            " Preview"
-                        }
-                        a href=(source_link) class="view-tab" {
-                            i class="ph ph-code" {}
-                            " Code"
-                        }
-                    }
+                    (view_toggle(&view_tabs))
                 }
                 main class="markdown-content latte" {
                     (PreEscaped(rendered_html))
@@ -482,6 +540,74 @@ pub fn generate_markdown_source(
     ))
 }
 
+/// Generates HTML blame page with commit attribution per line
+///
+/// Creates a blame view showing which commit last modified each line of the file.
+/// Each line displays the commit hash, author avatar, author name, and relative
+/// timestamp alongside syntax highlighted code.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `ref_name`: Git reference (branch/tag/commit)
+/// * `file_path`: Path to file within repository tree
+/// * `repo_name`: Repository name for breadcrumb navigation
+/// * `theme`: Syntax highlighting theme name
+///
+/// # Returns
+///
+/// HTML markup with blame annotations and highlighted code
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Blob cannot be read from repository
+/// - File content contains invalid UTF8
+/// - Blame computation fails
+/// - Syntax highlighting fails
+pub fn generate_blame(
+    repo_path: impl AsRef<Path>,
+    ref_name: &str,
+    file_path: impl AsRef<Path>,
+    repo_name: &str,
+    theme: &str,
+) -> Result<Markup> {
+    let path_str = file_path.as_ref().display().to_string();
+
+    let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
+        .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
+
+    let raw_size = content_bytes.len();
+
+    let content = String::from_utf8(content_bytes)
+        .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
+
+    let metadata = FileMetadata::from_content(&content, raw_size);
+
+    let highlighter = Highlighter::with_theme(theme)
+        .or_else(|_| Highlighter::new())
+        .context("Failed to create highlighter")?;
+
+    let highlighted_lines = highlighter
+        .highlight(&content, file_path.as_ref())
+        .with_context(|| format!("Failed to highlight: {}", path_str))?;
+
+    let blame_result = crate::git::blame_file(&repo_path, Some(ref_name), &file_path)
+        .with_context(|| format!("Failed to compute blame: {}", path_str))?;
+
+    let path_components = extract_breadcrumb_components(&path_str);
+
+    Ok(blame_page_markup(
+        &path_str,
+        &path_components,
+        ref_name,
+        repo_name,
+        &blame_result.lines,
+        &highlighted_lines,
+        &metadata,
+    ))
+}
+
 /// Renders markdown source page HTML structure with link to rendered view
 fn markdown_source_page_markup(
     file_path: &str,
@@ -516,12 +642,13 @@ fn markdown_source_page_markup(
 
     let title = format!("{}/{}: {} (source)", repo_name, ref_name, file_path);
 
-    // Rendered file link: README.md.html (we're at README.md.source.html)
-    let file_name = Path::new(file_path)
+    let file_path_obj = Path::new(file_path);
+    let file_name = file_path_obj
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or(file_path);
-    let rendered_link = format!("{}.html", file_name);
+
+    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Code);
 
     page_wrapper(
         &title,
@@ -535,16 +662,7 @@ fn markdown_source_page_markup(
                         span class="blob-filename" { (file_name) }
                         span class="blob-meta" { (metadata.display()) }
                     }
-                    div class="view-toggle" {
-                        a href=(rendered_link) class="view-tab" {
-                            i class="ph ph-eye" {}
-                            " Preview"
-                        }
-                        span class="view-tab active" {
-                            i class="ph ph-code" {}
-                            " Code"
-                        }
-                    }
+                    (view_toggle(&view_tabs))
                     button class="action-btn copy-btn" type="button" title="Copy file contents" {
                         i class="ph ph-copy" {}
                     }
@@ -552,6 +670,69 @@ fn markdown_source_page_markup(
                 (code_table(highlighted_lines))
             }
             (copy_button_script())
+        },
+    )
+}
+
+/// Renders blame page HTML structure with commit attribution
+fn blame_page_markup(
+    file_path: &str,
+    breadcrumb_components: &[&str],
+    ref_name: &str,
+    repo_name: &str,
+    blame_lines: &[BlameLine],
+    highlighted_lines: &[String],
+    metadata: &FileMetadata,
+) -> Markup {
+    let depth = calculate_depth(ref_name, file_path);
+    let index_path = "../".repeat(depth) + "index.html";
+    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
+
+    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
+        .iter()
+        .enumerate()
+        .map(|(idx, &component)| {
+            if idx == breadcrumb_components.len() - 1 {
+                (component, None)
+            } else {
+                let partial_path = breadcrumb_components[..=idx].join("/");
+                let link = format!(
+                    "{}tree/{}/{}.html",
+                    "../".repeat(depth),
+                    ref_name,
+                    partial_path
+                );
+                (component, Some(link))
+            }
+        })
+        .collect();
+
+    let title = format!("{}/{}: {} (blame)", repo_name, ref_name, file_path);
+
+    let file_path_obj = Path::new(file_path);
+    let file_name = file_path_obj
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+
+    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Blame);
+
+    page_wrapper(
+        &title,
+        &[&css_path],
+        html! {
+            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
+            div class="blob-card" {
+                div class="blob-header" {
+                    div class="blob-header-left" {
+                        i class="ph ph-file-code" {}
+                        span class="blob-filename" { (file_name) }
+                        span class="blob-meta" { (metadata.display()) }
+                    }
+                    (view_toggle(&view_tabs))
+                }
+                (blame_table(blame_lines, highlighted_lines, depth))
+            }
         },
     )
 }
