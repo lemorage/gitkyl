@@ -10,7 +10,7 @@ use crate::components::code::{code_table, copy_button_script};
 use crate::components::icons::is_markdown;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
-use crate::components::view_toggle::{ViewTab, view_toggle};
+use crate::components::view_toggle::{ViewMode, ViewTab, view_toggle};
 use crate::filetype::{FileType, ImageFormat, detect_file_type};
 use crate::git::{BlameLine, read_blob};
 use crate::highlight::Highlighter;
@@ -48,15 +48,36 @@ impl FileMetadata {
     }
 }
 
-/// Active view in the blob viewer
-enum ActiveView {
-    Preview,
-    Code,
-    Blame,
+/// Blob content variants for different view modes
+enum BlobContent<'a> {
+    /// Syntax highlighted source code
+    Code {
+        lines: &'a [String],
+        metadata: &'a FileMetadata,
+    },
+    /// Rendered markdown HTML
+    Preview { html: &'a str },
+    /// Blame annotations with syntax highlighted code
+    Blame {
+        blame_lines: &'a [BlameLine],
+        highlighted: &'a [String],
+        metadata: &'a FileMetadata,
+    },
+}
+
+impl BlobContent<'_> {
+    /// Returns the view mode for this content
+    fn view_mode(&self) -> ViewMode {
+        match self {
+            BlobContent::Code { .. } => ViewMode::Code,
+            BlobContent::Preview { .. } => ViewMode::Preview,
+            BlobContent::Blame { .. } => ViewMode::Blame,
+        }
+    }
 }
 
 /// Builds view toggle tabs for blob pages
-fn build_view_tabs(file_path: &Path, active: ActiveView) -> Vec<ViewTab> {
+fn build_view_tabs(file_path: &Path, active: ViewMode) -> Vec<ViewTab> {
     let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
     if is_markdown(file_path) {
@@ -65,24 +86,20 @@ fn build_view_tabs(file_path: &Path, active: ActiveView) -> Vec<ViewTab> {
         let blame = format!("{}.blame.html", file_name);
 
         match active {
-            ActiveView::Preview => vec![
-                ViewTab::Preview { link: None },
-                ViewTab::Code { link: Some(code) },
-                ViewTab::Blame { link: Some(blame) },
+            ViewMode::Preview => vec![
+                ViewTab::new(ViewMode::Preview, None),
+                ViewTab::new(ViewMode::Code, Some(code)),
+                ViewTab::new(ViewMode::Blame, Some(blame)),
             ],
-            ActiveView::Code => vec![
-                ViewTab::Preview {
-                    link: Some(preview),
-                },
-                ViewTab::Code { link: None },
-                ViewTab::Blame { link: Some(blame) },
+            ViewMode::Code => vec![
+                ViewTab::new(ViewMode::Preview, Some(preview)),
+                ViewTab::new(ViewMode::Code, None),
+                ViewTab::new(ViewMode::Blame, Some(blame)),
             ],
-            ActiveView::Blame => vec![
-                ViewTab::Preview {
-                    link: Some(preview),
-                },
-                ViewTab::Code { link: Some(code) },
-                ViewTab::Blame { link: None },
+            ViewMode::Blame => vec![
+                ViewTab::new(ViewMode::Preview, Some(preview)),
+                ViewTab::new(ViewMode::Code, Some(code)),
+                ViewTab::new(ViewMode::Blame, None),
             ],
         }
     } else {
@@ -90,17 +107,17 @@ fn build_view_tabs(file_path: &Path, active: ActiveView) -> Vec<ViewTab> {
         let blame = format!("{}.blame.html", file_name);
 
         match active {
-            ActiveView::Preview => vec![
-                ViewTab::Code { link: Some(code) },
-                ViewTab::Blame { link: Some(blame) },
+            ViewMode::Preview => vec![
+                ViewTab::new(ViewMode::Code, Some(code)),
+                ViewTab::new(ViewMode::Blame, Some(blame)),
             ],
-            ActiveView::Code => vec![
-                ViewTab::Code { link: None },
-                ViewTab::Blame { link: Some(blame) },
+            ViewMode::Code => vec![
+                ViewTab::new(ViewMode::Code, None),
+                ViewTab::new(ViewMode::Blame, Some(blame)),
             ],
-            ActiveView::Blame => vec![
-                ViewTab::Code { link: Some(code) },
-                ViewTab::Blame { link: None },
+            ViewMode::Blame => vec![
+                ViewTab::new(ViewMode::Code, Some(code)),
+                ViewTab::new(ViewMode::Blame, None),
             ],
         }
     }
@@ -349,14 +366,14 @@ fn generate_binary_blob(
     ))
 }
 
-/// Renders blob page HTML structure
-fn blob_page_markup(
+/// Renders blob page with different view modes
+fn render_blob_page(
     file_path: &str,
     breadcrumb_components: &[&str],
     ref_name: &str,
     repo_name: &str,
-    highlighted_lines: &[String],
-    metadata: &FileMetadata,
+    is_markdown: bool,
+    content: BlobContent,
 ) -> Markup {
     let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
@@ -381,36 +398,96 @@ fn blob_page_markup(
         })
         .collect();
 
-    let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
-
     let file_path_obj = Path::new(file_path);
     let file_name = file_path_obj
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or(file_path);
 
-    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Code);
+    let view_mode = content.view_mode();
+    let (metadata, has_copy_button, title_suffix) = match &content {
+        BlobContent::Code { metadata, .. } => {
+            let suffix = if is_markdown { " (source)" } else { "" };
+            (Some(*metadata), true, suffix)
+        }
+        BlobContent::Preview { .. } => (None, false, ""),
+        BlobContent::Blame { metadata, .. } => (Some(*metadata), false, " (blame)"),
+    };
+
+    let view_tabs = build_view_tabs(file_path_obj, view_mode);
+    let title = format!("{}/{}: {}{}", repo_name, ref_name, file_path, title_suffix);
+    let icon_class = if is_markdown {
+        "ph ph-file-md"
+    } else {
+        "ph ph-file-code"
+    };
+
+    let markdown_css = format!("{}assets/markdown.css", "../".repeat(depth));
+    let css_files: Vec<&str> = match &content {
+        BlobContent::Preview { .. } => vec![css_path.as_str(), markdown_css.as_str()],
+        _ => vec![css_path.as_str()],
+    };
 
     page_wrapper(
         &title,
-        &[&css_path],
+        &css_files,
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
             div class="blob-card" {
                 div class="blob-header" {
                     div class="blob-header-left" {
-                        i class="ph ph-file-code" {}
+                        i class=(icon_class) {}
                         span class="blob-filename" { (file_name) }
-                        span class="blob-meta" { (metadata.display()) }
+                        @if let Some(meta) = metadata {
+                            span class="blob-meta" { (meta.display()) }
+                        }
                     }
                     (view_toggle(&view_tabs))
-                    button class="action-btn copy-btn" type="button" title="Copy file contents" {
-                        i class="ph ph-copy" {}
+                    @if has_copy_button {
+                        button class="action-btn copy-btn" type="button" title="Copy file contents" {
+                            i class="ph ph-copy" {}
+                        }
                     }
                 }
-                (code_table(highlighted_lines))
+                @match content {
+                    BlobContent::Code { lines, .. } => {
+                        (code_table(lines))
+                    }
+                    BlobContent::Preview { html } => {
+                        main class="markdown-content latte" {
+                            (PreEscaped(html))
+                        }
+                    }
+                    BlobContent::Blame { blame_lines, highlighted, .. } => {
+                        (blame_table(blame_lines, highlighted, depth))
+                    }
+                }
             }
-            (copy_button_script())
+            @if has_copy_button {
+                (copy_button_script())
+            }
+        },
+    )
+}
+
+/// Renders blob page HTML structure
+fn blob_page_markup(
+    file_path: &str,
+    breadcrumb_components: &[&str],
+    ref_name: &str,
+    repo_name: &str,
+    highlighted_lines: &[String],
+    metadata: &FileMetadata,
+) -> Markup {
+    render_blob_page(
+        file_path,
+        breadcrumb_components,
+        ref_name,
+        repo_name,
+        false,
+        BlobContent::Code {
+            lines: highlighted_lines,
+            metadata,
         },
     )
 }
@@ -423,57 +500,14 @@ fn markdown_blob_page_markup(
     repo_name: &str,
     rendered_html: &str,
 ) -> Markup {
-    let depth = calculate_depth(ref_name, file_path);
-    let index_path = "../".repeat(depth) + "index.html";
-    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
-    let markdown_css_path = format!("{}assets/markdown.css", "../".repeat(depth));
-
-    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
-        .iter()
-        .enumerate()
-        .map(|(idx, &component)| {
-            if idx == breadcrumb_components.len() - 1 {
-                (component, None)
-            } else {
-                let partial_path = breadcrumb_components[..=idx].join("/");
-                let link = format!(
-                    "{}tree/{}/{}.html",
-                    "../".repeat(depth),
-                    ref_name,
-                    partial_path
-                );
-                (component, Some(link))
-            }
-        })
-        .collect();
-
-    let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
-
-    let file_path_obj = Path::new(file_path);
-    let file_name = file_path_obj
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(file_path);
-
-    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Preview);
-
-    page_wrapper(
-        &title,
-        &[&css_path, &markdown_css_path],
-        html! {
-            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            div class="blob-card" {
-                div class="blob-header" {
-                    div class="blob-header-left" {
-                        i class="ph ph-file-md" {}
-                        span class="blob-filename" { (file_name) }
-                    }
-                    (view_toggle(&view_tabs))
-                }
-                main class="markdown-content latte" {
-                    (PreEscaped(rendered_html))
-                }
-            }
+    render_blob_page(
+        file_path,
+        breadcrumb_components,
+        ref_name,
+        repo_name,
+        true,
+        BlobContent::Preview {
+            html: rendered_html,
         },
     )
 }
@@ -617,59 +651,15 @@ fn markdown_source_page_markup(
     highlighted_lines: &[String],
     metadata: &FileMetadata,
 ) -> Markup {
-    let depth = calculate_depth(ref_name, file_path);
-    let index_path = "../".repeat(depth) + "index.html";
-    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
-
-    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
-        .iter()
-        .enumerate()
-        .map(|(idx, &component)| {
-            if idx == breadcrumb_components.len() - 1 {
-                (component, None)
-            } else {
-                let partial_path = breadcrumb_components[..=idx].join("/");
-                let link = format!(
-                    "{}tree/{}/{}.html",
-                    "../".repeat(depth),
-                    ref_name,
-                    partial_path
-                );
-                (component, Some(link))
-            }
-        })
-        .collect();
-
-    let title = format!("{}/{}: {} (source)", repo_name, ref_name, file_path);
-
-    let file_path_obj = Path::new(file_path);
-    let file_name = file_path_obj
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(file_path);
-
-    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Code);
-
-    page_wrapper(
-        &title,
-        &[&css_path],
-        html! {
-            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            div class="blob-card" {
-                div class="blob-header" {
-                    div class="blob-header-left" {
-                        i class="ph ph-file-md" {}
-                        span class="blob-filename" { (file_name) }
-                        span class="blob-meta" { (metadata.display()) }
-                    }
-                    (view_toggle(&view_tabs))
-                    button class="action-btn copy-btn" type="button" title="Copy file contents" {
-                        i class="ph ph-copy" {}
-                    }
-                }
-                (code_table(highlighted_lines))
-            }
-            (copy_button_script())
+    render_blob_page(
+        file_path,
+        breadcrumb_components,
+        ref_name,
+        repo_name,
+        true,
+        BlobContent::Code {
+            lines: highlighted_lines,
+            metadata,
         },
     )
 }
@@ -684,55 +674,16 @@ fn blame_page_markup(
     highlighted_lines: &[String],
     metadata: &FileMetadata,
 ) -> Markup {
-    let depth = calculate_depth(ref_name, file_path);
-    let index_path = "../".repeat(depth) + "index.html";
-    let css_path = format!("{}assets/blob.css", "../".repeat(depth));
-
-    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
-        .iter()
-        .enumerate()
-        .map(|(idx, &component)| {
-            if idx == breadcrumb_components.len() - 1 {
-                (component, None)
-            } else {
-                let partial_path = breadcrumb_components[..=idx].join("/");
-                let link = format!(
-                    "{}tree/{}/{}.html",
-                    "../".repeat(depth),
-                    ref_name,
-                    partial_path
-                );
-                (component, Some(link))
-            }
-        })
-        .collect();
-
-    let title = format!("{}/{}: {} (blame)", repo_name, ref_name, file_path);
-
-    let file_path_obj = Path::new(file_path);
-    let file_name = file_path_obj
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(file_path);
-
-    let view_tabs = build_view_tabs(file_path_obj, ActiveView::Blame);
-
-    page_wrapper(
-        &title,
-        &[&css_path],
-        html! {
-            (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            div class="blob-card" {
-                div class="blob-header" {
-                    div class="blob-header-left" {
-                        i class="ph ph-file-code" {}
-                        span class="blob-filename" { (file_name) }
-                        span class="blob-meta" { (metadata.display()) }
-                    }
-                    (view_toggle(&view_tabs))
-                }
-                (blame_table(blame_lines, highlighted_lines, depth))
-            }
+    render_blob_page(
+        file_path,
+        breadcrumb_components,
+        ref_name,
+        repo_name,
+        false,
+        BlobContent::Blame {
+            blame_lines,
+            highlighted: highlighted_lines,
+            metadata,
         },
     )
 }

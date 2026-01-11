@@ -2,33 +2,48 @@
 
 use maud::{Markup, html};
 
-/// Available view tabs for file display
-pub enum ViewTab {
+/// The mode of blob view being rendered
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewMode {
     /// Rendered markdown preview
-    Preview { link: Option<String> },
+    Preview,
     /// Source code with syntax highlighting
-    Code { link: Option<String> },
+    Code,
     /// Git blame annotations
-    Blame { link: Option<String> },
+    Blame,
+}
+
+impl ViewMode {
+    /// Returns the icon class and label for this view mode
+    pub fn icon_and_label(&self) -> (&'static str, &'static str) {
+        match self {
+            ViewMode::Preview => ("ph ph-eye", "Preview"),
+            ViewMode::Code => ("ph ph-code", "Code"),
+            ViewMode::Blame => ("ph ph-git-commit", "Blame"),
+        }
+    }
+}
+
+/// View tab with optional link (None means active tab)
+pub struct ViewTab {
+    pub mode: ViewMode,
+    pub link: Option<String>,
 }
 
 impl ViewTab {
+    /// Creates a new view tab
+    pub fn new(mode: ViewMode, link: Option<String>) -> Self {
+        Self { mode, link }
+    }
+
     /// Returns the icon class and label for this tab
     fn icon_and_label(&self) -> (&'static str, &'static str) {
-        match self {
-            ViewTab::Preview { .. } => ("ph ph-eye", "Preview"),
-            ViewTab::Code { .. } => ("ph ph-code", "Code"),
-            ViewTab::Blame { .. } => ("ph ph-git-commit", "Blame"),
-        }
+        self.mode.icon_and_label()
     }
 
     /// Returns the link if this tab is not active
     fn link(&self) -> Option<&str> {
-        match self {
-            ViewTab::Preview { link } | ViewTab::Code { link } | ViewTab::Blame { link } => {
-                link.as_deref()
-            }
-        }
+        self.link.as_deref()
     }
 }
 
