@@ -269,12 +269,14 @@ pub fn generate_markdown(
 
     let path_components = extract_breadcrumb_components(&path_str);
 
-    Ok(markdown_blob_page_markup(
+    Ok(render_blob_page(
         &path_str,
         &path_components,
         ref_name,
         repo_name,
-        &rendered_html,
+        BlobContent::Preview {
+            html: &rendered_html,
+        },
     ))
 }
 
@@ -310,13 +312,15 @@ fn generate_text_blob(
     let path_str = file_path.display().to_string();
     let path_components = extract_breadcrumb_components(&path_str);
 
-    Ok(blob_page_markup(
+    Ok(render_blob_page(
         &path_str,
         &path_components,
         ref_name,
         repo_name,
-        &highlighted_lines,
-        &metadata,
+        BlobContent::Code {
+            lines: &highlighted_lines,
+            metadata: &metadata,
+        },
     ))
 }
 
@@ -372,7 +376,6 @@ fn render_blob_page(
     breadcrumb_components: &[&str],
     ref_name: &str,
     repo_name: &str,
-    is_markdown: bool,
     content: BlobContent,
 ) -> Markup {
     let depth = calculate_depth(ref_name, file_path);
@@ -404,10 +407,11 @@ fn render_blob_page(
         .and_then(|n| n.to_str())
         .unwrap_or(file_path);
 
+    let is_markdown_file = is_markdown(file_path_obj);
     let view_mode = content.view_mode();
     let (metadata, has_copy_button, title_suffix) = match &content {
         BlobContent::Code { metadata, .. } => {
-            let suffix = if is_markdown { " (source)" } else { "" };
+            let suffix = if is_markdown_file { " (source)" } else { "" };
             (Some(*metadata), true, suffix)
         }
         BlobContent::Preview { .. } => (None, false, ""),
@@ -416,7 +420,7 @@ fn render_blob_page(
 
     let view_tabs = build_view_tabs(file_path_obj, view_mode);
     let title = format!("{}/{}: {}{}", repo_name, ref_name, file_path, title_suffix);
-    let icon_class = if is_markdown {
+    let icon_class = if is_markdown_file {
         "ph ph-file-md"
     } else {
         "ph ph-file-code"
@@ -466,48 +470,6 @@ fn render_blob_page(
             @if has_copy_button {
                 (copy_button_script())
             }
-        },
-    )
-}
-
-/// Renders blob page HTML structure
-fn blob_page_markup(
-    file_path: &str,
-    breadcrumb_components: &[&str],
-    ref_name: &str,
-    repo_name: &str,
-    highlighted_lines: &[String],
-    metadata: &FileMetadata,
-) -> Markup {
-    render_blob_page(
-        file_path,
-        breadcrumb_components,
-        ref_name,
-        repo_name,
-        false,
-        BlobContent::Code {
-            lines: highlighted_lines,
-            metadata,
-        },
-    )
-}
-
-/// Renders markdown blob page HTML structure
-fn markdown_blob_page_markup(
-    file_path: &str,
-    breadcrumb_components: &[&str],
-    ref_name: &str,
-    repo_name: &str,
-    rendered_html: &str,
-) -> Markup {
-    render_blob_page(
-        file_path,
-        breadcrumb_components,
-        ref_name,
-        repo_name,
-        true,
-        BlobContent::Preview {
-            html: rendered_html,
         },
     )
 }
@@ -564,13 +526,15 @@ pub fn generate_markdown_source(
 
     let path_components = extract_breadcrumb_components(&path_str);
 
-    Ok(markdown_source_page_markup(
+    Ok(render_blob_page(
         &path_str,
         &path_components,
         ref_name,
         repo_name,
-        &highlighted_lines,
-        &metadata,
+        BlobContent::Code {
+            lines: &highlighted_lines,
+            metadata: &metadata,
+        },
     ))
 }
 
@@ -631,61 +595,17 @@ pub fn generate_blame(
 
     let path_components = extract_breadcrumb_components(&path_str);
 
-    Ok(blame_page_markup(
+    Ok(render_blob_page(
         &path_str,
         &path_components,
         ref_name,
         repo_name,
-        &blame_result.lines,
-        &highlighted_lines,
-        &metadata,
-    ))
-}
-
-/// Renders markdown source page HTML structure with link to rendered view
-fn markdown_source_page_markup(
-    file_path: &str,
-    breadcrumb_components: &[&str],
-    ref_name: &str,
-    repo_name: &str,
-    highlighted_lines: &[String],
-    metadata: &FileMetadata,
-) -> Markup {
-    render_blob_page(
-        file_path,
-        breadcrumb_components,
-        ref_name,
-        repo_name,
-        true,
-        BlobContent::Code {
-            lines: highlighted_lines,
-            metadata,
-        },
-    )
-}
-
-/// Renders blame page HTML structure with commit attribution
-fn blame_page_markup(
-    file_path: &str,
-    breadcrumb_components: &[&str],
-    ref_name: &str,
-    repo_name: &str,
-    blame_lines: &[BlameLine],
-    highlighted_lines: &[String],
-    metadata: &FileMetadata,
-) -> Markup {
-    render_blob_page(
-        file_path,
-        breadcrumb_components,
-        ref_name,
-        repo_name,
-        false,
         BlobContent::Blame {
-            blame_lines,
-            highlighted: highlighted_lines,
-            metadata,
+            blame_lines: &blame_result.lines,
+            highlighted: &highlighted_lines,
+            metadata: &metadata,
         },
-    )
+    ))
 }
 
 /// Renders image blob page with embedded data URL
