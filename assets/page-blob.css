@@ -454,13 +454,15 @@ td.blame-info:hover .blame-hash {
     left: 100%;
     top: 0;
     margin-left: 8px;
-    padding: 8px 10px;
+    padding: 8px 6px;
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
-    width: 220px;
+    min-width: 240px;
+    max-width: 360px;
+    width: fit-content;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.12s ease, visibility 0.12s ease;
@@ -472,58 +474,41 @@ td.blame-info:hover .blame-tooltip {
     visibility: visible;
 }
 
-/* Tooltip arrow */
-.blame-tooltip::before {
-    content: '';
-    position: absolute;
-    left: -6px;
-    top: 10px;
-    border: 6px solid transparent;
-    border-right-color: var(--border-subtle);
-}
-
-.blame-tooltip::after {
-    content: '';
-    position: absolute;
-    left: -5px;
-    top: 11px;
-    border: 5px solid transparent;
-    border-right-color: var(--bg-card);
-}
-
 /* Tooltip content */
 .tooltip-row {
     display: flex;
     align-items: center;
-    margin-bottom: 3px;
+    gap: 4px;
+    margin-bottom: 4px;
 }
 
 .tooltip-author {
     font-size: 11px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-weight: 400;
+    color: var(--text-tertiary);
 }
 
 .tooltip-sep {
     color: var(--text-tertiary);
     font-size: 11px;
+    opacity: 0.6;
 }
 
 .tooltip-time {
     font-size: 11px;
+    font-weight: 400;
     color: var(--text-tertiary);
 }
 
 .tooltip-summary {
     font-size: 11px;
-    color: var(--text-secondary);
-    line-height: 1.4;
+    font-weight: 400;
+    color: var(--text-primary);
+    line-height: 1.5;
     font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, sans-serif);
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
 }
 
 /* Alternating backgrounds for groups */
