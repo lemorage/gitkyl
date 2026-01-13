@@ -343,6 +343,26 @@ td.line-content {
     background: var(--bg-card);
     border-radius: 0 0 var(--radius-m) var(--radius-m);
     padding: 0 0 6px 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.blame-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.blame-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.blame-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.blame-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 table.blame-table {
@@ -356,6 +376,8 @@ table.blame-table {
 
 tr.blame-line {
     scroll-margin-top: 100px;
+    will-change: auto;
+    contain: layout style paint;
 }
 
 /* Line highlighting */
@@ -458,7 +480,6 @@ td.blame-info:hover .blame-hash {
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
     min-width: 240px;
     max-width: 360px;
@@ -467,11 +488,13 @@ td.blame-info:hover .blame-hash {
     visibility: hidden;
     transition: opacity 0.12s ease, visibility 0.12s ease;
     pointer-events: none;
+    will-change: opacity, visibility;
 }
 
 td.blame-info:hover .blame-tooltip {
     opacity: 1;
     visibility: visible;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Tooltip content */
