@@ -2,7 +2,9 @@
 //!
 //! Glass-style avatars with frosted shapes and soft pastel backgrounds.
 
-use maud::{Markup, PreEscaped, html};
+use base64::Engine;
+use maud::{Markup, html};
+use resvg::{tiny_skia, usvg};
 
 const COLORS: &[&str] = &[
     // Pinks
@@ -39,7 +41,7 @@ fn hash(s: &str) -> u64 {
 }
 
 /// Generate SVG avatar from name
-pub fn generate_svg(name: &str, size: u32) -> String {
+fn generate_svg(name: &str, size: u32) -> String {
     let h = hash(name);
     let id = format!("{:x}", h & 0xFFFF);
 
@@ -61,9 +63,33 @@ pub fn generate_svg(name: &str, size: u32) -> String {
     )
 }
 
-/// Create inline SVG avatar element
+/// Rasterize SVG to PNG data URL
+fn generate_png_data_url(name: &str, size: u32) -> String {
+    let svg_size = size * 2;
+    let svg_str = generate_svg(name, svg_size);
+
+    let opts = usvg::Options::default();
+    let tree = usvg::Tree::from_str(&svg_str, &opts).expect("valid SVG");
+
+    let mut pixmap = tiny_skia::Pixmap::new(svg_size, svg_size).expect("valid size");
+    resvg::render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
+
+    let png = pixmap.encode_png().expect("PNG encode");
+    let b64 = base64::prelude::BASE64_STANDARD.encode(&png);
+    format!("data:image/png;base64,{}", b64)
+}
+
+/// Create inline avatar element
 pub fn render(name: &str, size: u32) -> Markup {
-    html! { span class="avatar" { (PreEscaped(generate_svg(name, size))) } }
+    html! {
+        span class="avatar" {
+            img src=(generate_png_data_url(name, size))
+                width=(size)
+                height=(size)
+                alt=(name)
+                loading="lazy";
+        }
+    }
 }
 
 #[cfg(test)]
@@ -72,22 +98,23 @@ mod tests {
 
     #[test]
     fn deterministic() {
-        assert_eq!(generate_svg("test", 50), generate_svg("test", 50));
+        let a = generate_png_data_url("test", 16);
+        let b = generate_png_data_url("test", 16);
+        assert_eq!(a, b);
     }
 
     #[test]
     fn varies() {
-        let a = generate_svg("alice", 50);
-        let b = generate_svg("bob", 50);
+        let a = generate_png_data_url("alice", 16);
+        let b = generate_png_data_url("bob", 16);
         assert_ne!(a, b);
     }
 
     #[test]
-    fn svg_valid() {
+    fn png_data_url_valid() {
         for name in ["test", "user", "admin", "guest"] {
-            let svg = generate_svg(name, 50);
-            assert!(svg.starts_with("<svg"));
-            assert!(svg.ends_with("</svg>"));
+            let url = generate_png_data_url(name, 16);
+            assert!(url.starts_with("data:image/png;base64,"));
         }
     }
 }

@@ -19,6 +19,7 @@ maud = "0.27.0"
 syntect = { version = "5.3", default-features = false, features = ["default-syntaxes", "default-themes", "html", "regex-onig", "plist-load"] }
 comrak = { version = "0.27", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["std"] }
+resvg = { version = "0.46", default-features = false }
 open = "5.3"
 
 [dev-dependencies]

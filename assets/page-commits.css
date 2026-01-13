@@ -91,16 +91,6 @@ main h1 {
 .commit-meta .avatar {
     width: 20px;
     height: 20px;
-    border-radius: 50%;
-    display: inline-flex;
-    flex-shrink: 0;
-    overflow: hidden;
-}
-
-.commit-meta .avatar svg {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
 }
 
 .commit-author {

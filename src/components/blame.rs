@@ -75,9 +75,7 @@ pub fn blame_table(
                             }
                             td class="blame-info" {
                                 @if is_group_start {
-                                    span class="blame-avatar" {
-                                        (render_avatar(&blame.author, 16))
-                                    }
+                                    (render_avatar(&blame.author, 16))
                                     a href=(format!("{}{}#L{}", commits_path, blame.commit_id, blame.line_num))
                                       class="blame-hash" {
                                         (blame.short_id)

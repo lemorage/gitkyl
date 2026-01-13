@@ -443,24 +443,21 @@ td.blame-info {
     border-right: 1px solid var(--border-subtle);
     position: relative;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-/* Avatar */
-.blame-avatar {
-    display: inline-flex;
-    vertical-align: middle;
-    margin-right: 6px;
-}
-
-.blame-avatar svg {
-    border-radius: 50%;
-    display: block;
+td.blame-info .avatar {
+    width: 16px;
+    height: 16px;
 }
 
 /* Commit hash */
 .blame-hash {
     font-family: var(--font-mono);
     font-size: 11px;
+    line-height: 16px;
     color: var(--text-tertiary);
     text-decoration: none;
     transition: color 0.15s ease;
