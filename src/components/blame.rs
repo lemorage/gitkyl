@@ -52,9 +52,10 @@ fn compute_group_indices(blame_lines: &[BlameLine]) -> Vec<usize> {
 pub fn blame_table(
     blame_lines: &[BlameLine],
     highlighted_lines: &[String],
+    ref_name: &str,
     depth: usize,
 ) -> Markup {
-    let commits_path = format!("{}commits/", "../".repeat(depth));
+    let commits_path = format!("{}commits/{}/page-1.html", "../".repeat(depth), ref_name);
     let group_indices = compute_group_indices(blame_lines);
     let recency_scores = compute_recency(blame_lines);
 
@@ -76,7 +77,7 @@ pub fn blame_table(
                             td class="blame-info" {
                                 @if is_group_start {
                                     (render_avatar(&blame.author, 16))
-                                    a href=(format!("{}{}#L{}", commits_path, blame.commit_id, blame.line_num))
+                                    a href=(commits_path)
                                       class="blame-hash" {
                                         (blame.short_id)
                                     }

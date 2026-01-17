@@ -463,7 +463,7 @@ fn render_blob_page(
                         }
                     }
                     BlobContent::Blame { blame_lines, highlighted, .. } => {
-                        (blame_table(blame_lines, highlighted, depth))
+                        (blame_table(blame_lines, highlighted, ref_name, depth))
                     }
                 }
             }
