@@ -289,6 +289,7 @@
     border-radius: 8px;
     transition: all 0.15s ease;
     flex-shrink: 0;
+    margin-right: -8px;
 }
 
 .history-link:hover {
