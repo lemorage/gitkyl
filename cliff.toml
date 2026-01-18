@@ -1,0 +1,44 @@
+[changelog]
+header = """
+{% if version -%}
+# Gitkyl {{ version }} Release Notes ({{ timestamp | date(format="%Y-%m-%d") }})
+
+**Full Changelog**: https://github.com/lemorage/gitkyl/compare/{{ previous.version }}...{{ version }}
+
+{% else -%}
+# Unreleased Changes
+{%- endif -%}
+"""
+body = """{%- set group_order = ["New Features", "Bug Fixes", "Performance", "Refactor", "Documentation", "Testing"] -%}
+{% for group_name in group_order -%}
+{%- set group_commits = commits | filter(attribute="group", value=group_name) -%}
+{%- if group_commits | length > 0 %}
+## {{ group_name }}
+{% for commit in group_commits -%}
+- {% if group_name == "New Features" %}feat{% elif group_name == "Bug Fixes" %}fix{% elif group_name == "Refactor" %}refactor{% elif group_name == "Performance" %}perf{% elif group_name == "Documentation" %}docs{% elif group_name == "Testing" %}test{% endif %}{% if commit.scope %}({{ commit.scope }}){% endif %}: {{ commit.message }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/lemorage/gitkyl/commit/{{ commit.id }}))
+{% endfor -%}
+{% endif -%}
+{%- endfor %}"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+protect_breaking_commits = false
+filter_commits = true
+tag_pattern = "v[0-9].*"
+skip_tags = ""
+ignore_tags = ""
+sort_commits = "oldest"
+
+commit_parsers = [
+    { message = "^feat", group = "New Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^refactor", group = "Refactor" },
+    { message = "^perf", group = "Performance" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^test", group = "Testing" },
+    { message = "^chore", skip = true },
+]
