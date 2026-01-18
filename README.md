@@ -2,6 +2,8 @@
 
 Gitkyl **[GIT-kul]** is a static site generator for git repositories. Pure Rust.
 
+<img src="images/preview.png" width="800" alt="Gitkyl preview">
+
 ## Install
 
 ```bash
@@ -38,12 +40,13 @@ gitkyl --theme path/to/custom.tmTheme   # External .tmTheme file
 
 ```
 dist/
-├── index.html                    # Repository home
-├── assets/                       # CSS bundles
-├── tree/master/src.html          # Directory listing
-├── blob/master/src/main.rs.html  # Code file (highlighted)
-├── commits/master/page-1.html    # Commit history (paginated)
-└── tags/index.html               # Tag listing
+├── index.html                     # Repository home
+├── assets/                        # CSS bundles
+├── tree/master/src.html           # Directory listing
+├── blob/master/src/main.rs.html   # Code file
+├── blame/master/src/main.rs.html  # Blame view
+├── commits/master/page-1.html     # Commit history
+└── tags/index.html                # Tag listing
 ```
 
 ## Build
