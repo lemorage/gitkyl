@@ -11,6 +11,27 @@ use std::path::Path;
 /// Maximum bytes to check for NUL byte heuristic (git uses 8KB).
 const BINARY_CHECK_LEN: usize = 8192;
 
+/// Checks if byte content is binary.
+///
+/// Uses two-phase detection:
+/// 1. NUL byte heuristic (first 8KB, git's approach)
+/// 2. UTF-8 validation (valid UTF-8 = text, otherwise binary)
+///
+/// # Arguments
+///
+/// * `bytes`: Content to check
+///
+/// # Returns
+///
+/// True if content is binary, false if text
+pub fn is_binary_content(bytes: &[u8]) -> bool {
+    let check_len = bytes.len().min(BINARY_CHECK_LEN);
+    if bytes[..check_len].contains(&0) {
+        return true;
+    }
+    std::str::from_utf8(bytes).is_err()
+}
+
 /// File type classification for blob rendering
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
@@ -71,11 +92,10 @@ impl ImageFormat {
 
 /// Detects file type from path and content.
 ///
-/// Uses four-phase detection for reliability:
+/// Uses three-phase detection for reliability:
 /// 1. Image extension lookup (fast path)
 /// 2. Image magic byte detection (handles extensionless files)
-/// 3. NUL byte heuristic (git's binary detection approach)
-/// 4. UTF-8 validation (valid UTF-8 = text, otherwise binary)
+/// 3. NUL byte heuristic + UTF-8 validation
 ///
 /// # Arguments
 ///
@@ -112,18 +132,11 @@ pub fn detect_file_type(bytes: &[u8], path: &Path) -> FileType {
         return FileType::Image(format);
     }
 
-    // Phase 3: NUL byte heuristic
-    // If first 8KB contains NUL byte, it's binary
-    let check_len = bytes.len().min(BINARY_CHECK_LEN);
-    if bytes[..check_len].contains(&0) {
-        return FileType::Binary;
-    }
-
-    // Phase 4: UTF-8 validation
-    if std::str::from_utf8(bytes).is_ok() {
-        FileType::Text
-    } else {
+    // Phase 3: NUL byte heuristic + UTF-8 validation
+    if is_binary_content(bytes) {
         FileType::Binary
+    } else {
+        FileType::Text
     }
 }
 
