@@ -2,7 +2,11 @@
 
 use anyhow::{Context, Result};
 use gix::bstr::{BString, ByteSlice};
+use similar::{ChangeTag, TextDiff};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
+
+use crate::filetype::is_binary_content;
 
 /// File entry in repository tree.
 #[derive(Debug, Clone)]
@@ -1014,6 +1018,591 @@ pub struct BlameLine {
 pub struct BlameResult {
     /// Blame lines in order
     pub lines: Vec<BlameLine>,
+}
+
+/// Line change in a diff hunk.
+#[derive(Debug, Clone)]
+pub enum DiffLineType {
+    /// Context line (unchanged)
+    Context,
+    /// Added line
+    Addition,
+    /// Deletion
+    Deletion,
+}
+
+/// Single line in a diff hunk.
+#[derive(Debug, Clone)]
+pub struct DiffLine {
+    /// Line type (context, addition, deletion)
+    pub line_type: DiffLineType,
+    /// Line content without leading +/-/ prefix
+    pub content: String,
+    /// Old file line number (None for additions)
+    pub old_line_num: Option<usize>,
+    /// New file line number (None for deletions)
+    pub new_line_num: Option<usize>,
+}
+
+/// Diff hunk with header and lines.
+#[derive(Debug, Clone)]
+pub struct DiffHunk {
+    /// Hunk header (e.g., "@@ -10,5 +10,7 @@")
+    pub header: String,
+    /// Lines in this hunk
+    pub lines: Vec<DiffLine>,
+}
+
+/// File statistics for diff.
+#[derive(Debug, Clone)]
+pub struct FileStats {
+    /// Number of lines added
+    pub additions: usize,
+    /// Number of lines deleted
+    pub deletions: usize,
+}
+
+/// Changed file in commit diff.
+#[derive(Debug, Clone)]
+pub struct ChangedFile {
+    /// File path
+    pub path: String,
+    /// Change type
+    pub change_type: ChangeType,
+    /// File statistics
+    pub stats: FileStats,
+    /// Diff hunks (empty for binary files)
+    pub hunks: Vec<DiffHunk>,
+}
+
+/// Type of file change in commit.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChangeType {
+    /// File was added
+    Added,
+    /// File was modified
+    Modified,
+    /// File was deleted
+    Deleted,
+    /// Binary file changed
+    Binary,
+}
+
+/// Full commit diff with all changed files.
+#[derive(Debug, Clone)]
+pub struct CommitDiff {
+    /// Commit object ID
+    pub commit_oid: String,
+    /// Parent commit OID (None for root commits)
+    pub parent_oid: Option<String>,
+    /// Changed files
+    pub changed_files: Vec<ChangedFile>,
+}
+
+/// Context lines to show around changes in diffs.
+const CONTEXT_LINES: usize = 3;
+
+/// Maximum lines to diff per file to prevent memory exhaustion.
+const MAX_DIFF_LINES: usize = 10_000;
+
+/// Computes diff for a commit against its parent.
+///
+/// For root commits (no parents), shows all files as additions.
+/// For merge commits, diffs against first parent.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `commit_oid`: Commit object ID to diff
+///
+/// # Returns
+///
+/// CommitDiff containing all changed files and their hunks
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Commit cannot be found
+/// - Tree comparison fails
+pub fn get_commit_diff(repo_path: impl AsRef<Path>, commit_oid: &str) -> Result<CommitDiff> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit_id =
+        gix::ObjectId::from_hex(commit_oid.as_bytes()).context("Failed to parse commit OID")?;
+
+    let commit = repo
+        .find_object(commit_id)
+        .context("Failed to find commit")?
+        .try_into_commit()
+        .map_err(|_| anyhow::anyhow!("Object is not a commit"))?;
+
+    let parent_ids: Vec<_> = commit.parent_ids().collect();
+    let parent_oid = parent_ids.first().map(|id| id.to_hex().to_string());
+
+    let current_tree = commit.tree().context("Failed to read commit tree")?;
+
+    let mut changed_files = Vec::new();
+
+    if parent_ids.is_empty() {
+        // Root commit: all files are additions
+        let files = current_tree
+            .traverse()
+            .breadthfirst
+            .files()
+            .context("Failed to traverse tree")?;
+
+        for entry in files {
+            if !entry.mode.is_blob() {
+                continue;
+            }
+
+            let path = entry.filepath.to_str_lossy().to_string();
+            let blob = repo
+                .find_object(entry.oid)
+                .context("Failed to find blob")?
+                .try_into_blob()
+                .map_err(|_| anyhow::anyhow!("Object is not a blob"))?;
+
+            let (change_type, stats, hunks) = if is_binary_content(&blob.data) {
+                (
+                    ChangeType::Binary,
+                    FileStats {
+                        additions: 0,
+                        deletions: 0,
+                    },
+                    vec![],
+                )
+            } else {
+                let content = blob.data.to_str_lossy();
+                let all_lines: Vec<&str> = content.lines().collect();
+                let total = all_lines.len();
+
+                if total > MAX_DIFF_LINES {
+                    (
+                        ChangeType::Added,
+                        FileStats {
+                            additions: total,
+                            deletions: 0,
+                        },
+                        vec![DiffHunk {
+                            header: format!(
+                                "@@ -0,0 +1,{} @@ (diff truncated, {} lines total)",
+                                MAX_DIFF_LINES, total
+                            ),
+                            lines: vec![],
+                        }],
+                    )
+                } else {
+                    let mut hunk_lines = Vec::with_capacity(total);
+                    for (idx, line) in all_lines.iter().enumerate() {
+                        hunk_lines.push(DiffLine {
+                            line_type: DiffLineType::Addition,
+                            content: (*line).to_string(),
+                            old_line_num: None,
+                            new_line_num: Some(idx + 1),
+                        });
+                    }
+
+                    let hunk = DiffHunk {
+                        header: format!("@@ -0,0 +1,{} @@", total),
+                        lines: hunk_lines,
+                    };
+
+                    (
+                        ChangeType::Added,
+                        FileStats {
+                            additions: total,
+                            deletions: 0,
+                        },
+                        vec![hunk],
+                    )
+                }
+            };
+
+            changed_files.push(ChangedFile {
+                path,
+                change_type,
+                stats,
+                hunks,
+            });
+        }
+    } else {
+        // Compare with first parent
+        let parent = repo
+            .find_object(parent_ids[0])
+            .context("Failed to find parent")?
+            .try_into_commit()
+            .map_err(|_| anyhow::anyhow!("Parent is not a commit"))?;
+
+        let parent_tree = parent.tree().context("Failed to read parent tree")?;
+
+        // Collect files from both trees
+        let mut current_files = HashMap::with_capacity(512);
+        for entry in current_tree
+            .traverse()
+            .breadthfirst
+            .files()
+            .context("Failed to traverse current tree")?
+        {
+            if entry.mode.is_blob() {
+                current_files.insert(entry.filepath.to_str_lossy().to_string(), entry.oid);
+            }
+        }
+
+        let mut parent_files = HashMap::with_capacity(512);
+        for entry in parent_tree
+            .traverse()
+            .breadthfirst
+            .files()
+            .context("Failed to traverse parent tree")?
+        {
+            if entry.mode.is_blob() {
+                parent_files.insert(entry.filepath.to_str_lossy().to_string(), entry.oid);
+            }
+        }
+
+        // Find all unique paths
+        let mut all_paths = HashSet::with_capacity(current_files.len() + parent_files.len());
+        all_paths.extend(current_files.keys().cloned());
+        all_paths.extend(parent_files.keys().cloned());
+
+        for path in all_paths {
+            let current_oid = current_files.get(&path);
+            let parent_oid = parent_files.get(&path);
+
+            match (current_oid, parent_oid) {
+                (Some(curr), Some(par)) if curr == par => {
+                    // Unchanged, skip
+                    continue;
+                }
+                (Some(curr), Some(par)) => {
+                    // Modified
+                    let curr_blob = repo
+                        .find_object(*curr)
+                        .with_context(|| format!("Failed to read current blob for {}", path))?
+                        .try_into_blob()
+                        .map_err(|_| anyhow::anyhow!("Object {} is not a blob", curr))?;
+                    let par_blob = repo
+                        .find_object(*par)
+                        .with_context(|| format!("Failed to read parent blob for {}", path))?
+                        .try_into_blob()
+                        .map_err(|_| anyhow::anyhow!("Object {} is not a blob", par))?;
+
+                    let curr_binary = is_binary_content(&curr_blob.data);
+                    let par_binary = is_binary_content(&par_blob.data);
+
+                    if curr_binary || par_binary {
+                        changed_files.push(ChangedFile {
+                            path,
+                            change_type: ChangeType::Binary,
+                            stats: FileStats {
+                                additions: 0,
+                                deletions: 0,
+                            },
+                            hunks: vec![],
+                        });
+                        continue;
+                    }
+
+                    let curr_content = curr_blob.data.to_str_lossy();
+                    let par_content = par_blob.data.to_str_lossy();
+
+                    let (stats, hunks) = simple_diff(&par_content, &curr_content);
+
+                    changed_files.push(ChangedFile {
+                        path,
+                        change_type: ChangeType::Modified,
+                        stats,
+                        hunks,
+                    });
+                }
+                (Some(curr), None) => {
+                    // Added
+                    let blob = repo
+                        .find_object(*curr)?
+                        .try_into_blob()
+                        .map_err(|_| anyhow::anyhow!("Not a blob"))?;
+
+                    if is_binary_content(&blob.data) {
+                        changed_files.push(ChangedFile {
+                            path,
+                            change_type: ChangeType::Binary,
+                            stats: FileStats {
+                                additions: 0,
+                                deletions: 0,
+                            },
+                            hunks: vec![],
+                        });
+                        continue;
+                    }
+
+                    let content = blob.data.to_str_lossy();
+                    let all_lines: Vec<&str> = content.lines().collect();
+                    let total = all_lines.len();
+
+                    if total > MAX_DIFF_LINES {
+                        changed_files.push(ChangedFile {
+                            path,
+                            change_type: ChangeType::Added,
+                            stats: FileStats {
+                                additions: total,
+                                deletions: 0,
+                            },
+                            hunks: vec![DiffHunk {
+                                header: format!(
+                                    "@@ -0,0 +1,{} @@ (diff truncated, {} lines total)",
+                                    MAX_DIFF_LINES, total
+                                ),
+                                lines: vec![],
+                            }],
+                        });
+                        continue;
+                    }
+
+                    let mut hunk_lines = Vec::with_capacity(total);
+                    for (idx, line) in all_lines.iter().enumerate() {
+                        hunk_lines.push(DiffLine {
+                            line_type: DiffLineType::Addition,
+                            content: (*line).to_string(),
+                            old_line_num: None,
+                            new_line_num: Some(idx + 1),
+                        });
+                    }
+
+                    changed_files.push(ChangedFile {
+                        path,
+                        change_type: ChangeType::Added,
+                        stats: FileStats {
+                            additions: total,
+                            deletions: 0,
+                        },
+                        hunks: vec![DiffHunk {
+                            header: format!("@@ -0,0 +1,{} @@", total),
+                            lines: hunk_lines,
+                        }],
+                    });
+                }
+                (None, Some(par)) => {
+                    // Deleted
+                    let blob = repo
+                        .find_object(*par)?
+                        .try_into_blob()
+                        .map_err(|_| anyhow::anyhow!("Not a blob"))?;
+
+                    if is_binary_content(&blob.data) {
+                        changed_files.push(ChangedFile {
+                            path,
+                            change_type: ChangeType::Binary,
+                            stats: FileStats {
+                                additions: 0,
+                                deletions: 0,
+                            },
+                            hunks: vec![],
+                        });
+                        continue;
+                    }
+
+                    let content = blob.data.to_str_lossy();
+                    let all_lines: Vec<&str> = content.lines().collect();
+                    let total = all_lines.len();
+
+                    if total > MAX_DIFF_LINES {
+                        changed_files.push(ChangedFile {
+                            path,
+                            change_type: ChangeType::Deleted,
+                            stats: FileStats {
+                                additions: 0,
+                                deletions: total,
+                            },
+                            hunks: vec![DiffHunk {
+                                header: format!(
+                                    "@@ -1,{} +0,0 @@ (diff truncated, {} lines total)",
+                                    MAX_DIFF_LINES, total
+                                ),
+                                lines: vec![],
+                            }],
+                        });
+                        continue;
+                    }
+
+                    let mut hunk_lines = Vec::with_capacity(total);
+                    for (idx, line) in all_lines.iter().enumerate() {
+                        hunk_lines.push(DiffLine {
+                            line_type: DiffLineType::Deletion,
+                            content: (*line).to_string(),
+                            old_line_num: Some(idx + 1),
+                            new_line_num: None,
+                        });
+                    }
+
+                    changed_files.push(ChangedFile {
+                        path,
+                        change_type: ChangeType::Deleted,
+                        stats: FileStats {
+                            additions: 0,
+                            deletions: total,
+                        },
+                        hunks: vec![DiffHunk {
+                            header: format!("@@ -1,{} +0,0 @@", total),
+                            lines: hunk_lines,
+                        }],
+                    });
+                }
+                (None, None) => unreachable!(),
+            }
+        }
+    }
+
+    Ok(CommitDiff {
+        commit_oid: commit_oid.to_string(),
+        parent_oid,
+        changed_files,
+    })
+}
+
+/// Computes proper diff using Myers algorithm via similar crate.
+fn simple_diff(old: &str, new: &str) -> (FileStats, Vec<DiffHunk>) {
+    #[derive(Debug)]
+    struct LineInfo {
+        line_type: DiffLineType,
+        content: String,
+        old_idx: Option<usize>,
+        new_idx: Option<usize>,
+        is_change: bool,
+    }
+
+    fn trim_context_end<'a>(lines: &[&'a LineInfo], limit: usize) -> Vec<&'a LineInfo> {
+        let trailing = lines.iter().rev().take_while(|l| !l.is_change).count();
+        let keep = trailing.min(limit);
+        let end = lines.len() - trailing + keep;
+        lines[..end].to_vec()
+    }
+
+    fn create_hunk(lines: &[&LineInfo]) -> DiffHunk {
+        let (first_old, first_new, old_count, new_count) =
+            lines
+                .iter()
+                .fold((None, None, 0, 0), |(fo, fn_, oc, nc), l| {
+                    (
+                        fo.or(l.old_idx),
+                        fn_.or(l.new_idx),
+                        oc + l.old_idx.is_some() as usize,
+                        nc + l.new_idx.is_some() as usize,
+                    )
+                });
+
+        let header = format!(
+            "@@ -{},{} +{},{} @@",
+            first_old.unwrap_or(0),
+            old_count,
+            first_new.unwrap_or(0),
+            new_count
+        );
+
+        let diff_lines = lines
+            .iter()
+            .map(|l| DiffLine {
+                line_type: l.line_type.clone(),
+                content: l.content.clone(),
+                old_line_num: l.old_idx,
+                new_line_num: l.new_idx,
+            })
+            .collect();
+
+        DiffHunk {
+            header,
+            lines: diff_lines,
+        }
+    }
+
+    let diff = TextDiff::from_lines(old, new);
+    let mut total_additions = 0;
+    let mut total_deletions = 0;
+
+    // Collect all lines with change markers
+    let mut all_lines = Vec::new();
+    for change in diff.iter_all_changes() {
+        let (line_type, old_idx, new_idx, is_change) = match change.tag() {
+            ChangeTag::Equal => (
+                DiffLineType::Context,
+                change.old_index(),
+                change.new_index(),
+                false,
+            ),
+            ChangeTag::Delete => {
+                total_deletions += 1;
+                (DiffLineType::Deletion, change.old_index(), None, true)
+            }
+            ChangeTag::Insert => {
+                total_additions += 1;
+                (DiffLineType::Addition, None, change.new_index(), true)
+            }
+        };
+
+        all_lines.push(LineInfo {
+            line_type,
+            content: change.value().trim_end_matches('\n').to_string(),
+            old_idx: old_idx.map(|i| i + 1),
+            new_idx: new_idx.map(|i| i + 1),
+            is_change,
+        });
+    }
+
+    // Split into hunks based on proximity of changes
+    let mut hunks = Vec::new();
+    let mut current_hunk: Vec<&LineInfo> = Vec::new();
+    let mut context_run = 0;
+    let max_context_gap = CONTEXT_LINES * 2 + 1;
+
+    for (idx, line) in all_lines.iter().enumerate() {
+        if line.is_change {
+            // Include accumulated context if starting new hunk
+            if current_hunk.is_empty() {
+                let start = idx.saturating_sub(CONTEXT_LINES);
+                current_hunk.extend(&all_lines[start..idx]);
+            }
+            current_hunk.push(line);
+            context_run = 0;
+        } else {
+            // Context line
+            if !current_hunk.is_empty() {
+                if context_run < max_context_gap {
+                    current_hunk.push(line);
+                    context_run += 1;
+                } else {
+                    // Gap too large, finalize current hunk
+                    let trimmed = trim_context_end(&current_hunk, CONTEXT_LINES);
+                    if !trimmed.is_empty() {
+                        hunks.push(create_hunk(&trimmed));
+                    }
+                    current_hunk.clear();
+                    context_run = 0;
+                }
+            }
+        }
+    }
+
+    // Finalize last hunk
+    if !current_hunk.is_empty() {
+        let trimmed = trim_context_end(&current_hunk, CONTEXT_LINES);
+        if !trimmed.is_empty() {
+            hunks.push(create_hunk(&trimmed));
+        }
+    }
+
+    (
+        FileStats {
+            additions: total_additions,
+            deletions: total_deletions,
+        },
+        hunks,
+    )
 }
 
 /// Computes blame for a file, attributing each line to its originating commit.
@@ -2458,5 +3047,120 @@ mod tests {
 
         assert_eq!(result.lines.len(), 1);
         assert_eq!(result.lines[0].content, "original");
+    }
+
+    #[test]
+    fn test_get_commit_diff_root_commit() {
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "line1\nline2\n");
+        git_add(td.path());
+        let commit = git_commit(td.path(), "Initial commit");
+
+        let diff = get_commit_diff(td.path(), &commit).expect("Should compute diff");
+
+        assert!(diff.parent_oid.is_none(), "Root commit has no parent");
+        assert_eq!(diff.changed_files.len(), 1);
+        assert_eq!(diff.changed_files[0].path, "test.txt");
+        assert_eq!(diff.changed_files[0].change_type, ChangeType::Added);
+        assert_eq!(diff.changed_files[0].stats.additions, 2);
+        assert_eq!(diff.changed_files[0].stats.deletions, 0);
+    }
+
+    #[test]
+    fn test_get_commit_diff_modified_file() {
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "line1\nline2\n");
+        git_add(td.path());
+        git_commit(td.path(), "Initial");
+
+        write_file(td.path(), "test.txt", "line1\nmodified\nline3\n");
+        git_add(td.path());
+        let commit = git_commit(td.path(), "Modify");
+
+        let diff = get_commit_diff(td.path(), &commit).expect("Should compute diff");
+
+        assert!(diff.parent_oid.is_some());
+        assert_eq!(diff.changed_files.len(), 1);
+        assert_eq!(diff.changed_files[0].change_type, ChangeType::Modified);
+        assert_eq!(diff.changed_files[0].stats.additions, 2);
+        assert_eq!(diff.changed_files[0].stats.deletions, 1);
+    }
+
+    #[test]
+    fn test_get_commit_diff_added_file() {
+        let td = temp_repo();
+        write_file(td.path(), "a.txt", "a");
+        git_add(td.path());
+        git_commit(td.path(), "Initial");
+
+        write_file(td.path(), "b.txt", "b");
+        git_add(td.path());
+        let commit = git_commit(td.path(), "Add b");
+
+        let diff = get_commit_diff(td.path(), &commit).expect("Should compute diff");
+
+        assert_eq!(diff.changed_files.len(), 1);
+        assert_eq!(diff.changed_files[0].path, "b.txt");
+        assert_eq!(diff.changed_files[0].change_type, ChangeType::Added);
+    }
+
+    #[test]
+    fn test_get_commit_diff_deleted_file() {
+        let td = temp_repo();
+        write_file(td.path(), "a.txt", "a");
+        git_add(td.path());
+        git_commit(td.path(), "Initial");
+
+        std::fs::remove_file(td.path().join("a.txt")).unwrap();
+        git_add(td.path());
+        let commit = git_commit(td.path(), "Delete a");
+
+        let diff = get_commit_diff(td.path(), &commit).expect("Should compute diff");
+
+        assert_eq!(diff.changed_files.len(), 1);
+        assert_eq!(diff.changed_files[0].path, "a.txt");
+        assert_eq!(diff.changed_files[0].change_type, ChangeType::Deleted);
+    }
+
+    #[test]
+    fn test_get_commit_diff_binary_file() {
+        let td = temp_repo();
+        let binary_data = vec![0x00, 0x01, 0x02, 0xFF];
+        std::fs::write(td.path().join("binary.dat"), &binary_data).unwrap();
+        git_add(td.path());
+        let commit = git_commit(td.path(), "Add binary");
+
+        let diff = get_commit_diff(td.path(), &commit).expect("Should compute diff");
+
+        assert_eq!(diff.changed_files.len(), 1);
+        assert_eq!(diff.changed_files[0].change_type, ChangeType::Binary);
+        assert_eq!(diff.changed_files[0].stats.additions, 0);
+        assert_eq!(diff.changed_files[0].stats.deletions, 0);
+        assert!(diff.changed_files[0].hunks.is_empty());
+    }
+
+    #[test]
+    fn test_get_commit_diff_multi_hunk_split() {
+        let td = temp_repo();
+        let content = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\n\
+                       line11\nline12\nline13\nline14\nline15\nline16\nline17\nline18\nline19\nline20\n";
+        write_file(td.path(), "test.txt", content);
+        git_add(td.path());
+        git_commit(td.path(), "Initial");
+
+        let modified = "line1\nCHANGED\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\n\
+                        line11\nline12\nline13\nline14\nline15\nline16\nline17\nline18\nALSO_CHANGED\nline20\n";
+        write_file(td.path(), "test.txt", modified);
+        git_add(td.path());
+        let commit = git_commit(td.path(), "Modify distant lines");
+
+        let diff = get_commit_diff(td.path(), &commit).expect("Should compute diff");
+
+        assert_eq!(diff.changed_files.len(), 1);
+        let hunks = &diff.changed_files[0].hunks;
+        assert!(
+            hunks.len() >= 2,
+            "Should split into multiple hunks due to distance"
+        );
     }
 }

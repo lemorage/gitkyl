@@ -18,9 +18,10 @@ pub use components::icons::{is_markdown, is_readme};
 pub use config::Config;
 pub use filetype::{FileType, ImageFormat, detect_file_type, is_binary_content};
 pub use git::{
-    BlameLine, BlameResult, CommitInfo, FileEntry, PaginatedCommits, RepoInfo, TagInfo, TreeItem,
-    analyze_repository, blame_file, get_last_commits_batch, list_commits, list_commits_paginated,
-    list_files, list_tags, read_blob,
+    BlameLine, BlameResult, ChangeType, ChangedFile, CommitDiff, CommitInfo, DiffHunk, DiffLine,
+    DiffLineType, FileEntry, FileStats, PaginatedCommits, RepoInfo, TagInfo, TreeItem,
+    analyze_repository, blame_file, get_commit_diff, get_last_commits_batch, list_commits,
+    list_commits_paginated, list_files, list_tags, read_blob,
 };
 pub use highlight::{Highlighter, highlight};
 pub use markdown::{LinkResolver, MarkdownRenderer};
