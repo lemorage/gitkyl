@@ -15,7 +15,7 @@ fn test_full_workflow_e2e() -> Result<()> {
 
     // Act
     let status = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--manifest-path",
             "Cargo.toml",
@@ -64,7 +64,7 @@ fn test_minimal_args_e2e() -> Result<()> {
 
     // Act
     let status = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--manifest-path",
             "Cargo.toml",

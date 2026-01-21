@@ -535,10 +535,7 @@ mod tests {
 
         let readme_file = files
             .iter()
-            .find(|f| {
-                f.path()
-                    .map_or(false, |p| crate::components::icons::is_readme(p))
-            })
+            .find(|f| f.path().is_some_and(crate::components::icons::is_readme))
             .expect("Repository should have README");
 
         let readme_path = readme_file
@@ -601,10 +598,7 @@ mod tests {
 
         let readme_files: Vec<_> = files
             .iter()
-            .filter(|f| {
-                f.path()
-                    .map_or(false, |p| crate::components::icons::is_readme(p))
-            })
+            .filter(|f| f.path().is_some_and(crate::components::icons::is_readme))
             .collect();
 
         if readme_files.is_empty() {
