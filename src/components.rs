@@ -8,6 +8,7 @@
 pub mod blame;
 pub mod code;
 pub mod commit;
+pub mod diff;
 pub mod file_list;
 pub mod footer;
 pub mod icons;
