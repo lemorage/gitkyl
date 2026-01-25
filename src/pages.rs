@@ -5,6 +5,7 @@
 //! utilizes shared components from the components module.
 
 pub mod blob;
+pub mod commit;
 pub mod commits;
 pub mod index;
 pub mod tags;

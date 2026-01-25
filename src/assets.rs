@@ -12,6 +12,7 @@ const INDEX_PAGE: &str = include_str!("../assets/page-index.css");
 const TREE_PAGE: &str = include_str!("../assets/page-tree.css");
 const BLOB_PAGE: &str = include_str!("../assets/page-blob.css");
 const COMMITS_PAGE: &str = include_str!("../assets/page-commits.css");
+const COMMIT_PAGE: &str = include_str!("../assets/page-commit.css");
 const TAGS_PAGE: &str = include_str!("../assets/page-tags.css");
 const MARKDOWN: &str = include_str!("../assets/markdown.css");
 
@@ -33,6 +34,7 @@ pub fn write_css_assets(assets_dir: &Path) -> Result<()> {
         "commits.css",
         &[BASE, LAYOUT, NAV, COMMITS_PAGE],
     )?;
+    write_bundled(assets_dir, "commit.css", &[BASE, LAYOUT, NAV, COMMIT_PAGE])?;
     write_bundled(assets_dir, "tags.css", &[BASE, LAYOUT, NAV, TAGS_PAGE])?;
     write_bundled(assets_dir, "markdown.css", &[MARKDOWN])?;
     Ok(())
