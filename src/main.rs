@@ -16,6 +16,7 @@ struct BranchStats {
     tree_pages: usize,
     blob_pages: usize,
     markdown_pages: usize,
+    commit_pages: usize,
 }
 
 impl BranchStats {
@@ -495,6 +496,56 @@ fn generate_commits_page_for_branch(
     Ok(())
 }
 
+/// Generates individual commit detail pages for all commits in a branch.
+///
+/// Creates a commit/ directory and generates HTML pages showing full diffs
+/// and metadata for each commit.
+///
+/// # Arguments
+///
+/// * `config`: CLI configuration
+/// * `repo_info`: Repository metadata
+/// * `branch`: Branch name to generate commit pages for
+///
+/// # Returns
+///
+/// Number of commit pages generated
+///
+/// # Errors
+///
+/// Returns error if commit listing or page generation fails
+fn generate_commit_detail_pages(
+    config: &Config,
+    repo_info: &gitkyl::RepoInfo,
+    branch: &str,
+) -> Result<usize> {
+    let commit_dir = config.output.join("commit");
+    fs::create_dir_all(&commit_dir).context("Failed to create commit directory")?;
+
+    // List all commits for this branch
+    let all_commits =
+        gitkyl::list_commits(&config.repo, Some(branch), None).context("Failed to list commits")?;
+
+    let total = all_commits.len();
+
+    for commit in all_commits {
+        let commit_oid = commit.oid();
+        let html = gitkyl::pages::commit::generate_commit_page(
+            &config.repo,
+            commit_oid,
+            repo_info.name(),
+            Some(branch),
+        )
+        .with_context(|| format!("Failed to generate commit page for {}", commit_oid))?;
+
+        let commit_path = commit_dir.join(format!("{}.html", commit_oid));
+        fs::write(&commit_path, html)
+            .with_context(|| format!("Failed to write commit page to {}", commit_path.display()))?;
+    }
+
+    Ok(total)
+}
+
 /// Generates all pages for a single branch.
 ///
 /// Orchestrates generation of tree pages, blob pages, and commits page for
@@ -540,10 +591,20 @@ fn generate_all_pages_for_branch(
 
     generate_commits_page_for_branch(config, repo_info, branch)?;
 
+    let commit_pages =
+        generate_commit_detail_pages(config, repo_info, branch).unwrap_or_else(|e| {
+            eprintln!(
+                "Warning: Failed to generate commit detail pages for branch {}: {:#}",
+                branch, e
+            );
+            0
+        });
+
     Ok(BranchStats {
         tree_pages,
         blob_pages,
         markdown_pages,
+        commit_pages,
     })
 }
 
@@ -700,15 +761,17 @@ fn main() -> Result<()> {
         generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
 
     println!(
-        "→ {}: {} trees, {} blobs ({} md)",
+        "→ {}: {} trees, {} blobs ({} md), {} commits",
         repo_info.default_branch(),
         default_stats.tree_pages,
         default_stats.total_blobs(),
-        default_stats.markdown_pages
+        default_stats.markdown_pages,
+        default_stats.commit_pages
     );
 
     let mut total_trees = default_stats.tree_pages;
     let mut total_blobs = default_stats.total_blobs();
+    let mut total_commits = default_stats.commit_pages;
     let mut branch_count = 1;
 
     for branch in repo_info.branches() {
@@ -719,14 +782,16 @@ fn main() -> Result<()> {
         match generate_all_pages_for_branch(&config, &repo_info, branch) {
             Ok(stats) => {
                 println!(
-                    "→ {}: {} trees, {} blobs ({} md)",
+                    "→ {}: {} trees, {} blobs ({} md), {} commits",
                     branch,
                     stats.tree_pages,
                     stats.total_blobs(),
-                    stats.markdown_pages
+                    stats.markdown_pages,
+                    stats.commit_pages
                 );
                 total_trees += stats.tree_pages;
                 total_blobs += stats.total_blobs();
+                total_commits += stats.commit_pages;
                 branch_count += 1;
             }
             Err(e) => {
@@ -741,14 +806,16 @@ fn main() -> Result<()> {
         match generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
             Ok(stats) => {
                 println!(
-                    "→ {}: {} trees, {} blobs ({} md)",
+                    "→ {}: {} trees, {} blobs ({} md), {} commits",
                     tag.name,
                     stats.tree_pages,
                     stats.total_blobs(),
-                    stats.markdown_pages
+                    stats.markdown_pages,
+                    stats.commit_pages
                 );
                 total_trees += stats.tree_pages;
                 total_blobs += stats.total_blobs();
+                total_commits += stats.commit_pages;
             }
             Err(e) => {
                 eprintln!("✗ tag {}: {:#}", tag.name, e);
@@ -762,8 +829,8 @@ fn main() -> Result<()> {
     });
 
     println!(
-        "✓ Generated {} trees, {} blobs ({} branches, {} tags)",
-        total_trees, total_blobs, branch_count, tags_count
+        "✓ Generated {} trees, {} blobs, {} commits ({} branches, {} tags)",
+        total_trees, total_blobs, total_commits, branch_count, tags_count
     );
 
     if !config.no_open {

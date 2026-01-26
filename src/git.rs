@@ -591,6 +591,43 @@ pub fn list_commits(
     Ok(commits)
 }
 
+/// Retrieves a single commit by its OID.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `commit_oid`: Commit object ID (full hash)
+///
+/// # Returns
+///
+/// CommitInfo for the requested commit
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Commit OID is invalid
+/// - Commit cannot be found
+pub fn get_commit_by_oid(repo_path: impl AsRef<Path>, commit_oid: &str) -> Result<CommitInfo> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let commit_id =
+        gix::ObjectId::from_hex(commit_oid.as_bytes()).context("Failed to parse commit OID")?;
+
+    let commit = repo
+        .find_object(commit_id)
+        .context("Failed to find commit")?
+        .try_into_commit()
+        .map_err(|_| anyhow::anyhow!("Object is not a commit"))?;
+
+    extract_commit_info(&commit)
+}
+
 /// Lists commits with pagination support.
 ///
 /// Fetches commits for a specific page. Internally fetches one extra commit
@@ -3047,6 +3084,41 @@ mod tests {
 
         assert_eq!(result.lines.len(), 1);
         assert_eq!(result.lines[0].content, "original");
+    }
+
+    #[test]
+    fn test_get_commit_by_oid_valid() {
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "content");
+        git_add(td.path());
+        let oid = git_commit(td.path(), "Test commit");
+
+        let commit = get_commit_by_oid(td.path(), &oid).expect("Should get commit");
+
+        assert_eq!(commit.oid(), &oid);
+        assert_eq!(commit.message(), "Test commit");
+    }
+
+    #[test]
+    fn test_get_commit_by_oid_invalid_format() {
+        let td = temp_repo();
+
+        let result = get_commit_by_oid(td.path(), "invalid-oid-format");
+
+        assert!(result.is_err(), "Should fail for invalid OID format");
+    }
+
+    #[test]
+    fn test_get_commit_by_oid_nonexistent() {
+        let td = temp_repo();
+        write_file(td.path(), "test.txt", "content");
+        git_add(td.path());
+        git_commit(td.path(), "Test commit");
+
+        let nonexistent = "0000000000000000000000000000000000000000";
+        let result = get_commit_by_oid(td.path(), nonexistent);
+
+        assert!(result.is_err(), "Should fail for non-existent commit");
     }
 
     #[test]

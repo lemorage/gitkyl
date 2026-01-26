@@ -62,18 +62,21 @@ pub fn generate(
                         } @else {
                             ol class="commit-list" {
                                 @for commit in &paginated.commits {
+                                    @let commit_page_path = format!("{}commit/{}.html", "../".repeat(depth), commit.oid());
                                     li class="commit-entry" {
-                                        div class="commit-header" {
-                                            span class="commit-hash" {
-                                                (commit_hash(commit.oid()))
+                                        a href=(commit_page_path) class="commit-link" {
+                                            div class="commit-header" {
+                                                span class="commit-hash" {
+                                                    (commit_hash(commit.oid()))
+                                                }
+                                                span class="commit-message" { (commit.message()) }
                                             }
-                                            span class="commit-message" { (commit.message()) }
-                                        }
-                                        div class="commit-meta" {
-                                            (crate::avatar::render(commit.author(), 20))
-                                            (attribution(commit))
-                                            span class="commit-date" {
-                                                (format_timestamp(commit.date()))
+                                            div class="commit-meta" {
+                                                (crate::avatar::render(commit.author(), 20))
+                                                (attribution(commit))
+                                                span class="commit-date" {
+                                                    (format_timestamp(commit.date()))
+                                                }
                                             }
                                         }
                                     }
