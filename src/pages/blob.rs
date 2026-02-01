@@ -6,10 +6,11 @@ use maud::{Markup, PreEscaped, html};
 use std::path::Path;
 
 use crate::components::blame::blame_table;
-use crate::components::code::{code_table, copy_button_script};
+use crate::components::code::code_table;
 use crate::components::icons::is_markdown;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
+use crate::components::scripts::copy_file_content_script;
 use crate::components::view_toggle::{ViewMode, ViewTab, view_toggle};
 use crate::filetype::{FileType, ImageFormat, detect_file_type};
 use crate::git::{BlameLine, read_blob};
@@ -468,7 +469,7 @@ fn render_blob_page(
                 }
             }
             @if has_copy_button {
-                (copy_button_script())
+                (copy_file_content_script())
             }
         },
     )

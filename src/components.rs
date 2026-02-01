@@ -15,4 +15,5 @@ pub mod icons;
 pub mod layout;
 pub mod metadata;
 pub mod nav;
+pub mod scripts;
 pub mod view_toggle;

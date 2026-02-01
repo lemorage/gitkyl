@@ -1,11 +1,12 @@
 //! Commit detail page generation with full diff display
 
 use anyhow::{Context, Result};
-use maud::{Markup, PreEscaped, html};
+use maud::{Markup, html};
 use std::path::Path;
 
 use crate::components::diff::{changed_files_list, diff_view, file_stats_summary};
 use crate::components::layout::page_wrapper;
+use crate::components::scripts::copy_commit_hash_script;
 use crate::git::{CommitDiff, CommitInfo, get_commit_by_oid, get_commit_diff};
 use crate::util::format_timestamp;
 
@@ -82,7 +83,7 @@ fn commit_detail_content(
                 }
             }
         }
-        (copy_hash_script())
+        (copy_commit_hash_script())
     }
 }
 
@@ -205,29 +206,6 @@ fn files_changed_section(files: &[crate::git::ChangedFile]) -> Markup {
                 (file_stats_summary(files))
             }
             (changed_files_list(files))
-        }
-    }
-}
-
-/// Renders copy hash button script
-pub fn copy_hash_script() -> Markup {
-    html! {
-        script {
-            (PreEscaped(r#"
-document.querySelector('.copy-hash-btn')?.addEventListener('click', async function() {
-    const hash = this.parentElement.querySelector('code').textContent;
-    try {
-        await navigator.clipboard.writeText(hash);
-        const icon = this.querySelector('i');
-        icon.className = 'ph ph-check';
-        setTimeout(() => {
-            icon.className = 'ph ph-copy';
-        }, 2000);
-    } catch (e) {
-        console.error('Copy failed:', e);
-    }
-});
-"#))
         }
     }
 }
