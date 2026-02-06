@@ -1,3 +1,5 @@
+mod renderer;
+
 use anyhow::{Context, Result};
 use gitkyl::pages::index::{IndexPageData, find_and_render_readme, generate as index_page};
 use gitkyl::{Config, TreeItem};
@@ -32,29 +34,6 @@ fn validate_tree_path(path: &str) -> Result<()> {
     if path.starts_with('/') {
         anyhow::bail!("Path is absolute, must be relative: {}", path);
     }
-    Ok(())
-}
-
-/// Creates output directory structure and writes CSS assets.
-///
-/// Sets up required directories (output root, assets, tree, blob, commits)
-/// and writes all CSS bundles to assets directory.
-///
-/// # Arguments
-///
-/// * `output_dir`: Base output directory path
-///
-/// # Errors
-///
-/// Returns error if directory creation fails or CSS writing fails
-fn setup_output_directories(output_dir: &std::path::Path) -> Result<()> {
-    fs::create_dir_all(output_dir).context("Failed to create output directory")?;
-
-    let assets_dir = output_dir.join("assets");
-    fs::create_dir_all(&assets_dir).context("Failed to create assets directory")?;
-
-    gitkyl::write_css_assets(&assets_dir).context("Failed to write CSS assets")?;
-
     Ok(())
 }
 
@@ -675,7 +654,7 @@ fn main() -> Result<()> {
     let repo_info = gitkyl::analyze_repository(&config.repo, config.owner.clone())
         .context("Failed to analyze repository")?;
 
-    setup_output_directories(&config.output)?;
+    renderer::setup_output_directories(&config.output)?;
 
     let latest_commit =
         gitkyl::list_commits(&config.repo, Some(repo_info.default_branch()), Some(1))
@@ -954,61 +933,6 @@ mod tests {
         assert!(validate_tree_path("./../../etc/passwd").is_err());
         assert!(validate_tree_path("foo/./../../../bar").is_err());
         assert!(validate_tree_path("src/./../../sensitive").is_err());
-    }
-
-    #[test]
-    fn test_setup_creates_directories() {
-        use tempfile::TempDir;
-
-        // Arrange: create temporary output directory
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let output_path = temp_dir.path().join("output");
-
-        // Act: call setup function
-        let result = setup_output_directories(&output_path);
-
-        // Assert: directories should be created
-        assert!(
-            result.is_ok(),
-            "setup_output_directories failed: {:?}",
-            result.err()
-        );
-        assert!(output_path.exists(), "Output directory not created");
-        assert!(
-            output_path.join("assets").exists(),
-            "Assets directory not created"
-        );
-    }
-
-    #[test]
-    fn test_setup_writes_css_assets() {
-        use tempfile::TempDir;
-
-        // Arrange: create temporary output directory
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let output_path = temp_dir.path().join("output");
-
-        // Act: call setup function
-        let result = setup_output_directories(&output_path);
-
-        // Assert: CSS files should be written
-        assert!(
-            result.is_ok(),
-            "setup_output_directories failed: {:?}",
-            result.err()
-        );
-
-        let assets_dir = output_path.join("assets");
-        assert!(assets_dir.exists(), "Assets directory not created");
-
-        // Check that CSS assets were written by verifying files exist
-        let css_files = std::fs::read_dir(&assets_dir)
-            .expect("Failed to read assets dir")
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "css"))
-            .count();
-
-        assert!(css_files > 0, "No CSS files written to assets directory");
     }
 
     #[test]
