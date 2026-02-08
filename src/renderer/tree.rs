@@ -3,11 +3,118 @@
 use anyhow::{Context, Result};
 use gitkyl::pages::index::{IndexPageData, generate as index_page};
 use gitkyl::{CommitInfo, Config, FileEntry, FileTree, TreeItem};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
 
 /// Default limit for commits displayed on commit log page.
 const DEFAULT_COMMIT_LIMIT: usize = 35;
+
+/// Shared context for tree page generation.
+struct TreeContext<'a> {
+    config: &'a Config,
+    repo_info: &'a gitkyl::RepoInfo,
+    branch: &'a str,
+    tree: &'a FileTree,
+    file_commit_map: &'a HashMap<String, CommitInfo>,
+    commits: &'a [CommitInfo],
+}
+
+/// Generates a single tree page for a directory.
+fn process_tree_directory(ctx: &TreeContext, dir_path: &str) -> Result<()> {
+    validate_tree_path(dir_path).with_context(|| format!("Invalid tree path: {}", dir_path))?;
+
+    let entries_at_this_level = ctx.tree.files_at(dir_path);
+    let subdirs_at_this_level = ctx.tree.subdirs_at(dir_path);
+
+    let full_dir_paths: Vec<String> = subdirs_at_this_level
+        .iter()
+        .map(|subdir| {
+            if dir_path.is_empty() {
+                subdir.to_string()
+            } else {
+                format!("{}/{}", dir_path, subdir)
+            }
+        })
+        .collect();
+
+    let dir_path_refs: Vec<&str> = full_dir_paths.iter().map(|s| s.as_str()).collect();
+
+    let level_dir_commit_map = if !dir_path_refs.is_empty() {
+        gitkyl::get_last_commits_batch(&ctx.config.repo, Some(ctx.branch), &dir_path_refs)
+            .unwrap_or_else(|e| {
+                eprintln!(
+                    "Warning: Failed to batch lookup directory commits for {}: {:#}",
+                    dir_path, e
+                );
+                HashMap::new()
+            })
+    } else {
+        HashMap::new()
+    };
+
+    let tree_items_for_page = build_tree_items(
+        entries_at_this_level,
+        &subdirs_at_this_level,
+        dir_path,
+        ctx.file_commit_map,
+        &level_dir_commit_map,
+    );
+
+    let html = if dir_path.is_empty() {
+        let depth = ctx.branch.matches('/').count() + 2;
+        let readme_html = gitkyl::pages::index::find_and_render_readme(
+            &ctx.config.repo,
+            ctx.branch,
+            &tree_items_for_page,
+            depth,
+        )
+        .ok()
+        .flatten();
+
+        index_page(IndexPageData {
+            name: ctx.repo_info.name(),
+            owner: ctx.repo_info.owner(),
+            default_branch: ctx.branch,
+            branches: ctx.repo_info.branches(),
+            commit_count: ctx.commits.len(),
+            tag_count: 0,
+            latest_commit: ctx.commits.first(),
+            items: &tree_items_for_page,
+            readme_html: readme_html.as_deref(),
+            depth,
+        })
+    } else {
+        gitkyl::pages::tree::generate(
+            &ctx.config.repo,
+            ctx.branch,
+            dir_path,
+            ctx.repo_info.name(),
+            &tree_items_for_page,
+        )?
+    };
+
+    let tree_path = if dir_path.is_empty() {
+        ctx.config
+            .output
+            .join("tree")
+            .join(ctx.branch)
+            .join("index.html")
+    } else {
+        ctx.config
+            .output
+            .join("tree")
+            .join(ctx.branch)
+            .join(format!("{}.html", dir_path))
+    };
+
+    if let Some(parent) = tree_path.parent() {
+        fs::create_dir_all(parent).context("Failed to create tree directory")?;
+    }
+
+    fs::write(&tree_path, html.into_string())
+        .with_context(|| format!("Failed to write tree page {}", tree_path.display()))
+}
 
 /// Validates tree path to prevent directory traversal attacks.
 fn validate_tree_path(path: &str) -> Result<()> {
@@ -112,7 +219,7 @@ pub fn generate_tree_pages_for_branch(
     file_commit_map: &HashMap<String, CommitInfo>,
 ) -> Result<usize> {
     let directories = tree.all_dirs();
-    let mut count = 0;
+    let total = directories.len();
 
     let commits = gitkyl::list_commits(&config.repo, Some(branch), Some(DEFAULT_COMMIT_LIMIT))
         .unwrap_or_else(|e| {
@@ -123,112 +230,20 @@ pub fn generate_tree_pages_for_branch(
             vec![]
         });
 
-    let latest_commit = commits.first();
+    let ctx = TreeContext {
+        config,
+        repo_info,
+        branch,
+        tree,
+        file_commit_map,
+        commits: &commits,
+    };
 
-    for dir_path in directories {
-        validate_tree_path(&dir_path)
-            .with_context(|| format!("Invalid tree path: {}", dir_path))?;
+    directories
+        .par_iter()
+        .try_for_each(|dir_path| process_tree_directory(&ctx, dir_path))?;
 
-        let entries_at_this_level = tree.files_at(&dir_path);
-        let subdirs_at_this_level = tree.subdirs_at(&dir_path);
-
-        let full_dir_paths: Vec<String> = subdirs_at_this_level
-            .iter()
-            .map(|subdir| {
-                if dir_path.is_empty() {
-                    subdir.to_string()
-                } else {
-                    format!("{}/{}", dir_path, subdir)
-                }
-            })
-            .collect();
-
-        let dir_path_refs: Vec<&str> = full_dir_paths.iter().map(|s| s.as_str()).collect();
-
-        let level_dir_commit_map = if !dir_path_refs.is_empty() {
-            gitkyl::get_last_commits_batch(&config.repo, Some(branch), &dir_path_refs)
-                .unwrap_or_else(|e| {
-                    eprintln!(
-                        "Warning: Failed to batch lookup directory commits for {}: {:#}",
-                        dir_path, e
-                    );
-                    HashMap::new()
-                })
-        } else {
-            HashMap::new()
-        };
-
-        let tree_items_for_page = build_tree_items(
-            entries_at_this_level,
-            &subdirs_at_this_level,
-            &dir_path,
-            file_commit_map,
-            &level_dir_commit_map,
-        );
-
-        let html_result = if dir_path.is_empty() {
-            let depth = branch.matches('/').count() + 2;
-            let readme_html = gitkyl::pages::index::find_and_render_readme(
-                &config.repo,
-                branch,
-                &tree_items_for_page,
-                depth,
-            )
-            .ok()
-            .flatten();
-
-            Ok(index_page(IndexPageData {
-                name: repo_info.name(),
-                owner: repo_info.owner(),
-                default_branch: branch,
-                branches: repo_info.branches(),
-                commit_count: commits.len(),
-                tag_count: 0,
-                latest_commit,
-                items: &tree_items_for_page,
-                readme_html: readme_html.as_deref(),
-                depth,
-            }))
-        } else {
-            gitkyl::pages::tree::generate(
-                &config.repo,
-                branch,
-                &dir_path,
-                repo_info.name(),
-                &tree_items_for_page,
-            )
-        };
-
-        match html_result {
-            Ok(html) => {
-                let tree_path = if dir_path.is_empty() {
-                    config.output.join("tree").join(branch).join("index.html")
-                } else {
-                    config
-                        .output
-                        .join("tree")
-                        .join(branch)
-                        .join(format!("{}.html", dir_path))
-                };
-
-                if let Some(parent) = tree_path.parent() {
-                    fs::create_dir_all(parent).context("Failed to create tree directory")?;
-                }
-
-                fs::write(&tree_path, html.into_string()).with_context(|| {
-                    format!("Failed to write tree page {}", tree_path.display())
-                })?;
-
-                count += 1;
-            }
-            Err(e) => {
-                return Err(e)
-                    .with_context(|| format!("Failed to generate tree page for {}", dir_path));
-            }
-        }
-    }
-
-    Ok(count)
+    Ok(total)
 }
 
 #[cfg(test)]

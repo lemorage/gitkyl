@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 use gitkyl::Config;
+use rayon::prelude::*;
 use std::fs;
 
 /// Default limit for commits displayed on commit log page.
@@ -83,7 +84,7 @@ pub fn generate_commit_detail_pages(
 
     let total = all_commits.len();
 
-    for commit in all_commits {
+    all_commits.par_iter().try_for_each(|commit| {
         let commit_oid = commit.oid();
         let html = gitkyl::pages::commit::generate_commit_page(
             &config.repo,
@@ -95,8 +96,8 @@ pub fn generate_commit_detail_pages(
 
         let commit_path = commit_dir.join(format!("{}.html", commit_oid));
         fs::write(&commit_path, html)
-            .with_context(|| format!("Failed to write commit page to {}", commit_path.display()))?;
-    }
+            .with_context(|| format!("Failed to write commit page to {}", commit_path.display()))
+    })?;
 
     Ok(total)
 }
