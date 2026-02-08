@@ -5,144 +5,6 @@ use gitkyl::Config;
 use gitkyl::pages::index::{IndexPageData, find_and_render_readme, generate as index_page};
 use std::fs;
 
-/// Generation statistics for a single branch.
-#[derive(Debug, Default, Clone)]
-struct BranchStats {
-    tree_pages: usize,
-    blob_pages: usize,
-    markdown_pages: usize,
-    commit_pages: usize,
-}
-
-impl BranchStats {
-    fn total_blobs(&self) -> usize {
-        self.blob_pages + self.markdown_pages
-    }
-}
-
-/// Generates all pages for a single branch.
-///
-/// Orchestrates generation of tree pages, blob pages, and commits page for
-/// the specified branch. Returns statistics for reporting.
-///
-/// # Arguments
-///
-/// * `config`: CLI configuration
-/// * `repo_info`: Repository metadata
-/// * `branch`: Branch name to generate for
-///
-/// # Returns
-///
-/// Statistics about generated pages
-///
-/// # Errors
-///
-/// Returns error if any critical generation step fails
-fn generate_all_pages_for_branch(
-    config: &Config,
-    repo_info: &gitkyl::RepoInfo,
-    branch: &str,
-) -> Result<BranchStats> {
-    let files = gitkyl::list_files(&config.repo, Some(branch)).context("Failed to list files")?;
-
-    let tree = gitkyl::FileTree::from_files(files.clone());
-
-    let file_paths: Vec<&str> = files.iter().filter_map(|f| f.path()?.to_str()).collect();
-
-    let commit_map = gitkyl::get_last_commits_batch(&config.repo, Some(branch), &file_paths)
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "Warning: Failed to batch lookup commits for branch {}: {:#}",
-                branch, e
-            );
-            std::collections::HashMap::new()
-        });
-
-    let tree_pages =
-        renderer::generate_tree_pages_for_branch(config, repo_info, branch, &tree, &commit_map)?;
-
-    let (blob_pages, markdown_pages) =
-        renderer::generate_blob_pages_for_branch(config, repo_info, branch, &files)?;
-
-    renderer::generate_commits_page_for_branch(config, repo_info, branch)?;
-
-    let commit_pages = renderer::generate_commit_detail_pages(config, repo_info, branch)
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "Warning: Failed to generate commit detail pages for branch {}: {:#}",
-                branch, e
-            );
-            0
-        });
-
-    Ok(BranchStats {
-        tree_pages,
-        blob_pages,
-        markdown_pages,
-        commit_pages,
-    })
-}
-
-/// Generates tags listing and detail pages.
-///
-/// Creates a tags index page listing all repository tags, plus individual
-/// detail pages for each tag showing commit information.
-///
-/// # Arguments
-///
-/// * `config`: Application configuration containing repository and output paths
-/// * `repo_info`: Repository metadata including name
-///
-/// # Returns
-///
-/// Count of tags processed
-///
-/// # Errors
-///
-/// Returns error if tag listing or page generation fails
-fn generate_tags_pages(config: &Config, repo_info: &gitkyl::RepoInfo) -> Result<usize> {
-    let tags = gitkyl::list_tags(&config.repo).context("Failed to list tags")?;
-
-    if tags.is_empty() {
-        return Ok(0);
-    }
-
-    let tags_dir = config.output.join("tags");
-    fs::create_dir_all(&tags_dir).context("Failed to create tags directory")?;
-
-    let tags_index_html = gitkyl::pages::tags::generate_list(repo_info.name(), &tags);
-    let index_path = tags_dir.join("index.html");
-    fs::write(&index_path, tags_index_html.into_string())
-        .with_context(|| format!("Failed to write tags index to {}", index_path.display()))?;
-
-    for tag in &tags {
-        let commits =
-            gitkyl::list_commits(&config.repo, Some(&tag.name), Some(1)).unwrap_or_else(|e| {
-                eprintln!(
-                    "Warning: Failed to get commit for tag {}: {:#}",
-                    tag.name, e
-                );
-                vec![]
-            });
-
-        if let Some(commit) = commits.first() {
-            let tag_html = gitkyl::pages::tags::generate_detail(
-                repo_info.name(),
-                tag,
-                commit.message(),
-                commit.author(),
-                commit.date(),
-            );
-
-            let tag_path = tags_dir.join(format!("{}.html", tag.name));
-            fs::write(&tag_path, tag_html.into_string())
-                .with_context(|| format!("Failed to write tag page to {}", tag_path.display()))?;
-        }
-    }
-
-    Ok(tags.len())
-}
-
 fn main() -> Result<()> {
     let config = Config::parse();
     config.validate().context("Invalid configuration")?;
@@ -233,7 +95,7 @@ fn main() -> Result<()> {
         .with_context(|| format!("Failed to write index page to {}", index_path.display()))?;
 
     let default_stats =
-        generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
+        renderer::generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
 
     println!(
         "→ {}: {} trees, {} blobs ({} md), {} commits",
@@ -254,7 +116,7 @@ fn main() -> Result<()> {
             continue;
         }
 
-        match generate_all_pages_for_branch(&config, &repo_info, branch) {
+        match renderer::generate_all_pages_for_branch(&config, &repo_info, branch) {
             Ok(stats) => {
                 println!(
                     "→ {}: {} trees, {} blobs ({} md), {} commits",
@@ -278,7 +140,7 @@ fn main() -> Result<()> {
     // Generate tree and blob pages for tags to enable file browsing
     let tags = gitkyl::list_tags(&config.repo).unwrap_or_default();
     for tag in &tags {
-        match generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
+        match renderer::generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
             Ok(stats) => {
                 println!(
                     "→ {}: {} trees, {} blobs ({} md), {} commits",
@@ -298,7 +160,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let tags_count = generate_tags_pages(&config, &repo_info).unwrap_or_else(|e| {
+    let tags_count = renderer::generate_tags_pages(&config, &repo_info).unwrap_or_else(|e| {
         eprintln!("Warning: Failed to generate tags pages: {:#}", e);
         0
     });
