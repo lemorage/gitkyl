@@ -434,6 +434,42 @@ pub fn read_blob(
     Ok(blob.data.to_vec())
 }
 
+/// Reads blob content directly by object ID.
+///
+/// # Arguments
+///
+/// * `repo_path`: Path to git repository
+/// * `oid`: Git object ID of the blob
+///
+/// # Returns
+///
+/// Raw bytes of blob content
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Repository cannot be opened
+/// - Object cannot be found
+/// - Object is not a blob
+pub fn read_blob_by_oid(repo_path: impl AsRef<Path>, oid: &gix::ObjectId) -> Result<Vec<u8>> {
+    let repo = gix::open(repo_path.as_ref()).with_context(|| {
+        format!(
+            "Failed to open repository at {}",
+            repo_path.as_ref().display()
+        )
+    })?;
+
+    let object = repo
+        .find_object(*oid)
+        .with_context(|| format!("Failed to find object {}", oid))?;
+
+    let blob = object
+        .try_into_blob()
+        .map_err(|_| anyhow::anyhow!("Object {} is not a blob", oid))?;
+
+    Ok(blob.data.to_vec())
+}
+
 /// Lists all files in repository at given reference.
 ///
 /// Traverses the tree at the specified reference using breadth-first order,

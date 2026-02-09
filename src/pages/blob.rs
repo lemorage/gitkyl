@@ -188,26 +188,43 @@ pub fn generate(
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
 
-    let file_type = detect_file_type(&content_bytes, file_path.as_ref());
+    generate_from_content(
+        &content_bytes,
+        file_path.as_ref(),
+        ref_name,
+        repo_name,
+        theme,
+    )
+}
+
+/// Generates HTML blob page from pre-read content bytes.
+///
+/// # Arguments
+///
+/// * `content_bytes`: Raw blob content
+/// * `file_path`: File path for extension detection and display
+/// * `ref_name`: Git reference for breadcrumb navigation
+/// * `repo_name`: Repository name for display
+/// * `theme`: Syntax highlighting theme
+///
+/// # Returns
+///
+/// HTML markup ready for writing to disk
+pub fn generate_from_content(
+    content_bytes: &[u8],
+    file_path: &Path,
+    ref_name: &str,
+    repo_name: &str,
+    theme: &str,
+) -> Result<Markup> {
+    let file_type = detect_file_type(content_bytes, file_path);
 
     match file_type {
-        FileType::Text => generate_text_blob(
-            &content_bytes,
-            file_path.as_ref(),
-            ref_name,
-            repo_name,
-            theme,
-        ),
-        FileType::Image(format) => generate_image_blob(
-            &content_bytes,
-            format,
-            file_path.as_ref(),
-            ref_name,
-            repo_name,
-        ),
-        FileType::Binary => {
-            generate_binary_blob(&content_bytes, file_path.as_ref(), ref_name, repo_name)
+        FileType::Text => generate_text_blob(content_bytes, file_path, ref_name, repo_name, theme),
+        FileType::Image(format) => {
+            generate_image_blob(content_bytes, format, file_path, ref_name, repo_name)
         }
+        FileType::Binary => generate_binary_blob(content_bytes, file_path, ref_name, repo_name),
     }
 }
 
@@ -260,7 +277,19 @@ pub fn generate_markdown(
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
 
-    let content = String::from_utf8(content_bytes)
+    generate_markdown_from_content(&content_bytes, file_path.as_ref(), ref_name, repo_name)
+}
+
+/// Generates rendered markdown page from pre-read content bytes.
+pub fn generate_markdown_from_content(
+    content_bytes: &[u8],
+    file_path: &Path,
+    ref_name: &str,
+    repo_name: &str,
+) -> Result<Markup> {
+    let path_str = file_path.display().to_string();
+
+    let content = String::from_utf8(content_bytes.to_vec())
         .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
 
     let renderer = MarkdownRenderer::new();
@@ -510,9 +539,27 @@ pub fn generate_markdown_source(
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
 
+    generate_markdown_source_from_content(
+        &content_bytes,
+        file_path.as_ref(),
+        ref_name,
+        repo_name,
+        theme,
+    )
+}
+
+/// Generates syntax highlighted markdown source from pre-read content bytes.
+pub fn generate_markdown_source_from_content(
+    content_bytes: &[u8],
+    file_path: &Path,
+    ref_name: &str,
+    repo_name: &str,
+    theme: &str,
+) -> Result<Markup> {
+    let path_str = file_path.display().to_string();
     let raw_size = content_bytes.len();
 
-    let content = String::from_utf8(content_bytes)
+    let content = String::from_utf8(content_bytes.to_vec())
         .with_context(|| format!("Blob contains invalid UTF8: {}", path_str))?;
 
     let metadata = FileMetadata::from_content(&content, raw_size);
@@ -522,7 +569,7 @@ pub fn generate_markdown_source(
         .context("Failed to create highlighter")?;
 
     let highlighted_lines = highlighter
-        .highlight(&content, file_path.as_ref())
+        .highlight(&content, file_path)
         .with_context(|| format!("Failed to highlight: {}", path_str))?;
 
     let path_components = extract_breadcrumb_components(&path_str);

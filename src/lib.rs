@@ -21,7 +21,7 @@ pub use git::{
     BlameLine, BlameResult, ChangeType, ChangedFile, CommitDiff, CommitInfo, DiffHunk, DiffLine,
     DiffLineType, FileEntry, FileStats, PaginatedCommits, RepoInfo, TagInfo, TreeItem,
     analyze_repository, blame_file, get_commit_by_oid, get_commit_diff, get_last_commits_batch,
-    list_commits, list_commits_paginated, list_files, list_tags, read_blob,
+    list_commits, list_commits_paginated, list_files, list_tags, read_blob, read_blob_by_oid,
 };
 pub use highlight::{Highlighter, highlight};
 pub use markdown::{LinkResolver, MarkdownRenderer};
