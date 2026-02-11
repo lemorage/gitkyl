@@ -6,25 +6,15 @@ use rayon::prelude::*;
 use std::fs;
 use std::path::Path;
 
-/// Result of processing a single blob entry.
-enum BlobKind {
-    /// Markdown file
-    Markdown,
-    /// Code file
-    Code,
-    /// Entry skipped: not a blob, invalid path, or unprocessable.
-    Skipped,
-}
-
-/// Processes a single blob entry.
+/// Processes a single blob entry, returning true if processed.
 fn process_blob_entry(
     config: &Config,
     repo_info: &gitkyl::RepoInfo,
     branch: &str,
     entry: &FileEntry,
-) -> Result<BlobKind> {
+) -> Result<bool> {
     let Some(path) = entry.path() else {
-        return Ok(BlobKind::Skipped);
+        return Ok(false);
     };
 
     if path.to_str().is_none() {
@@ -32,12 +22,12 @@ fn process_blob_entry(
             "Warning: Skipping file with invalid UTF-8 path: {}",
             path.display()
         );
-        return Ok(BlobKind::Skipped);
+        return Ok(false);
     }
 
     if gitkyl::is_markdown(path) {
         process_markdown_blob(config, repo_info, branch, entry, path)?;
-        return Ok(BlobKind::Markdown);
+        return Ok(true);
     }
 
     process_code_blob(config, repo_info, branch, entry, path)
@@ -103,7 +93,7 @@ fn process_code_blob(
     branch: &str,
     entry: &FileEntry,
     path: &Path,
-) -> Result<BlobKind> {
+) -> Result<bool> {
     let bytes = gitkyl::read_blob_by_oid(&config.repo, entry.oid())
         .with_context(|| format!("Failed to read blob {}", path.display()))?;
 
@@ -147,7 +137,7 @@ fn process_code_blob(
         _ => {}
     }
 
-    Ok(BlobKind::Code)
+    Ok(true)
 }
 
 /// Writes blame page for a file if blame generation succeeds.
@@ -177,11 +167,9 @@ fn write_blame_page(config: &Config, repo_info: &gitkyl::RepoInfo, branch: &str,
 
 /// Generates blob pages for all files in a branch.
 ///
-/// Creates HTML pages for all files in the specified branch, with special
-/// handling for markdown files. README files are rendered with full markdown
-/// processing, while code files receive syntax highlighting. Image files
-/// are copied as raw files alongside their HTML viewer pages for use in
-/// markdown image references. Text files also get blame views.
+/// Creates HTML pages for all files in the specified branch. Markdown files
+/// get rendered views plus source views. Code files receive syntax highlighting.
+/// Image files are copied raw for markdown references. Text files get blame views.
 ///
 /// # Arguments
 ///
@@ -192,7 +180,7 @@ fn write_blame_page(config: &Config, repo_info: &gitkyl::RepoInfo, branch: &str,
 ///
 /// # Returns
 ///
-/// Tuple of (code blob count, markdown file count)
+/// Count of blob pages generated
 ///
 /// # Errors
 ///
@@ -202,20 +190,14 @@ pub fn generate_blob_pages_for_branch(
     repo_info: &gitkyl::RepoInfo,
     branch: &str,
     files: &[FileEntry],
-) -> Result<(usize, usize)> {
-    let results: Vec<BlobKind> = files
+) -> Result<usize> {
+    let count = files
         .par_iter()
         .map(|entry| process_blob_entry(config, repo_info, branch, entry))
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|&processed| processed)
+        .count();
 
-    let (blob_count, markdown_count) =
-        results
-            .iter()
-            .fold((0, 0), |(blobs, mds), kind| match kind {
-                BlobKind::Markdown => (blobs + 1, mds + 1),
-                BlobKind::Code => (blobs + 1, mds),
-                BlobKind::Skipped => (blobs, mds),
-            });
-
-    Ok((blob_count, markdown_count))
+    Ok(count)
 }

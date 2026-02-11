@@ -10,14 +10,7 @@ use std::collections::HashMap;
 pub(crate) struct BranchStats {
     pub tree_pages: usize,
     pub blob_pages: usize,
-    pub markdown_pages: usize,
     pub commit_pages: usize,
-}
-
-impl BranchStats {
-    pub fn total_blobs(&self) -> usize {
-        self.blob_pages + self.markdown_pages
-    }
 }
 
 /// Generates all pages for a single branch.
@@ -61,8 +54,7 @@ pub fn generate_all_pages_for_branch(
     let tree_pages =
         renderer::generate_tree_pages_for_branch(config, repo_info, branch, &tree, &commit_map)?;
 
-    let (blob_pages, markdown_pages) =
-        renderer::generate_blob_pages_for_branch(config, repo_info, branch, &files)?;
+    let blob_pages = renderer::generate_blob_pages_for_branch(config, repo_info, branch, &files)?;
 
     renderer::generate_commits_page_for_branch(config, repo_info, branch)?;
 
@@ -78,7 +70,6 @@ pub fn generate_all_pages_for_branch(
     Ok(BranchStats {
         tree_pages,
         blob_pages,
-        markdown_pages,
         commit_pages,
     })
 }

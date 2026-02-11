@@ -98,16 +98,15 @@ fn main() -> Result<()> {
         renderer::generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
 
     println!(
-        "→ {}: {} trees, {} blobs ({} md), {} commits",
+        "→ {}: {} trees, {} blobs, {} commits",
         repo_info.default_branch(),
         default_stats.tree_pages,
-        default_stats.total_blobs(),
-        default_stats.markdown_pages,
+        default_stats.blob_pages,
         default_stats.commit_pages
     );
 
     let mut total_trees = default_stats.tree_pages;
-    let mut total_blobs = default_stats.total_blobs();
+    let mut total_blobs = default_stats.blob_pages;
     let mut total_commits = default_stats.commit_pages;
     let mut branch_count = 1;
 
@@ -119,15 +118,11 @@ fn main() -> Result<()> {
         match renderer::generate_all_pages_for_branch(&config, &repo_info, branch) {
             Ok(stats) => {
                 println!(
-                    "→ {}: {} trees, {} blobs ({} md), {} commits",
-                    branch,
-                    stats.tree_pages,
-                    stats.total_blobs(),
-                    stats.markdown_pages,
-                    stats.commit_pages
+                    "→ {}: {} trees, {} blobs, {} commits",
+                    branch, stats.tree_pages, stats.blob_pages, stats.commit_pages
                 );
                 total_trees += stats.tree_pages;
-                total_blobs += stats.total_blobs();
+                total_blobs += stats.blob_pages;
                 total_commits += stats.commit_pages;
                 branch_count += 1;
             }
@@ -143,15 +138,11 @@ fn main() -> Result<()> {
         match renderer::generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
             Ok(stats) => {
                 println!(
-                    "→ {}: {} trees, {} blobs ({} md), {} commits",
-                    tag.name,
-                    stats.tree_pages,
-                    stats.total_blobs(),
-                    stats.markdown_pages,
-                    stats.commit_pages
+                    "→ {}: {} trees, {} blobs, {} commits",
+                    tag.name, stats.tree_pages, stats.blob_pages, stats.commit_pages
                 );
                 total_trees += stats.tree_pages;
-                total_blobs += stats.total_blobs();
+                total_blobs += stats.blob_pages;
                 total_commits += stats.commit_pages;
             }
             Err(e) => {
