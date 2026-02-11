@@ -18,18 +18,20 @@ use maud::{Markup, PreEscaped, html};
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
+/// use gitkyl::components::scripts::clipboard_script;
+///
 /// // Copy commit hash from adjacent code element
-/// clipboard_script(
+/// let script = clipboard_script(
 ///     ".copy-hash-btn",
 ///     "this.parentElement.querySelector('code').textContent"
-/// )
+/// );
 ///
 /// // Copy file content from table rows
-/// clipboard_script(
+/// let script = clipboard_script(
 ///     ".copy-btn",
-///     "Array.from(document.querySelectorAll('#blob-code .line-content')).map(r => r.textContent).join('\\n')"
-/// )
+///     r#"Array.from(document.querySelectorAll('#blob-code .line-content')).map(r => r.textContent).join('\n')"#
+/// );
 /// ```
 pub fn clipboard_script(button_selector: &str, content_expression: &str) -> Markup {
     let script = format!(
