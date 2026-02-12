@@ -3,7 +3,31 @@ mod renderer;
 use anyhow::{Context, Result};
 use gitkyl::Config;
 use gitkyl::pages::index::{IndexPageData, find_and_render_readme, generate as index_page};
+use renderer::BranchStats;
 use std::fs;
+
+/// Accumulated generation statistics across all refs.
+#[derive(Default)]
+struct Totals {
+    trees: usize,
+    blobs: usize,
+    commits: usize,
+    refs: usize,
+}
+
+impl Totals {
+    /// Prints branch stats and accumulates into totals.
+    fn record(&mut self, name: &str, stats: &BranchStats) {
+        println!(
+            "→ {}: {} trees, {} blobs, {} commits",
+            name, stats.tree_pages, stats.blob_pages, stats.commit_pages
+        );
+        self.trees += stats.tree_pages;
+        self.blobs += stats.blob_pages;
+        self.commits += stats.commit_pages;
+        self.refs += 1;
+    }
+}
 
 fn main() -> Result<()> {
     let config = Config::parse();
@@ -97,57 +121,27 @@ fn main() -> Result<()> {
     let default_stats =
         renderer::generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
 
-    println!(
-        "→ {}: {} trees, {} blobs, {} commits",
-        repo_info.default_branch(),
-        default_stats.tree_pages,
-        default_stats.blob_pages,
-        default_stats.commit_pages
-    );
-
-    let mut total_trees = default_stats.tree_pages;
-    let mut total_blobs = default_stats.blob_pages;
-    let mut total_commits = default_stats.commit_pages;
-    let mut branch_count = 1;
+    let mut totals = Totals::default();
+    totals.record(repo_info.default_branch(), &default_stats);
 
     for branch in repo_info.branches() {
         if branch == repo_info.default_branch() {
             continue;
         }
-
         match renderer::generate_all_pages_for_branch(&config, &repo_info, branch) {
-            Ok(stats) => {
-                println!(
-                    "→ {}: {} trees, {} blobs, {} commits",
-                    branch, stats.tree_pages, stats.blob_pages, stats.commit_pages
-                );
-                total_trees += stats.tree_pages;
-                total_blobs += stats.blob_pages;
-                total_commits += stats.commit_pages;
-                branch_count += 1;
-            }
-            Err(e) => {
-                eprintln!("✗ {}: {:#}", branch, e);
-            }
+            Ok(stats) => totals.record(branch, &stats),
+            Err(e) => eprintln!("✗ {}: {:#}", branch, e),
         }
     }
 
-    // Generate tree and blob pages for tags to enable file browsing
+    let branch_count = totals.refs;
+
+    // Generate tree and blob pages for tags
     let tags = gitkyl::list_tags(&config.repo).unwrap_or_default();
     for tag in &tags {
         match renderer::generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
-            Ok(stats) => {
-                println!(
-                    "→ {}: {} trees, {} blobs, {} commits",
-                    tag.name, stats.tree_pages, stats.blob_pages, stats.commit_pages
-                );
-                total_trees += stats.tree_pages;
-                total_blobs += stats.blob_pages;
-                total_commits += stats.commit_pages;
-            }
-            Err(e) => {
-                eprintln!("✗ tag {}: {:#}", tag.name, e);
-            }
+            Ok(stats) => totals.record(&tag.name, &stats),
+            Err(e) => eprintln!("✗ tag {}: {:#}", tag.name, e),
         }
     }
 
@@ -158,7 +152,7 @@ fn main() -> Result<()> {
 
     println!(
         "✓ Generated {} trees, {} blobs, {} commits ({} branches, {} tags)",
-        total_trees, total_blobs, total_commits, branch_count, tags_count
+        totals.trees, totals.blobs, totals.commits, branch_count, tags_count
     );
 
     if !config.no_open {

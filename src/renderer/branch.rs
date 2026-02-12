@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 /// Generation statistics for a single branch.
 #[derive(Debug, Default, Clone)]
-pub(crate) struct BranchStats {
+pub struct BranchStats {
     pub tree_pages: usize,
     pub blob_pages: usize,
     pub commit_pages: usize,
