@@ -3,8 +3,32 @@
 use anyhow::{Context, Result};
 use gitkyl::{Config, FileEntry};
 use rayon::prelude::*;
+use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Returns the blob output directory for a branch.
+#[inline]
+fn blob_dir(config: &Config, branch: &str) -> PathBuf {
+    config.output.join("blob").join(branch)
+}
+
+/// Creates all unique parent directories for a batch of files.
+fn ensure_directories(base: &Path, files: &[FileEntry]) -> Result<()> {
+    let dirs: HashSet<PathBuf> = files
+        .iter()
+        .filter_map(|f| f.path())
+        .filter_map(|p| p.parent())
+        .map(|p| base.join(p))
+        .collect();
+
+    for dir in dirs {
+        fs::create_dir_all(&dir)
+            .with_context(|| format!("Failed to create directory {}", dir.display()))?;
+    }
+
+    Ok(())
+}
 
 /// Processes a single blob entry, returning true if processed.
 fn process_blob_entry(
@@ -41,28 +65,19 @@ fn process_markdown_blob(
     entry: &FileEntry,
     path: &Path,
 ) -> Result<()> {
-    // Read blob once by oid, no redundant tree traversal
     let bytes = gitkyl::read_blob_by_oid(&config.repo, entry.oid())
         .with_context(|| format!("Failed to read blob {}", path.display()))?;
+
+    let base = blob_dir(config, branch);
 
     let rendered =
         gitkyl::pages::blob::generate_markdown_from_content(&bytes, path, branch, repo_info.name())
             .with_context(|| format!("Failed to render markdown {}", path.display()))?;
 
-    let blob_path = config
-        .output
-        .join("blob")
-        .join(branch)
-        .join(format!("{}.html", path.display()));
+    let out_path = base.join(format!("{}.html", path.display()));
+    fs::write(&out_path, rendered.into_string())
+        .with_context(|| format!("Failed to write {}", out_path.display()))?;
 
-    if let Some(parent) = blob_path.parent() {
-        fs::create_dir_all(parent).context("Failed to create blob directory")?;
-    }
-
-    fs::write(&blob_path, rendered.into_string())
-        .with_context(|| format!("Failed to write blob page {}", blob_path.display()))?;
-
-    // Reuse already-read bytes for source view
     let source = gitkyl::pages::blob::generate_markdown_source_from_content(
         &bytes,
         path,
@@ -72,14 +87,9 @@ fn process_markdown_blob(
     )
     .with_context(|| format!("Failed to highlight markdown source {}", path.display()))?;
 
-    let source_path = config
-        .output
-        .join("blob")
-        .join(branch)
-        .join(format!("{}.source.html", path.display()));
-
+    let source_path = base.join(format!("{}.source.html", path.display()));
     fs::write(&source_path, source.into_string())
-        .with_context(|| format!("Failed to write source page {}", source_path.display()))?;
+        .with_context(|| format!("Failed to write {}", source_path.display()))?;
 
     write_blame_page(config, repo_info, branch, path);
 
@@ -97,6 +107,8 @@ fn process_code_blob(
     let bytes = gitkyl::read_blob_by_oid(&config.repo, entry.oid())
         .with_context(|| format!("Failed to read blob {}", path.display()))?;
 
+    let base = blob_dir(config, branch);
+
     let html = gitkyl::pages::blob::generate_from_content(
         &bytes,
         path,
@@ -106,34 +118,17 @@ fn process_code_blob(
     )
     .with_context(|| format!("Failed to generate blob page for {}", path.display()))?;
 
-    let blob_path = config
-        .output
-        .join("blob")
-        .join(branch)
-        .join(format!("{}.html", path.display()));
+    let out_path = base.join(format!("{}.html", path.display()));
+    fs::write(&out_path, html.into_string())
+        .with_context(|| format!("Failed to write {}", out_path.display()))?;
 
-    if let Some(parent) = blob_path.parent() {
-        fs::create_dir_all(parent).context("Failed to create blob directory")?;
-    }
-
-    fs::write(&blob_path, html.into_string())
-        .with_context(|| format!("Failed to write blob page {}", blob_path.display()))?;
-
-    // Reuse already-read bytes for image copy and blame
     match gitkyl::detect_file_type(&bytes, path) {
         gitkyl::FileType::Image(_) => {
-            let raw_path = config.output.join("blob").join(branch).join(path);
-
-            if let Some(parent) = raw_path.parent() {
-                fs::create_dir_all(parent).context("Failed to create raw image directory")?;
-            }
-
-            fs::write(&raw_path, &bytes)
-                .with_context(|| format!("Failed to write raw image {}", raw_path.display()))?;
+            let img_path = base.join(path);
+            fs::write(&img_path, &bytes)
+                .with_context(|| format!("Failed to write {}", img_path.display()))?;
         }
-        gitkyl::FileType::Text => {
-            write_blame_page(config, repo_info, branch, path);
-        }
+        gitkyl::FileType::Text => write_blame_page(config, repo_info, branch, path),
         _ => {}
     }
 
@@ -142,26 +137,20 @@ fn process_code_blob(
 
 /// Writes blame page for a file if blame generation succeeds.
 fn write_blame_page(config: &Config, repo_info: &gitkyl::RepoInfo, branch: &str, path: &Path) {
-    if let Ok(blame) = gitkyl::pages::blob::generate_blame(
+    let Ok(blame) = gitkyl::pages::blob::generate_blame(
         &config.repo,
         branch,
         path,
         repo_info.name(),
         &config.theme,
-    ) {
-        let blame_path = config
-            .output
-            .join("blob")
-            .join(branch)
-            .join(format!("{}.blame.html", path.display()));
+    ) else {
+        return;
+    };
 
-        if let Err(e) = fs::write(&blame_path, blame.into_string()) {
-            eprintln!(
-                "Warning: Failed to write blame page {}: {}",
-                blame_path.display(),
-                e
-            );
-        }
+    let blame_path = blob_dir(config, branch).join(format!("{}.blame.html", path.display()));
+
+    if let Err(e) = fs::write(&blame_path, blame.into_string()) {
+        eprintln!("Warning: Failed to write {}: {}", blame_path.display(), e);
     }
 }
 
@@ -191,6 +180,9 @@ pub fn generate_blob_pages_for_branch(
     branch: &str,
     files: &[FileEntry],
 ) -> Result<usize> {
+    // Pre-create all directories
+    ensure_directories(&blob_dir(config, branch), files)?;
+
     let count = files
         .par_iter()
         .map(|entry| process_blob_entry(config, repo_info, branch, entry))
