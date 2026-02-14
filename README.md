@@ -7,7 +7,7 @@ Gitkyl **[GIT-kul]** is a static site generator for git repositories. Pure Rust.
 ## Install
 
 ```bash
-cargo install --git https://github.com/lemorage/gitkyl
+cargo install gitkyl
 ```
 
 ## Use
@@ -45,6 +45,7 @@ dist/
 ├── tree/master/src.html           # Directory listing
 ├── blob/master/src/main.rs.html   # Code file
 ├── blame/master/src/main.rs.html  # Blame view
+├── commit/abc1234.html            # Commit detail with diff
 ├── commits/master/page-1.html     # Commit history
 └── tags/index.html                # Tag listing
 ```
