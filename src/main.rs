@@ -3,7 +3,7 @@ mod renderer;
 use anyhow::{Context, Result};
 use gitkyl::Config;
 use gitkyl::pages::index::{IndexPageData, find_and_render_readme, generate as index_page};
-use renderer::BranchStats;
+use renderer::{BlobCache, BranchStats};
 use std::fs;
 
 /// Accumulated generation statistics across all refs.
@@ -118,8 +118,15 @@ fn main() -> Result<()> {
     fs::write(&index_path, html.into_string())
         .with_context(|| format!("Failed to write index page to {}", index_path.display()))?;
 
-    let default_stats =
-        renderer::generate_all_pages_for_branch(&config, &repo_info, repo_info.default_branch())?;
+    // Shared cache for blob deduplication across refs
+    let cache = BlobCache::new();
+
+    let default_stats = renderer::generate_all_pages_for_branch(
+        &config,
+        &cache,
+        &repo_info,
+        repo_info.default_branch(),
+    )?;
 
     let mut totals = Totals::default();
     totals.record(repo_info.default_branch(), &default_stats);
@@ -128,7 +135,7 @@ fn main() -> Result<()> {
         if branch == repo_info.default_branch() {
             continue;
         }
-        match renderer::generate_all_pages_for_branch(&config, &repo_info, branch) {
+        match renderer::generate_all_pages_for_branch(&config, &cache, &repo_info, branch) {
             Ok(stats) => totals.record(branch, &stats),
             Err(e) => eprintln!("✗ {}: {:#}", branch, e),
         }
@@ -139,7 +146,7 @@ fn main() -> Result<()> {
     // Generate tree and blob pages for tags
     let tags = gitkyl::list_tags(&config.repo).unwrap_or_default();
     for tag in &tags {
-        match renderer::generate_all_pages_for_branch(&config, &repo_info, &tag.name) {
+        match renderer::generate_all_pages_for_branch(&config, &cache, &repo_info, &tag.name) {
             Ok(stats) => totals.record(&tag.name, &stats),
             Err(e) => eprintln!("✗ tag {}: {:#}", tag.name, e),
         }

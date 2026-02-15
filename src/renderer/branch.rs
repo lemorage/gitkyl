@@ -1,6 +1,6 @@
 //! Per-branch page generation orchestration.
 
-use crate::renderer;
+use crate::renderer::{self, BlobCache};
 use anyhow::{Context, Result};
 use gitkyl::Config;
 use std::collections::HashMap;
@@ -23,6 +23,7 @@ pub struct BranchStats {
 /// * `config`: CLI configuration
 /// * `repo_info`: Repository metadata
 /// * `branch`: Branch name to generate for
+/// * `cache`: Shared blob cache for deduplication across refs
 ///
 /// # Returns
 ///
@@ -33,6 +34,7 @@ pub struct BranchStats {
 /// Returns error if any critical generation step fails
 pub fn generate_all_pages_for_branch(
     config: &Config,
+    cache: &BlobCache,
     repo_info: &gitkyl::RepoInfo,
     branch: &str,
 ) -> Result<BranchStats> {
@@ -54,7 +56,8 @@ pub fn generate_all_pages_for_branch(
     let tree_pages =
         renderer::generate_tree_pages_for_branch(config, repo_info, branch, &tree, &commit_map)?;
 
-    let blob_pages = renderer::generate_blob_pages_for_branch(config, repo_info, branch, &files)?;
+    let blob_pages =
+        renderer::generate_blob_pages_for_branch(config, cache, repo_info, branch, &files)?;
 
     renderer::generate_commits_page_for_branch(config, repo_info, branch)?;
 
