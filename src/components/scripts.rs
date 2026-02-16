@@ -2,10 +2,12 @@
 
 use maud::{Markup, PreEscaped, html};
 
+use crate::icons::check_icon_svg;
+
 /// Generates clipboard copy script for a button with visual feedback
 ///
 /// Creates a click handler that copies content to clipboard and swaps
-/// the icon from copy to check for 2 seconds as visual confirmation.
+/// the icon SVG from copy to check for 2 seconds as visual confirmation.
 ///
 /// # Arguments
 ///
@@ -34,6 +36,9 @@ use maud::{Markup, PreEscaped, html};
 /// );
 /// ```
 pub fn clipboard_script(button_selector: &str, content_expression: &str) -> Markup {
+    // Inline SVG string for check icon (copy icon is already in DOM)
+    let check_svg = check_icon_svg().replace(['\n', '\t'], "");
+
     let script = format!(
         r#"
 document.querySelector('{button_selector}')?.addEventListener('click', async function() {{
@@ -44,11 +49,12 @@ document.querySelector('{button_selector}')?.addEventListener('click', async fun
     }}
     try {{
         await navigator.clipboard.writeText(content);
-        const icon = this.querySelector('i');
-        if (icon) {{
-            icon.className = 'ph ph-check';
+        const iconSpan = this.querySelector('.ui-icon');
+        if (iconSpan) {{
+            const originalSvg = iconSpan.innerHTML;
+            iconSpan.innerHTML = '{check_svg}';
             setTimeout(() => {{
-                icon.className = 'ph ph-copy';
+                iconSpan.innerHTML = originalSvg;
             }}, 2000);
         }}
     }} catch (e) {{
@@ -57,7 +63,8 @@ document.querySelector('{button_selector}')?.addEventListener('click', async fun
 }});
 "#,
         button_selector = button_selector,
-        content_expression = content_expression
+        content_expression = content_expression,
+        check_svg = check_svg.replace('\'', "\\'")
     );
 
     html! {

@@ -31,30 +31,18 @@
     outline-offset: -2px;
 }
 
-.icon-box {
-    color: var(--text-secondary);
+.file-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
-    width: 24px;
+    width: 20px;
+    height: 16px;
     flex-shrink: 0;
 }
 
-.icon-folder {
-    color: var(--icon-folder);
-}
-
-.icon-rust {
-    color: var(--icon-rust);
-}
-
-.icon-readme {
-    color: var(--icon-readme);
-}
-
-.icon-config {
-    color: var(--icon-config);
+.file-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 .file-name-cell {

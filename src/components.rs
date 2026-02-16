@@ -11,7 +11,6 @@ pub mod commit;
 pub mod diff;
 pub mod file_list;
 pub mod footer;
-pub mod icons;
 pub mod layout;
 pub mod metadata;
 pub mod nav;

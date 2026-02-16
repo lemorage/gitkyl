@@ -2,6 +2,8 @@
 
 use maud::{Markup, html};
 
+use crate::icons::{code_icon, commit_icon, eye_icon};
+
 /// The mode of blob view being rendered
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewMode {
@@ -14,12 +16,21 @@ pub enum ViewMode {
 }
 
 impl ViewMode {
-    /// Returns the icon class and label for this view mode
-    pub fn icon_and_label(&self) -> (&'static str, &'static str) {
+    /// Returns the label for this view mode
+    pub fn label(&self) -> &'static str {
         match self {
-            ViewMode::Preview => ("ph ph-eye", "Preview"),
-            ViewMode::Code => ("ph ph-code", "Code"),
-            ViewMode::Blame => ("ph ph-git-commit", "Blame"),
+            ViewMode::Preview => "Preview",
+            ViewMode::Code => "Code",
+            ViewMode::Blame => "Blame",
+        }
+    }
+
+    /// Returns the icon markup for this view mode
+    pub fn icon(&self) -> Markup {
+        match self {
+            ViewMode::Preview => eye_icon(),
+            ViewMode::Code => code_icon(),
+            ViewMode::Blame => commit_icon(),
         }
     }
 }
@@ -36,11 +47,6 @@ impl ViewTab {
         Self { mode, link }
     }
 
-    /// Returns the icon class and label for this tab
-    fn icon_and_label(&self) -> (&'static str, &'static str) {
-        self.mode.icon_and_label()
-    }
-
     /// Returns the link if this tab is not active
     fn link(&self) -> Option<&str> {
         self.link.as_deref()
@@ -52,16 +58,15 @@ pub fn view_toggle(tabs: &[ViewTab]) -> Markup {
     html! {
         div class="view-toggle" {
             @for tab in tabs {
-                @let (icon, label) = tab.icon_and_label();
                 @if let Some(href) = tab.link() {
                     a href=(href) class="view-tab" {
-                        i class=(icon) {}
-                        " " (label)
+                        (tab.mode.icon())
+                        span { (tab.mode.label()) }
                     }
                 } @else {
                     span class="view-tab active" {
-                        i class=(icon) {}
-                        " " (label)
+                        (tab.mode.icon())
+                        span { (tab.mode.label()) }
                     }
                 }
             }

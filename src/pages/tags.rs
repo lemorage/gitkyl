@@ -6,6 +6,7 @@ use crate::avatar;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
 use crate::git::TagInfo;
+use crate::icons::{arrow_right_icon, commit_icon, tag_icon};
 use crate::util::format_timestamp;
 
 /// Generates the tags listing page
@@ -35,7 +36,7 @@ pub fn generate_list(repo_name: &str, tags: &[TagInfo]) -> Markup {
                 div.repo-controls {
                     div.control-left {
                         h1.page-title {
-                            i.ph.ph-tag {}
+                            (tag_icon())
                             "Tags"
                         }
                     }
@@ -53,7 +54,7 @@ pub fn generate_list(repo_name: &str, tags: &[TagInfo]) -> Markup {
                         @for tag in tags {
                             a.file-row href=(format!("{}.html", tag.name)) {
                                 div.cell-name {
-                                    i.ph.ph-tag {}
+                                    (tag_icon())
                                     span.name-text { (tag.name) }
                                 }
                                 div.cell-message {
@@ -122,13 +123,13 @@ pub fn generate_detail(
                 div.repo-controls {
                     div.control-left {
                         h1.page-title {
-                            i.ph.ph-tag {}
+                            (tag_icon())
                             (tag.name)
                         }
                     }
                     div.control-right {
                         span.badge {
-                            i.ph.ph-git-commit {}
+                            (commit_icon())
                             "Tag"
                         }
                     }
@@ -177,7 +178,7 @@ pub fn generate_detail(
             div.action-bar {
                 a.browse-link href=(format!("../tree/{}/index.html", tag.name)) {
                     "Browse files"
-                    i.ph.ph-arrow-right {}
+                    (arrow_right_icon())
                 }
             }
         },
@@ -231,7 +232,7 @@ mod tests {
             html_str.contains("file-table"),
             "Should use file-table structure"
         );
-        assert!(html_str.contains("ph-tag"), "Should have tag icon");
+        assert!(html_str.contains("ui-icon"), "Should have tag icon");
     }
 
     #[test]

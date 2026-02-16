@@ -5,10 +5,10 @@ use maud::{Markup, html};
 use std::path::Path;
 
 use crate::components::file_list::{file_row, file_table};
-use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::breadcrumb;
 use crate::git::TreeItem;
+use crate::icons::{file_icon, parent_dir_icon};
 use crate::util::{calculate_depth, format_timestamp};
 
 /// Generates HTML tree page for directory browsing
@@ -110,10 +110,10 @@ pub fn generate(
                             } else {
                                 format!("{}tree/{}/{}.html", "../".repeat(depth), ref_name, parent_path)
                             };
-                            // Parent directory link with custom icon
+                            // Parent directory link with arrow icon
                             (file_row(
                                 &parent_href,
-                                html! { div class="icon-box" { i class="ph ph-arrow-up icon-folder" {} } },
+                                parent_dir_icon(),
                                 "..",
                                 None,
                                 ""

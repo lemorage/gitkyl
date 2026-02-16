@@ -7,6 +7,7 @@ mod config;
 mod filetype;
 mod git;
 mod highlight;
+pub mod icons;
 mod markdown;
 pub mod pages;
 mod tree;
@@ -14,7 +15,6 @@ mod util;
 
 pub use assets::write_css_assets;
 pub use avatar::render;
-pub use components::icons::{is_markdown, is_readme};
 pub use config::Config;
 pub use filetype::{FileType, ImageFormat, detect_file_type, is_binary_content};
 pub use git::{
@@ -24,5 +24,6 @@ pub use git::{
     list_commits, list_commits_paginated, list_files, list_tags, read_blob, read_blob_by_oid,
 };
 pub use highlight::{Highlighter, highlight};
+pub use icons::{is_markdown, is_readme};
 pub use markdown::{LinkResolver, MarkdownRenderer};
 pub use tree::FileTree;

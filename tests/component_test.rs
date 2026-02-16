@@ -276,7 +276,7 @@ fn test_file_table_with_empty_rows() {
 
 #[test]
 fn test_file_row_contains_href_link() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234def5678".to_string(),
         "Initial commit".to_string(),
@@ -299,7 +299,7 @@ fn test_file_row_contains_href_link() {
 
 #[test]
 fn test_file_row_contains_file_row_class() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Update docs".to_string(),
@@ -322,7 +322,7 @@ fn test_file_row_contains_file_row_class() {
 
 #[test]
 fn test_file_row_contains_file_name() {
-    let test_icon = html! { i class="ph-fill ph-folder" {} };
+    let test_icon = html! { span class="file-icon" { "folder" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Add source directory".to_string(),
@@ -346,7 +346,7 @@ fn test_file_row_contains_file_name() {
 
 #[test]
 fn test_file_row_contains_commit_message() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Fix configuration defaults".to_string(),
@@ -370,7 +370,7 @@ fn test_file_row_contains_commit_message() {
 
 #[test]
 fn test_file_row_contains_commit_date() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Add BSD-3-Clause license".to_string(),
@@ -395,8 +395,8 @@ fn test_file_row_contains_commit_date() {
 #[test]
 fn test_file_row_contains_icon_markup() {
     let test_icon = html! {
-        div class="icon-box" {
-            i class="ph-fill ph-file-rs icon-rust" {}
+        span class="file-icon" {
+            "rust-icon"
         }
     };
     let commit = CommitInfo::new(
@@ -416,13 +416,13 @@ fn test_file_row_contains_icon_markup() {
     );
     let html_output = result.into_string();
 
-    assert!(html_output.contains("icon-box"));
-    assert!(html_output.contains("ph-fill ph-file-rs"));
+    assert!(html_output.contains("file-icon"));
+    assert!(html_output.contains("rust-icon"));
 }
 
 #[test]
 fn test_file_row_has_title_with_author_info() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234def5678901234567890123456789012".to_string(),
         "Add comprehensive tests".to_string(),
@@ -446,7 +446,7 @@ fn test_file_row_has_title_with_author_info() {
 
 #[test]
 fn test_file_row_proper_html_structure() {
-    let test_icon = html! { i class="ph-fill ph-folder" {} };
+    let test_icon = html! { span class="file-icon" { "folder" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Add test directory".to_string(),
@@ -473,7 +473,7 @@ fn test_file_row_proper_html_structure() {
 
 #[test]
 fn test_file_row_handles_special_characters_in_filename() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Update versioned file".to_string(),
@@ -496,7 +496,7 @@ fn test_file_row_handles_special_characters_in_filename() {
 
 #[test]
 fn test_file_row_handles_long_commit_messages() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let long_message = "This is a very long commit message that describes in detail all the changes that were made to the file including implementation details and reasoning";
     let commit = CommitInfo::new(
         "abc1234".to_string(),
@@ -520,7 +520,7 @@ fn test_file_row_handles_long_commit_messages() {
 
 #[test]
 fn test_file_row_handles_unicode_in_filenames() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit = CommitInfo::new(
         "abc1234".to_string(),
         "Add Chinese readme".to_string(),
@@ -543,7 +543,7 @@ fn test_file_row_handles_unicode_in_filenames() {
 
 #[test]
 fn test_file_table_and_file_row_integration() {
-    let test_icon = html! { i class="ph-fill ph-file" {} };
+    let test_icon = html! { span class="file-icon" { "icon" } };
     let commit1 = CommitInfo::new(
         "abc1234".to_string(),
         "First commit".to_string(),
@@ -592,7 +592,7 @@ fn test_file_table_and_file_row_integration() {
 
 #[test]
 fn test_file_row_none_commit_shows_empty_message() {
-    let test_icon = html! { i class="ph-fill ph-folder" {} };
+    let test_icon = html! { span class="file-icon" { "folder" } };
 
     let result = file_row("/repo/tree/main/parent/", test_icon, "..", None, "");
     let html_output = result.into_string();
@@ -744,7 +744,7 @@ fn test_branch_selector_single_branch_no_dropdown_icon() {
     let html_str = html.into_string();
 
     assert!(
-        !html_str.contains("ph-caret-down"),
+        !html_str.contains("caret"),
         "Static badge should not contain dropdown arrow icon"
     );
 }
@@ -761,7 +761,7 @@ fn test_branch_selector_multiple_branches_shows_dropdown() {
     let html_str = html.into_string();
 
     assert!(
-        html_str.contains("ph-caret-down"),
+        html_str.contains("caret"),
         "Dropdown should contain caret icon"
     );
 }
@@ -827,12 +827,12 @@ fn test_branch_selector_multiple_branches_has_dropdown_icon() {
     let html_str = html.into_string();
 
     assert!(
-        html_str.contains("ph-caret-down"),
+        html_str.contains("caret"),
         "Multiple branches should trigger dropdown with icon"
     );
     assert!(
-        html_str.contains("branch-caret"),
-        "Caret should have branch-caret class"
+        html_str.contains("ui-icon"),
+        "Dropdown should use inline SVG icons"
     );
 }
 
@@ -848,7 +848,7 @@ fn test_branch_selector_threshold_exactly_at_min() {
     let html_str = html.into_string();
 
     assert!(
-        html_str.contains("ph-caret-down"),
+        html_str.contains("caret"),
         "Exactly min_for_selector branches should trigger dropdown"
     );
     assert!(
@@ -869,7 +869,7 @@ fn test_branch_selector_threshold_just_below_min() {
     let html_str = html.into_string();
 
     assert!(
-        !html_str.contains("ph-caret-down"),
+        !html_str.contains("caret"),
         "Below threshold should show static badge without dropdown icon"
     );
 }

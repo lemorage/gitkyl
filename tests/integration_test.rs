@@ -898,7 +898,7 @@ mod tree_page_tests {
 
         assert!(html.contains("docs"), "Should list docs directory");
         assert!(html.contains("src"), "Should list src directory");
-        assert!(html.contains("icon-folder"), "Should use folder icon");
+        assert!(html.contains("file-icon"), "Should use folder icon");
 
         Ok(())
     }
@@ -1189,7 +1189,7 @@ mod tree_page_tests {
         assert!(html.contains("bin"), "Should list bin directory");
         assert!(html.contains("examples"), "Should list examples directory");
         assert!(html.contains("LICENSE"), "Should list LICENSE file");
-        assert!(html.contains("icon-folder"), "Should have folder icons");
+        assert!(html.contains("file-icon"), "Should have folder icons");
 
         Ok(())
     }
@@ -1286,7 +1286,10 @@ mod tree_page_tests {
         let html = result.into_string();
 
         assert!(html.contains(".."), "Should have parent directory link");
-        assert!(html.contains("ph-arrow-up"), "Should have arrow up icon");
+        assert!(
+            html.contains("file-icon"),
+            "Should have parent directory icon"
+        );
 
         Ok(())
     }

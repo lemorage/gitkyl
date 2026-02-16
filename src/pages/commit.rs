@@ -8,6 +8,7 @@ use crate::components::diff::{changed_files_list, diff_view, file_stats_summary}
 use crate::components::layout::page_wrapper;
 use crate::components::scripts::copy_commit_hash_script;
 use crate::git::{CommitDiff, CommitInfo, get_commit_by_oid, get_commit_diff};
+use crate::icons::copy_icon;
 use crate::util::format_timestamp;
 
 /// Generates commit detail page HTML showing metadata and full diff
@@ -177,7 +178,7 @@ fn commit_header(commit: &CommitInfo, diff: &CommitDiff) -> Markup {
                     span class="metadata-value commit-hash" {
                         code { (commit.oid()) }
                         button class="copy-hash-btn" title="Copy commit hash" {
-                            i class="ph ph-copy" {}
+                            (copy_icon())
                         }
                     }
                 }

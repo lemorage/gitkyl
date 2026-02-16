@@ -6,10 +6,10 @@ use std::path::Path;
 
 use crate::components::commit::{attribution, commit_hash};
 use crate::components::file_list::{file_row, file_table};
-use crate::components::icons::file_icon;
 use crate::components::layout::page_wrapper;
 use crate::components::metadata::{RepoHeaderData, branch_selector, repo_header};
 use crate::git::{CommitInfo, TreeItem};
+use crate::icons::{clock_icon, file_icon, is_readme};
 use crate::util::format_timestamp;
 
 /// Minimum branches required to show selector dropdown
@@ -110,7 +110,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                         format!("{}commits/{}/page-1.html", "../".repeat(data.depth), data.default_branch)
                     };
                     a href=(commits_href) class="history-link" {
-                        i class="ph ph-clock-counter-clockwise" {}
+                        (clock_icon())
                         " " (data.commit_count) " commits"
                     }
                 }
@@ -163,7 +163,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                 section class="readme-section" {
                     div class="readme-card" {
                         div class="readme-header" {
-                            i class="ph ph-info" {}
+                            (file_icon("README.md"))
                             span class="readme-title" { "README.md" }
                         }
                         div class="readme-content latte" {
@@ -208,7 +208,7 @@ pub fn find_and_render_readme(
         if let TreeItem::File { entry, .. } = item
             && let Some(path) = entry.path()
             && let Some(path_str) = path.to_str()
-            && crate::components::icons::is_readme(path)
+            && is_readme(path)
         {
             for variant in README_VARIANTS {
                 if path_str == *variant {
@@ -440,8 +440,8 @@ mod tests {
             "Should have commit date"
         );
         assert!(
-            html_string.contains("class=\"ph ") || html_string.contains("class=\"ph-"),
-            "Should have Phosphor icon class"
+            html_string.contains("file-icon") || html_string.contains("ui-icon"),
+            "Should have inline SVG icon"
         );
         assert!(html_string.contains("lib"), "Should contain directory name");
     }
@@ -535,7 +535,7 @@ mod tests {
 
         let readme_file = files
             .iter()
-            .find(|f| f.path().is_some_and(crate::components::icons::is_readme))
+            .find(|f| f.path().is_some_and(is_readme))
             .expect("Repository should have README");
 
         let readme_path = readme_file
@@ -598,7 +598,7 @@ mod tests {
 
         let readme_files: Vec<_> = files
             .iter()
-            .filter(|f| f.path().is_some_and(crate::components::icons::is_readme))
+            .filter(|f| f.path().is_some_and(is_readme))
             .collect();
 
         if readme_files.is_empty() {

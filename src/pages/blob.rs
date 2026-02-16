@@ -7,7 +7,6 @@ use std::path::Path;
 
 use crate::components::blame::blame_table;
 use crate::components::code::code_table;
-use crate::components::icons::is_markdown;
 use crate::components::layout::page_wrapper;
 use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
 use crate::components::scripts::copy_file_content_script;
@@ -15,6 +14,7 @@ use crate::components::view_toggle::{ViewMode, ViewTab, view_toggle};
 use crate::filetype::{FileType, ImageFormat, detect_file_type};
 use crate::git::{BlameLine, read_blob};
 use crate::highlight::Highlighter;
+use crate::icons::{code_icon, copy_icon, file_icon, file_x_icon, is_markdown};
 use crate::markdown::MarkdownRenderer;
 use crate::util::{calculate_depth, format_file_size};
 
@@ -450,10 +450,10 @@ fn render_blob_page(
 
     let view_tabs = build_view_tabs(file_path_obj, view_mode);
     let title = format!("{}/{}: {}{}", repo_name, ref_name, file_path, title_suffix);
-    let icon_class = if is_markdown_file {
-        "ph ph-file-md"
+    let blob_icon = if is_markdown_file {
+        file_icon(file_path)
     } else {
-        "ph ph-file-code"
+        code_icon()
     };
 
     let markdown_css = format!("{}assets/markdown.css", "../".repeat(depth));
@@ -470,7 +470,7 @@ fn render_blob_page(
             div class="blob-card" {
                 div class="blob-header" {
                     div class="blob-header-left" {
-                        i class=(icon_class) {}
+                        (blob_icon)
                         span class="blob-filename" { (file_name) }
                         @if let Some(meta) = metadata {
                             span class="blob-meta" { (meta.display()) }
@@ -479,7 +479,7 @@ fn render_blob_page(
                     (view_toggle(&view_tabs))
                     @if has_copy_button {
                         button class="action-btn copy-btn" type="button" title="Copy file contents" {
-                            i class="ph ph-copy" {}
+                            (copy_icon())
                         }
                     }
                 }
@@ -759,7 +759,7 @@ fn binary_blob_page_markup(
             main class="blob-container binary-blob" {
                 div class="binary-message" {
                     div class="binary-icon" {
-                        i class="ph ph-file-x" {}
+                        (file_x_icon())
                     }
                     h2 { "Binary file" }
                     p class="binary-info" {

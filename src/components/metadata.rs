@@ -2,6 +2,8 @@
 
 use maud::{Markup, html};
 
+use crate::icons::{branch_icon, caret_down_icon, check_icon, tag_icon};
+
 /// Data for repository header rendering
 pub struct RepoHeaderData<'a> {
     pub name: &'a str,
@@ -31,7 +33,7 @@ pub fn repo_header(data: RepoHeaderData<'_>) -> Markup {
             @if data.tag_count > 0 {
                 @if let Some(href) = data.tags_href {
                     a href=(href) class="repo-tags-link" {
-                        i class="ph ph-tag" {}
+                        (tag_icon())
                         (data.tag_count)
                     }
                 }
@@ -65,7 +67,7 @@ pub fn branch_selector(
     if branches.len() < min_for_selector {
         return html! {
             div class="branch-info" {
-                i class="ph ph-git-branch" {}
+                (branch_icon())
                 span class="branch-name branch-active" { (current) }
             }
         };
@@ -74,15 +76,15 @@ pub fn branch_selector(
     html! {
         div class="branch-selector" {
             div class="branch-button" {
-                i class="ph ph-git-branch" {}
+                (branch_icon())
                 span class="branch-name branch-active" { (current) }
-                i class="ph ph-caret-down branch-caret" {}
+                (caret_down_icon())
             }
             div class="branch-dropdown" {
                 @for branch in branches {
                     @if *branch == current {
                         div class="branch-item branch-current" {
-                            i class="ph ph-check" {}
+                            (check_icon())
                             span { (branch) }
                         }
                     } @else {
