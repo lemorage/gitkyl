@@ -160,10 +160,10 @@
     top: calc(100% + 8px);
     left: 0;
     min-width: 220px;
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
     border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-card);
     padding: 6px;
     z-index: 100;
 }

@@ -23,7 +23,7 @@
 }
 
 .file-row:hover {
-    background-color: #F5F5F7;
+    background-color: var(--bg-body);
 }
 
 .file-row:focus-visible {

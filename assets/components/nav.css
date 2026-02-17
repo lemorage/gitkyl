@@ -49,7 +49,7 @@
 
 .ref-name {
     font-family: var(--font-mono);
-    background: #e8e8ed;
+    background: var(--bg-subtle);
     padding: 4px 10px;
     border-radius: 100px;
     color: var(--text-primary);
@@ -65,7 +65,7 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--accent);
-    background: rgba(0, 113, 227, 0.1);
+    background: var(--bg-accent-subtle);
     border-radius: 100px;
 }
 
