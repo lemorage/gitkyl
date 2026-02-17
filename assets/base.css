@@ -24,6 +24,48 @@
     --text-code: #1D1D1F;
     --indent-offset: 32px;
     --filename-shift: -12px;
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.4);
+    --glass-bg-subtle: rgba(255, 255, 255, 0.2);
+    --glass-bg-faint: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-border-subtle: rgba(255, 255, 255, 0.2);
+    --glass-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+    /* Selection */
+    --selection-bg: rgba(0, 113, 227, 0.3);
+
+    /* Status colors */
+    --color-success: #22c55e;
+    --color-success-bg: rgba(34, 197, 94, 0.15);
+    --color-success-border: rgba(34, 197, 94, 0.3);
+    --color-warning: #f9a825;
+    --color-warning-bg: rgba(255, 223, 93, 0.2);
+    --color-danger: #ef4444;
+    --color-danger-bg: rgba(239, 68, 68, 0.1);
+
+    /* Transparency grid (checkerboard for images) */
+    --transparency-grid: #e0e0e0;
+
+    /* Shadows */
+    --shadow-subtle: rgba(0, 0, 0, 0.06);
+
+    /* Subtle backgrounds */
+    --bg-subtle: rgba(0, 0, 0, 0.04);
+    --bg-subtle-hover: rgba(0, 0, 0, 0.06);
+    --bg-row-alt: rgba(0, 0, 0, 0.02);
+    --bg-overlay: rgba(255, 255, 255, 0.85);
+    --bg-accent-subtle: rgba(0, 113, 227, 0.1);
+    --bg-accent-hover: rgba(0, 113, 227, 0.2);
+
+    /* Scrollbar */
+    --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+
+    /* Line numbers */
+    --color-line-number: rgba(110, 118, 129, 0.4);
+    --color-line-number-hover: rgba(110, 118, 129, 1);
 }
 
 /* Smooth Scroll Behavior */
@@ -69,7 +111,7 @@ body {
 
 /* Selection */
 ::selection {
-    background-color: rgba(0, 113, 227, 0.3);
+    background-color: var(--selection-bg);
 }
 
 /* Commit Hash Tooltip */
@@ -89,13 +131,13 @@ code[data-full]::after {
     color: var(--text-primary);
     background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.4) 0%,
-        rgba(255, 255, 255, 0.2) 100%
+        var(--glass-bg) 0%,
+        var(--glass-bg-subtle) 100%
     );
     backdrop-filter: blur(16px);
     border-radius: var(--radius-s);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.15s, visibility 0.15s;
@@ -130,13 +172,13 @@ code[data-full]:hover::after {
     color: var(--text-primary);
     background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.4) 0%,
-        rgba(255, 255, 255, 0.2) 100%
+        var(--glass-bg) 0%,
+        var(--glass-bg-subtle) 100%
     );
     backdrop-filter: blur(16px);
     border-radius: var(--radius-s);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.15s, visibility 0.15s;

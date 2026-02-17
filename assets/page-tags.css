@@ -10,7 +10,7 @@ header {
     background: var(--bg-card);
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-card);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid var(--glass-border);
     overflow: hidden;
 }
 
@@ -20,7 +20,7 @@ header {
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--bg-overlay);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle);
@@ -31,7 +31,7 @@ header {
 
 @supports not (backdrop-filter: blur(12px)) {
     .repo-controls {
-        background: #f9f9fa;
+        background: var(--bg-code);
     }
 }
 
@@ -66,7 +66,7 @@ header {
     align-items: center;
     gap: 6px;
     padding: 5px 12px;
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
     color: var(--text-secondary);
     border-radius: 100px;
     font-size: 13px;
@@ -138,7 +138,7 @@ header {
 .oid {
     font-family: var(--font-mono);
     padding: 2px 8px;
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
     border-radius: 6px;
     font-size: 12px;
 }
@@ -266,7 +266,7 @@ header {
 }
 
 .browse-link:hover {
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
     color: var(--text-primary);
 }
 

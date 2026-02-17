@@ -10,7 +10,7 @@ header {
     background: var(--bg-card);
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-card);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid var(--glass-border);
     overflow: hidden;
 }
 
@@ -19,7 +19,7 @@ header {
     display: flex;
     align-items: center;
     padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--bg-overlay);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle);
@@ -31,7 +31,7 @@ header {
 
 @supports not (backdrop-filter: blur(12px)) {
     .blob-header {
-        background: #f9f9fa;
+        background: var(--bg-code);
     }
 }
 
@@ -78,12 +78,12 @@ header {
     padding: 0;
     background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.1) 0%,
-        rgba(255, 255, 255, 0.05) 100%
+        var(--glass-bg-subtle) 0%,
+        var(--glass-bg-faint) 100%
     );
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--glass-border-subtle);
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -92,12 +92,12 @@ header {
 .action-btn:hover {
     background: linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.15) 0%,
-        rgba(255, 255, 255, 0.08) 100%
+        var(--glass-bg-subtle) 0%,
+        var(--glass-bg-faint) 100%
     );
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: var(--glass-border);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--glass-shadow);
 }
 
 .action-btn:active {
@@ -118,21 +118,21 @@ header {
 .action-btn.copied {
     background: linear-gradient(
         135deg,
-        rgba(34, 197, 94, 0.15) 0%,
-        rgba(34, 197, 94, 0.08) 100%
+        var(--color-success-bg) 0%,
+        var(--color-success-bg) 100%
     );
-    border-color: rgba(34, 197, 94, 0.3);
+    border-color: var(--color-success-border);
 }
 
 .action-btn.copied i {
-    color: #22c55e;
+    color: var(--color-success);
 }
 
 /* View Toggle Tabs */
 .view-toggle {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
     border-radius: 8px;
     padding: 3px;
     flex-shrink: 0;
@@ -154,13 +154,13 @@ header {
 
 .view-tab:hover:not(.active) {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.5);
+    background: var(--glass-border);
 }
 
 .view-tab.active {
     background: var(--bg-card);
     color: var(--text-primary);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 2px var(--shadow-subtle);
 }
 
 .view-tab i {
@@ -190,7 +190,7 @@ tr.code-line {
 
 tr.code-line:target,
 tr.code-line.highlighted {
-    background-color: rgba(255, 223, 93, 0.2);
+    background-color: var(--color-warning-bg);
 }
 
 /* Line Number Cell */
@@ -209,21 +209,21 @@ td.line-number {
 /* Highlight bar on targeted line */
 tr.code-line:target td.line-number,
 tr.code-line.highlighted td.line-number {
-    border-left-color: #f9a825;
+    border-left-color: var(--color-warning);
 }
 
 td.line-number a {
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 20px;
-    color: rgba(110, 118, 129, 0.4);
+    color: var(--color-line-number);
     text-decoration: none;
     display: block;
     transition: color 0.15s ease;
 }
 
 td.line-number:hover a {
-    color: rgba(110, 118, 129, 1);
+    color: var(--color-line-number-hover);
     cursor: pointer;
 }
 
@@ -278,10 +278,10 @@ td.line-content {
 .image-display img[src*="image/gif"],
 .image-display img[src*="image/webp"] {
     background-image:
-        linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
-        linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
-        linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+        linear-gradient(45deg, var(--transparency-grid) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--transparency-grid) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--transparency-grid) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--transparency-grid) 75%);
     background-size: 16px 16px;
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
@@ -344,7 +344,7 @@ td.line-content {
     border-radius: 0 0 var(--radius-m) var(--radius-m);
     padding: 0 0 6px 4px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 .blame-wrapper::-webkit-scrollbar {
@@ -357,12 +357,12 @@ td.line-content {
 }
 
 .blame-wrapper::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
 }
 
 .blame-wrapper::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--scrollbar-thumb-hover);
 }
 
 table.blame-table {
@@ -383,12 +383,12 @@ tr.blame-line {
 /* Line highlighting */
 tr.blame-line:target,
 tr.blame-line.highlighted {
-    background-color: rgba(255, 223, 93, 0.25) !important;
+    background-color: var(--color-warning-bg) !important;
 }
 
 tr.blame-line:target td.line-number,
 tr.blame-line.highlighted td.line-number {
-    border-left-color: #f9a825;
+    border-left-color: var(--color-warning);
 }
 
 /* Commit group separator */
@@ -491,7 +491,7 @@ td.blame-info:hover .blame-hash {
 td.blame-info:hover .blame-tooltip {
     opacity: 1;
     visibility: visible;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--glass-shadow);
 }
 
 /* Tooltip content */
@@ -541,7 +541,7 @@ tr.blame-line.group-odd td.line-number {
 tr.blame-line.group-even td.blame-age,
 tr.blame-line.group-even td.blame-info,
 tr.blame-line.group-even td.line-number {
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--bg-row-alt);
 }
 
 /* Line numbers */
@@ -559,14 +559,14 @@ tr.blame-line.group-even td.line-number {
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 20px;
-    color: rgba(110, 118, 129, 0.4);
+    color: var(--color-line-number);
     text-decoration: none;
     display: block;
     transition: color 0.15s ease;
 }
 
 .blame-table td.line-number:hover a {
-    color: rgba(110, 118, 129, 1);
+    color: var(--color-line-number-hover);
     cursor: pointer;
 }
 

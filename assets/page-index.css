@@ -57,14 +57,14 @@
     background: var(--bg-card);
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-card);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid var(--glass-border);
 }
 
 /* Card Headers with Backdrop */
 .repo-controls,
 .readme-header {
     padding: 16px 20px;
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--bg-overlay);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle);
@@ -95,7 +95,7 @@
 @supports not (backdrop-filter: blur(20px)) {
     .repo-controls,
     .readme-header {
-        background: #f9f9fa;
+        background: var(--bg-code);
     }
 }
 
@@ -111,7 +111,7 @@
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
     color: var(--text-primary);
     border-radius: 100px;
     font-weight: 500;
@@ -127,7 +127,7 @@
 }
 
 .branch-button:hover {
-    background: rgba(0, 0, 0, 0.06);
+    background: var(--bg-subtle-hover);
 }
 
 .branch-button .ph-git-branch {
@@ -200,7 +200,7 @@
 }
 
 .branch-item:hover {
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
 }
 
 .branch-item span {
@@ -223,7 +223,7 @@
 }
 
 .branch-current:hover {
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--bg-row-alt);
 }
 
 .branch-current i {
@@ -293,7 +293,7 @@
 }
 
 .history-link:hover {
-    background: rgba(0, 0, 0, 0.04);
+    background: var(--bg-subtle);
     color: var(--text-primary);
 }
 

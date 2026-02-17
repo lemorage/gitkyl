@@ -10,7 +10,7 @@ header {
     background: var(--bg-card);
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-card);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid var(--glass-border);
     overflow: hidden;
 }
 
