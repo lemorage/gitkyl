@@ -1,0 +1,63 @@
+/* Catppuccin Mocha UI Theme */
+:root {
+    /* Backgrounds */
+    --bg-body: #1e1e2e;
+    --bg-card: #313244;
+    --bg-code: #181825;
+    --bg-subtle: rgba(255, 255, 255, 0.04);
+    --bg-subtle-hover: rgba(255, 255, 255, 0.06);
+    --bg-row-alt: rgba(255, 255, 255, 0.02);
+    --bg-overlay: rgba(30, 30, 46, 0.85);
+    --bg-accent-subtle: rgba(137, 180, 250, 0.1);
+    --bg-accent-hover: rgba(137, 180, 250, 0.2);
+
+    /* Text */
+    --text-primary: #cdd6f4;
+    --text-secondary: #a6adc8;
+    --text-tertiary: #6c7086;
+    --text-code: #cdd6f4;
+
+    /* Accent */
+    --accent: #89b4fa;
+    --accent-hover: #b4befe;
+
+    /* Borders and shadows */
+    --border-subtle: #45475a;
+    --shadow-card:
+        0 0 0 1px rgba(205, 214, 244, 0.05),
+        0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-subtle: rgba(0, 0, 0, 0.3);
+
+    /* Glassmorphism */
+    --glass-bg: rgba(49, 50, 68, 0.4);
+    --glass-bg-subtle: rgba(49, 50, 68, 0.2);
+    --glass-bg-faint: rgba(49, 50, 68, 0.08);
+    --glass-border: rgba(205, 214, 244, 0.1);
+    --glass-border-subtle: rgba(205, 214, 244, 0.06);
+    --glass-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+    /* Selection */
+    --selection-bg: rgba(137, 180, 250, 0.3);
+
+    /* Status colors */
+    --color-success: #a6e3a1;
+    --color-success-bg: rgba(166, 227, 161, 0.15);
+    --color-success-border: rgba(166, 227, 161, 0.3);
+    --color-warning: #f9e2af;
+    --color-warning-bg: rgba(249, 226, 175, 0.2);
+    --color-danger: #f38ba8;
+    --color-danger-bg: rgba(243, 139, 168, 0.1);
+
+    /* Icons */
+    --icon-folder: #89b4fa;
+    --icon-rust: #fab387;
+    --icon-readme: #89b4fa;
+    --icon-config: #a6adc8;
+
+    /* Misc */
+    --transparency-grid: #45475a;
+    --scrollbar-thumb: rgba(205, 214, 244, 0.2);
+    --scrollbar-thumb-hover: rgba(205, 214, 244, 0.3);
+    --color-line-number: rgba(166, 173, 200, 0.4);
+    --color-line-number-hover: rgba(166, 173, 200, 1);
+}

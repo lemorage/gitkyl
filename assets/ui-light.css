@@ -1,0 +1,63 @@
+/* Catppuccin Latte UI Theme */
+:root {
+    /* Backgrounds */
+    --bg-body: #eff1f5;
+    --bg-card: #ffffff;
+    --bg-code: #e6e9ef;
+    --bg-subtle: rgba(0, 0, 0, 0.04);
+    --bg-subtle-hover: rgba(0, 0, 0, 0.06);
+    --bg-row-alt: rgba(0, 0, 0, 0.02);
+    --bg-overlay: rgba(255, 255, 255, 0.85);
+    --bg-accent-subtle: rgba(30, 102, 245, 0.1);
+    --bg-accent-hover: rgba(30, 102, 245, 0.2);
+
+    /* Text */
+    --text-primary: #4c4f69;
+    --text-secondary: #6c6f85;
+    --text-tertiary: #8c8fa1;
+    --text-code: #4c4f69;
+
+    /* Accent */
+    --accent: #1e66f5;
+    --accent-hover: #2a6ff7;
+
+    /* Borders and shadows */
+    --border-subtle: rgba(0, 0, 0, 0.05);
+    --shadow-card:
+        0 0 0 1px rgba(0, 0, 0, 0.03),
+        0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-subtle: rgba(0, 0, 0, 0.06);
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.4);
+    --glass-bg-subtle: rgba(255, 255, 255, 0.2);
+    --glass-bg-faint: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-border-subtle: rgba(255, 255, 255, 0.2);
+    --glass-shadow: 0 4px 12px rgba(76, 79, 105, 0.1);
+
+    /* Selection */
+    --selection-bg: rgba(30, 102, 245, 0.3);
+
+    /* Status colors */
+    --color-success: #40a02b;
+    --color-success-bg: rgba(64, 160, 43, 0.15);
+    --color-success-border: rgba(64, 160, 43, 0.3);
+    --color-warning: #df8e1d;
+    --color-warning-bg: rgba(223, 142, 29, 0.2);
+    --color-danger: #d20f39;
+    --color-danger-bg: rgba(210, 15, 57, 0.1);
+
+    /* Icons */
+    --icon-folder: #1e66f5;
+    --icon-rust: #fe640b;
+    --icon-readme: #1e66f5;
+    --icon-config: #6c6f85;
+
+    /* Misc */
+    --transparency-grid: #dce0e8;
+    --scrollbar-thumb: rgba(76, 79, 105, 0.2);
+    --scrollbar-thumb-hover: rgba(76, 79, 105, 0.3);
+    --color-line-number: rgba(76, 79, 105, 0.4);
+    --color-line-number-hover: rgba(76, 79, 105, 1);
+}

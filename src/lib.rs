@@ -15,7 +15,7 @@ mod util;
 
 pub use assets::write_css_assets;
 pub use avatar::render;
-pub use config::Config;
+pub use config::{Config, UiMode};
 pub use filetype::{FileType, ImageFormat, detect_file_type, is_binary_content};
 pub use git::{
     BlameLine, BlameResult, ChangeType, ChangedFile, CommitDiff, CommitInfo, DiffHunk, DiffLine,

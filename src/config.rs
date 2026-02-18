@@ -33,6 +33,57 @@ pub struct Config {
     pub no_open: bool,
 }
 
+/// UI color mode derived from theme name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UiMode {
+    #[default]
+    Light,
+    Dark,
+}
+
+impl UiMode {
+    /// Detects UI mode from theme name.
+    ///
+    /// Dark themes are detected by keywords: mocha, dark, dracula, nord, night.
+    /// Everything else defaults to light mode.
+    pub fn detect(theme_name: &str) -> Self {
+        let name = theme_name.to_lowercase();
+
+        let dark_indicators = [
+            "mocha",
+            "dark",
+            "dracula",
+            "nord",
+            "night",
+            "ayu-dark",
+            "gruvbox-dark",
+            "one-dark",
+        ];
+
+        if dark_indicators.iter().any(|ind| name.contains(ind)) {
+            Self::Dark
+        } else {
+            Self::Light
+        }
+    }
+
+    /// Returns the markdown theme class.
+    pub fn markdown_class(&self) -> &'static str {
+        match self {
+            Self::Light => "latte",
+            Self::Dark => "mocha",
+        }
+    }
+
+    /// Returns the UI CSS content.
+    pub fn ui_css(&self) -> &'static str {
+        match self {
+            Self::Light => include_str!("../assets/ui-light.css"),
+            Self::Dark => include_str!("../assets/ui-dark.css"),
+        }
+    }
+}
+
 impl Config {
     /// Parses configuration from command line arguments.
     pub fn parse() -> Self {
@@ -71,6 +122,11 @@ impl Config {
             .and_then(|n| n.to_str())
             .with_context(|| format!("Cannot extract project name from path: {}", path.display()))
             .map(String::from)
+    }
+
+    /// Returns detected UI mode based on theme name.
+    pub fn ui_mode(&self) -> UiMode {
+        UiMode::detect(&self.theme)
     }
 }
 
