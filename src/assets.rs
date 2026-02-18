@@ -3,6 +3,10 @@
 use anyhow::{Context, Result};
 use std::{fs, path::Path};
 
+use crate::config::UiMode;
+
+const UI_LIGHT: &str = include_str!("../assets/ui-light.css");
+const UI_DARK: &str = include_str!("../assets/ui-dark.css");
 const BASE: &str = include_str!("../assets/base.css");
 const LAYOUT: &str = include_str!("../assets/components/layout.css");
 const NAV: &str = include_str!("../assets/components/nav.css");
@@ -17,25 +21,42 @@ const TAGS_PAGE: &str = include_str!("../assets/page-tags.css");
 const MARKDOWN: &str = include_str!("../assets/markdown.css");
 
 /// Writes all bundled CSS assets to output directory
-pub fn write_css_assets(assets_dir: &Path) -> Result<()> {
+pub fn write_css_assets(assets_dir: &Path, ui_mode: UiMode) -> Result<()> {
+    let ui_css = match ui_mode {
+        UiMode::Light => UI_LIGHT,
+        UiMode::Dark => UI_DARK,
+    };
+
     write_bundled(
         assets_dir,
         "index.css",
-        &[BASE, LAYOUT, FILE_LIST, INDEX_PAGE],
+        &[ui_css, BASE, LAYOUT, FILE_LIST, INDEX_PAGE],
     )?;
     write_bundled(
         assets_dir,
         "tree.css",
-        &[BASE, LAYOUT, NAV, FILE_LIST, TREE_PAGE],
+        &[ui_css, BASE, LAYOUT, NAV, FILE_LIST, TREE_PAGE],
     )?;
-    write_bundled(assets_dir, "blob.css", &[BASE, LAYOUT, NAV, BLOB_PAGE])?;
+    write_bundled(
+        assets_dir,
+        "blob.css",
+        &[ui_css, BASE, LAYOUT, NAV, BLOB_PAGE],
+    )?;
     write_bundled(
         assets_dir,
         "commits.css",
-        &[BASE, LAYOUT, NAV, COMMITS_PAGE],
+        &[ui_css, BASE, LAYOUT, NAV, COMMITS_PAGE],
     )?;
-    write_bundled(assets_dir, "commit.css", &[BASE, LAYOUT, NAV, COMMIT_PAGE])?;
-    write_bundled(assets_dir, "tags.css", &[BASE, LAYOUT, NAV, TAGS_PAGE])?;
+    write_bundled(
+        assets_dir,
+        "commit.css",
+        &[ui_css, BASE, LAYOUT, NAV, COMMIT_PAGE],
+    )?;
+    write_bundled(
+        assets_dir,
+        "tags.css",
+        &[ui_css, BASE, LAYOUT, NAV, TAGS_PAGE],
+    )?;
     write_bundled(assets_dir, "markdown.css", &[MARKDOWN])?;
     Ok(())
 }

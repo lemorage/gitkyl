@@ -262,7 +262,8 @@ pub fn generate_from_content(
 ///     Path::new("."),
 ///     "main",
 ///     Path::new("README.md"),
-///     "my-repo"
+///     "my-repo",
+///     "latte"
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
@@ -271,13 +272,20 @@ pub fn generate_markdown(
     ref_name: &str,
     file_path: impl AsRef<Path>,
     repo_name: &str,
+    markdown_class: &str,
 ) -> Result<Markup> {
     let path_str = file_path.as_ref().display().to_string();
 
     let content_bytes = read_blob(&repo_path, Some(ref_name), &file_path)
         .with_context(|| format!("Failed to read blob from repository: {}", path_str))?;
 
-    generate_markdown_from_content(&content_bytes, file_path.as_ref(), ref_name, repo_name)
+    generate_markdown_from_content(
+        &content_bytes,
+        file_path.as_ref(),
+        ref_name,
+        repo_name,
+        markdown_class,
+    )
 }
 
 /// Generates rendered markdown page from pre-read content bytes.
@@ -286,6 +294,7 @@ pub fn generate_markdown_from_content(
     file_path: &Path,
     ref_name: &str,
     repo_name: &str,
+    markdown_class: &str,
 ) -> Result<Markup> {
     let path_str = file_path.display().to_string();
 
@@ -307,6 +316,7 @@ pub fn generate_markdown_from_content(
         BlobContent::Preview {
             html: &rendered_html,
         },
+        markdown_class,
     ))
 }
 
@@ -351,6 +361,7 @@ fn generate_text_blob(
             lines: &highlighted_lines,
             metadata: &metadata,
         },
+        "latte",
     ))
 }
 
@@ -407,6 +418,7 @@ fn render_blob_page(
     ref_name: &str,
     repo_name: &str,
     content: BlobContent,
+    markdown_class: &str,
 ) -> Markup {
     let depth = calculate_depth(ref_name, file_path);
     let index_path = "../".repeat(depth) + "index.html";
@@ -488,7 +500,7 @@ fn render_blob_page(
                         (code_table(lines))
                     }
                     BlobContent::Preview { html } => {
-                        main class="markdown-content latte" {
+                        main class=(format!("markdown-content {}", markdown_class)) {
                             (PreEscaped(html))
                         }
                     }
@@ -583,6 +595,7 @@ pub fn generate_markdown_source_from_content(
             lines: &highlighted_lines,
             metadata: &metadata,
         },
+        "latte",
     ))
 }
 
@@ -653,6 +666,7 @@ pub fn generate_blame(
             highlighted: &highlighted_lines,
             metadata: &metadata,
         },
+        "latte",
     ))
 }
 
@@ -837,8 +851,14 @@ mod tests {
         fs::write(repo.path().join("README.md"), "# Test\nContent").unwrap();
         git_commit(repo.path()).unwrap();
 
-        let html =
-            generate_markdown(repo.path(), "HEAD", Path::new("README.md"), "test-repo").unwrap();
+        let html = generate_markdown(
+            repo.path(),
+            "HEAD",
+            Path::new("README.md"),
+            "test-repo",
+            "latte",
+        )
+        .unwrap();
 
         let html_str = html.into_string();
         assert!(html_str.contains("test-repo"));

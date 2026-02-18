@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     let repo_info = gitkyl::analyze_repository(&config.repo, config.owner.clone())
         .context("Failed to analyze repository")?;
 
-    renderer::setup_output_directories(&config.output)?;
+    renderer::setup_output_directories(&config.output, config.ui_mode())?;
 
     let latest_commit =
         gitkyl::list_commits(&config.repo, Some(repo_info.default_branch()), Some(1))
@@ -112,6 +112,7 @@ fn main() -> Result<()> {
         items: &tree_items,
         readme_html: readme_html.as_deref(),
         depth: 0,
+        markdown_class: config.ui_mode().markdown_class(),
     });
 
     let index_path = config.output.join("index.html");

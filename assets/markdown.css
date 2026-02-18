@@ -626,8 +626,8 @@
     --links: #89b4fa;
     --inline-code-color: #cdd6f4;
     --quote-bg: #181825;
-    --quote-border: #11111b;
-    --table-border-color: #313244;
+    --quote-border: #45475a;
+    --table-border-color: #45475a;
     --table-header-bg: #181825;
     --table-alternate-bg: #181825;
     --warning-border: #fab387;
@@ -655,14 +655,14 @@
     font-size: 2.2em;
     margin-top: 0;
     padding-bottom: 0.3em;
-    border-bottom: 1px solid #313244;
+    border-bottom: 1px solid #45475a;
 }
 
 .mocha h2 {
     font-size: 1.7em;
     margin-top: 48px;
     padding-bottom: 0.3em;
-    border-bottom: 1px solid #313244;
+    border-bottom: 1px solid #45475a;
 }
 
 .mocha h3 {
@@ -882,7 +882,7 @@
 .mocha blockquote {
     padding: 0 1em;
     color: #9399b2;
-    border-left: 0.25em solid #313244;
+    border-left: 0.25em solid #45475a;
     margin-top: 0;
     margin-bottom: 16px;
     background: transparent;
@@ -907,7 +907,7 @@
     height: 0.25em;
     padding: 0;
     margin: 32px 0;
-    background-color: #313244;
+    background-color: #45475a;
     border: 0;
 }
 
@@ -1220,108 +1220,6 @@
 .mocha .hljs-deletion {
     color: #f38ba8;
     background: rgba(243, 139, 168, 0.15);
-}
-
-/* AUTO DARK MODE: Override .latte with mocha colors when system prefers dark */
-@media (prefers-color-scheme: dark) {
-    .latte {
-        --bg: #1e1e2e;
-        --fg: #cdd6f4;
-        --links: #89b4fa;
-        --inline-code-color: #cdd6f4;
-        --quote-bg: #181825;
-        --quote-border: #11111b;
-        --table-border-color: #313244;
-        --table-header-bg: #181825;
-        --table-alternate-bg: #181825;
-        --warning-border: #fab387;
-        --color-scheme: dark;
-    }
-
-    .latte h1, .latte h2, .latte h3,
-    .latte h4, .latte h5, .latte h6 { color: #cdd6f4; }
-    .latte h1, .latte h2 { border-bottom-color: #313244; }
-    .latte h6 { color: #9399b2; }
-    .latte p, .latte strong { color: #cdd6f4; }
-    .latte del { color: #9399b2; }
-    .latte a { color: #89b4fa; }
-    .latte a:visited { color: #cba6f7; }
-    .latte code { color: #cdd6f4; background: #1e1e2e; }
-    .latte pre { background: #1e1e2e; }
-    .latte :is(h1, h2, h3, h4, h5, h6) a code { color: #cdd6f4; }
-    .latte a code { color: #89b4fa; }
-    .latte blockquote { color: #9399b2; border-left-color: #313244; }
-    .latte blockquote blockquote { border-top-color: #585b70; border-bottom-color: #585b70; }
-    .latte hr { background-color: #313244; }
-    .latte li { color: #cdd6f4; }
-
-    /* Prism tokens */
-    .latte .token.comment, .latte .token.prolog,
-    .latte .token.doctype, .latte .token.cdata { color: #9399b2; }
-    .latte .token.punctuation { color: #bac2de; }
-    .latte .token.property, .latte .token.tag, .latte .token.boolean,
-    .latte .token.number, .latte .token.constant, .latte .token.symbol,
-    .latte .token.deleted { color: #fab387; }
-    .latte .token.selector, .latte .token.attr-name, .latte .token.string,
-    .latte .token.char, .latte .token.builtin, .latte .token.inserted { color: #a6e3a1; }
-    .latte .token.operator, .latte .token.entity, .latte .token.url,
-    .latte .language-css .token.string, .latte .style .token.string { color: #89dceb; }
-    .latte .token.atrule, .latte .token.attr-value, .latte .token.keyword { color: #cba6f7; }
-    .latte .token.function, .latte .token.class-name { color: #89b4fa; }
-    .latte .token.regex, .latte .token.important, .latte .token.variable { color: #f38ba8; }
-
-    /* hljs classes */
-    .latte .hljs-keyword { color: #cba6f7; }
-    .latte .hljs-built_in { color: #f38ba8; }
-    .latte .hljs-type { color: #f9e2af; }
-    .latte .hljs-literal, .latte .hljs-number { color: #fab387; }
-    .latte .hljs-operator { color: #89dceb; }
-    .latte .hljs-punctuation { color: #bac2de; }
-    .latte .hljs-property { color: #94e2d5; }
-    .latte .hljs-regexp { color: #f5c2e7; }
-    .latte .hljs-string, .latte .hljs-char-escape { color: #a6e3a1; }
-    .latte .hljs-subst { color: #a6adc8; }
-    .latte .hljs-symbol { color: #f2cdcd; }
-    .latte .hljs-variable, .latte .hljs-variable-language { color: #cba6f7; }
-    .latte .hljs-constant { color: #fab387; }
-    .latte .hljs-title, .latte .hljs-function-title { color: #89b4fa; }
-    .latte .hljs-class-title { color: #f9e2af; }
-    .latte .hljs-params { color: #cdd6f4; }
-    .latte .hljs-comment { color: #9399b2; }
-    .latte .hljs-doctag { color: #f38ba8; }
-    .latte .hljs-meta { color: #fab387; }
-    .latte .hljs-section { color: #89b4fa; }
-    .latte .hljs-tag { color: #94e2d5; }
-    .latte .hljs-name { color: #cba6f7; }
-    .latte .hljs-attr { color: #89b4fa; }
-    .latte .hljs-attribute { color: #a6e3a1; }
-    .latte .hljs-bullet { color: #94e2d5; }
-    .latte .hljs-code { color: #a6e3a1; }
-    .latte .hljs-emphasis { color: #f38ba8; }
-    .latte .hljs-strong { color: #f38ba8; }
-    .latte .hljs-formula { color: #94e2d5; }
-    .latte .hljs-link { color: #74c7ec; }
-    .latte .hljs-quote { color: #a6e3a1; }
-    .latte .hljs-selector-tag { color: #f9e2af; }
-    .latte .hljs-selector-id { color: #89b4fa; }
-    .latte .hljs-selector-class { color: #94e2d5; }
-    .latte .hljs-selector-attr { color: #cba6f7; }
-    .latte .hljs-selector-pseudo { color: #94e2d5; }
-    .latte .hljs-template-tag, .latte .hljs-template-variable { color: #f2cdcd; }
-    .latte .hljs-addition { color: #a6e3a1; background: rgba(166, 227, 161, 0.15); }
-    .latte .hljs-deletion { color: #f38ba8; background: rgba(243, 139, 168, 0.15); }
-
-    /* Alerts */
-    .latte .markdown-alert-note { background-color: rgba(137, 180, 250, 0.1); border-color: #89b4fa; color: #cdd6f4; }
-    .latte .markdown-alert-note .markdown-alert-title { color: #89b4fa; }
-    .latte .markdown-alert-tip { background-color: rgba(166, 227, 161, 0.1); border-color: #a6e3a1; color: #cdd6f4; }
-    .latte .markdown-alert-tip .markdown-alert-title { color: #a6e3a1; }
-    .latte .markdown-alert-important { background-color: rgba(203, 166, 247, 0.1); border-color: #cba6f7; color: #cdd6f4; }
-    .latte .markdown-alert-important .markdown-alert-title { color: #cba6f7; }
-    .latte .markdown-alert-warning { background-color: rgba(249, 226, 175, 0.1); border-color: #f9e2af; color: #cdd6f4; }
-    .latte .markdown-alert-warning .markdown-alert-title { color: #f9e2af; }
-    .latte .markdown-alert-caution { background-color: rgba(243, 139, 168, 0.1); border-color: #f38ba8; color: #cdd6f4; }
-    .latte .markdown-alert-caution .markdown-alert-title { color: #f38ba8; }
 }
 
 /* RESPONSIVE DESIGN */

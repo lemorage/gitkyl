@@ -30,6 +30,7 @@ pub struct IndexPageData<'a> {
     pub items: &'a [TreeItem],
     pub readme_html: Option<&'a str>,
     pub depth: usize,
+    pub markdown_class: &'a str,
 }
 
 /// Generates repository index page HTML with optional README rendering
@@ -166,7 +167,7 @@ pub fn generate(data: IndexPageData<'_>) -> Markup {
                             (file_icon("README.md"))
                             span class="readme-title" { "README.md" }
                         }
-                        div class="readme-content latte" {
+                        div class=(format!("readme-content {}", data.markdown_class)) {
                             (PreEscaped(readme))
                         }
                     }
@@ -268,6 +269,7 @@ mod tests {
             items: &items,
             readme_html: None,
             depth: 0,
+            markdown_class: "latte",
         });
         let html_string = html.into_string();
 
@@ -311,6 +313,7 @@ mod tests {
             items: &items,
             readme_html: None,
             depth: 0,
+            markdown_class: "latte",
         });
         let html_string = html.into_string();
 
@@ -376,6 +379,7 @@ mod tests {
             items: &items,
             readme_html: None,
             depth: 0,
+            markdown_class: "latte",
         });
         let html_string = html.into_string();
 
@@ -427,6 +431,7 @@ mod tests {
             items: &items,
             readme_html: None,
             depth: 0,
+            markdown_class: "latte",
         });
         let html_string = html.into_string();
 
@@ -469,6 +474,7 @@ mod tests {
             items: &items,
             readme_html,
             depth: 0,
+            markdown_class: "latte",
         });
         let html_string = html.into_string();
 
@@ -514,6 +520,7 @@ mod tests {
             items: &items,
             readme_html: None,
             depth: 0,
+            markdown_class: "latte",
         });
         let html_string = html.into_string();
 

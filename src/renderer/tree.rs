@@ -83,6 +83,7 @@ fn process_tree_directory(ctx: &TreeContext, dir_path: &str) -> Result<()> {
             items: &tree_items_for_page,
             readme_html: readme_html.as_deref(),
             depth,
+            markdown_class: ctx.config.ui_mode().markdown_class(),
         })
     } else {
         gitkyl::pages::tree::generate(

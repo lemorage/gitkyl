@@ -4,6 +4,7 @@
 //! before page generation begins.
 
 use anyhow::{Context, Result};
+use gitkyl::UiMode;
 use std::fs;
 use std::path::Path;
 
@@ -15,17 +16,18 @@ use std::path::Path;
 /// # Arguments
 ///
 /// * `output_dir`: Base output directory path
+/// * `ui_mode`: UI color mode (light or dark)
 ///
 /// # Errors
 ///
 /// Returns error if directory creation fails or CSS writing fails
-pub fn setup_output_directories(output_dir: &Path) -> Result<()> {
+pub fn setup_output_directories(output_dir: &Path, ui_mode: UiMode) -> Result<()> {
     fs::create_dir_all(output_dir).context("Failed to create output directory")?;
 
     let assets_dir = output_dir.join("assets");
     fs::create_dir_all(&assets_dir).context("Failed to create assets directory")?;
 
-    gitkyl::write_css_assets(&assets_dir).context("Failed to write CSS assets")?;
+    gitkyl::write_css_assets(&assets_dir, ui_mode).context("Failed to write CSS assets")?;
 
     Ok(())
 }
@@ -43,7 +45,7 @@ mod tests {
         let output_path = temp_dir.path().join("output");
 
         // Act: call setup function
-        let result = setup_output_directories(&output_path);
+        let result = setup_output_directories(&output_path, UiMode::Light);
 
         // Assert: directories should be created
         assert!(
@@ -67,7 +69,7 @@ mod tests {
         let output_path = temp_dir.path().join("output");
 
         // Act: call setup function
-        let result = setup_output_directories(&output_path);
+        let result = setup_output_directories(&output_path, UiMode::Light);
 
         // Assert: CSS files should be written
         assert!(

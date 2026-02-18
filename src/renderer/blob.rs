@@ -141,6 +141,7 @@ fn process_markdown_blob(
             path,
             branch,
             repo_info.name(),
+            config.ui_mode().markdown_class(),
         )
         .with_context(|| format!("Failed to render markdown {}", path.display()))?;
         cache.insert(
