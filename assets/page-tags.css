@@ -127,10 +127,10 @@ header {
 
 .cell-meta {
     flex: 2;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    justify-content: flex-end;
-    gap: 16px;
+    gap: 0;
     font-size: 13px;
     color: var(--text-tertiary);
 }
@@ -141,6 +141,14 @@ header {
     background: var(--bg-subtle);
     border-radius: 6px;
     font-size: 12px;
+    display: inline-block;
+    justify-self: end;
+    margin-right: -12px;
+}
+
+.cell-meta .date {
+    text-align: right;
+    width: 120px;
 }
 
 .faint {
