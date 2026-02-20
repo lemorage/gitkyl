@@ -237,28 +237,7 @@ td.line-content {
 
 
 
-/* Image Blob Styles */
-.image-blob {
-    display: block;
-    max-width: 100%;
-}
-
-.image-meta {
-    padding: 12px 16px;
-    background: var(--bg-lines);
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.file-info {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-}
-
-.file-info strong {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
+/* Image Display */
 .image-display {
     padding: 24px;
     text-align: center;
@@ -286,27 +265,13 @@ td.line-content {
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
-/* Binary Blob Styles */
-.binary-blob {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 300px;
-}
-
-.binary-message {
+/* Binary Content */
+.binary-content {
     text-align: center;
     padding: 48px 24px;
-    max-width: 400px;
 }
 
-.binary-icon {
-    font-size: 48px;
-    color: var(--text-secondary);
-    margin-bottom: 16px;
-}
-
-.binary-message h2 {
+.binary-content h2 {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
@@ -316,18 +281,8 @@ td.line-content {
 .binary-info {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    margin: 0 0 16px;
-    line-height: 1.5;
-}
-
-.file-details {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
     margin: 0;
-}
-
-.file-details strong {
-    color: var(--text-primary);
+    line-height: 1.5;
 }
 
 /* Markdown Content inside blob card */

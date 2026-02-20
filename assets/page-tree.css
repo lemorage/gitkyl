@@ -14,9 +14,3 @@ header {
     overflow: hidden;
 }
 
-/* Empty State */
-.empty-state {
-    padding: 3rem;
-    text-align: center;
-    color: var(--text-secondary);
-}

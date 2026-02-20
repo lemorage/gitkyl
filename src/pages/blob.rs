@@ -710,17 +710,24 @@ fn image_blob_page_markup(
     let file_size = format_file_size(image_bytes.len());
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
+    let file_name = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+
     page_wrapper(
         &title,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            main class="blob-container image-blob" {
-                div class="image-meta" {
-                    span class="file-info" {
-                        strong { (format.extension().to_uppercase()) }
-                        " · "
-                        (file_size)
+            div class="blob-card" {
+                div class="blob-header" {
+                    div class="blob-header-left" {
+                        (file_icon(file_path))
+                        span class="blob-filename" { (file_name) }
+                        span class="blob-meta" {
+                            (format.extension().to_uppercase()) " · " (file_size)
+                        }
                     }
                 }
                 div class="image-display" {
@@ -765,23 +772,28 @@ fn binary_blob_page_markup(
     let file_size = format_file_size(file_size_bytes);
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);
 
+    let file_name = Path::new(file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(file_path);
+
     page_wrapper(
         &title,
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            main class="blob-container binary-blob" {
-                div class="binary-message" {
-                    div class="binary-icon" {
+            div class="blob-card" {
+                div class="blob-header" {
+                    div class="blob-header-left" {
                         (file_x_icon())
+                        span class="blob-filename" { (file_name) }
+                        span class="blob-meta" { (file_size) }
                     }
+                }
+                div class="binary-content" {
                     h2 { "Binary file" }
                     p class="binary-info" {
                         "This file contains binary data and cannot be displayed as text."
-                    }
-                    p class="file-details" {
-                        strong { "Size: " }
-                        (file_size)
                     }
                 }
             }
@@ -885,7 +897,7 @@ mod tests {
         let html_str = html.into_string();
         assert!(html_str.contains("test-repo"));
         assert!(html_str.contains("test.png"));
-        assert!(html_str.contains("image-blob"));
+        assert!(html_str.contains("blob-card"));
         assert!(html_str.contains("data:image/png;base64,"));
         assert!(html_str.contains("PNG"));
     }
@@ -909,7 +921,7 @@ mod tests {
         let html_str = html.into_string();
         assert!(html_str.contains("test-repo"));
         assert!(html_str.contains("data.bin"));
-        assert!(html_str.contains("binary-blob"));
+        assert!(html_str.contains("blob-card"));
         assert!(html_str.contains("Binary file"));
         assert!(html_str.contains("binary data"));
         assert!(html_str.contains("7 bytes"));

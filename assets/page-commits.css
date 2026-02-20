@@ -14,15 +14,6 @@ main h1 {
     margin-bottom: 1.5rem;
 }
 
-.empty-state {
-    padding: 2rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 14px;
-    background-color: var(--bg-body);
-    border-radius: var(--radius-m);
-}
-
 /* Commit List Container */
 .commit-list {
     list-style: none;

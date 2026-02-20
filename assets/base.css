@@ -168,6 +168,14 @@ code[data-full]:hover::after {
     margin-left: 4px;
 }
 
+/* Empty State */
+.empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     body {

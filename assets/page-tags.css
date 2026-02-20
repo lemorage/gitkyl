@@ -292,13 +292,6 @@ header {
     outline-offset: 2px;
 }
 
-/* Empty State */
-.empty-state {
-    padding: 48px;
-    text-align: center;
-    color: var(--text-secondary);
-}
-
 /* Responsive */
 @media (max-width: 768px) {
     .file-row {

@@ -311,16 +311,6 @@
     outline-offset: 2px;
 }
 
-/* Empty State */
-.empty-state {
-    padding: 2rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 14px;
-    background-color: var(--bg-body);
-    border-radius: var(--radius-m);
-}
-
 /* README Section */
 .readme-section {
     margin-top: 32px;
