@@ -94,7 +94,7 @@ pub fn generate(
         &[&css_path],
         html! {
             (breadcrumb(repo_name, &index_path, &breadcrumb_data, ref_name))
-            main class="tree-container" {
+            main class="repo-card" {
                 @if items.is_empty() && tree_path.is_empty() {
                     p class="empty-state" { "Empty directory" }
                 } @else {

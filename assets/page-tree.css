@@ -4,13 +4,3 @@
 header {
     margin-bottom: 2rem;
 }
-
-/* Tree Container */
-.tree-container {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
-    overflow: hidden;
-}
-

@@ -17,10 +17,6 @@ main h1 {
 /* Commit List Container */
 .commit-list {
     list-style: none;
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
     overflow: hidden;
 }
 
