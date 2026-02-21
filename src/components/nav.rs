@@ -60,3 +60,39 @@ pub fn breadcrumb(
 pub fn extract_breadcrumb_components(path: &str) -> Vec<&str> {
     path.split('/').filter(|s| !s.is_empty()).collect()
 }
+
+/// Builds breadcrumb link data from path components
+///
+/// Maps each component to a `(name, link)` pair where all components
+/// except the last get a link to their tree page, and the last gets
+/// `None` (current location, no link).
+///
+/// # Arguments
+///
+/// * `components`: Path segments from `extract_breadcrumb_components`
+/// * `depth`: Directory depth for relative path calculation
+/// * `ref_name`: Git reference being viewed
+pub fn build_breadcrumb_data<'a>(
+    components: &[&'a str],
+    depth: usize,
+    ref_name: &str,
+) -> Vec<(&'a str, Option<String>)> {
+    components
+        .iter()
+        .enumerate()
+        .map(|(idx, &component)| {
+            if idx == components.len() - 1 {
+                (component, None)
+            } else {
+                let partial_path = components[..=idx].join("/");
+                let link = format!(
+                    "{}tree/{}/{}.html",
+                    "../".repeat(depth),
+                    ref_name,
+                    partial_path
+                );
+                (component, Some(link))
+            }
+        })
+        .collect()
+}

@@ -8,7 +8,7 @@ use std::path::Path;
 use crate::components::blame::blame_table;
 use crate::components::code::code_table;
 use crate::components::layout::page_wrapper;
-use crate::components::nav::{breadcrumb, extract_breadcrumb_components};
+use crate::components::nav::{breadcrumb, build_breadcrumb_data, extract_breadcrumb_components};
 use crate::components::scripts::copy_file_content_script;
 use crate::components::view_toggle::{ViewMode, ViewTab, view_toggle};
 use crate::filetype::{FileType, ImageFormat, detect_file_type};
@@ -424,24 +424,7 @@ fn render_blob_page(
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
 
-    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
-        .iter()
-        .enumerate()
-        .map(|(idx, &component)| {
-            if idx == breadcrumb_components.len() - 1 {
-                (component, None)
-            } else {
-                let partial_path = breadcrumb_components[..=idx].join("/");
-                let link = format!(
-                    "{}tree/{}/{}.html",
-                    "../".repeat(depth),
-                    ref_name,
-                    partial_path
-                );
-                (component, Some(link))
-            }
-        })
-        .collect();
+    let breadcrumb_data = build_breadcrumb_data(breadcrumb_components, depth, ref_name);
 
     let file_path_obj = Path::new(file_path);
     let file_name = file_path_obj
@@ -683,24 +666,7 @@ fn image_blob_page_markup(
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
 
-    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
-        .iter()
-        .enumerate()
-        .map(|(idx, &component)| {
-            if idx == breadcrumb_components.len() - 1 {
-                (component, None)
-            } else {
-                let partial_path = breadcrumb_components[..=idx].join("/");
-                let link = format!(
-                    "{}tree/{}/{}.html",
-                    "../".repeat(depth),
-                    ref_name,
-                    partial_path
-                );
-                (component, Some(link))
-            }
-        })
-        .collect();
+    let breadcrumb_data = build_breadcrumb_data(breadcrumb_components, depth, ref_name);
 
     let data_url = format!(
         "data:{};base64,{}",
@@ -750,24 +716,7 @@ fn binary_blob_page_markup(
     let index_path = "../".repeat(depth) + "index.html";
     let css_path = format!("{}assets/blob.css", "../".repeat(depth));
 
-    let breadcrumb_data: Vec<(&str, Option<String>)> = breadcrumb_components
-        .iter()
-        .enumerate()
-        .map(|(idx, &component)| {
-            if idx == breadcrumb_components.len() - 1 {
-                (component, None)
-            } else {
-                let partial_path = breadcrumb_components[..=idx].join("/");
-                let link = format!(
-                    "{}tree/{}/{}.html",
-                    "../".repeat(depth),
-                    ref_name,
-                    partial_path
-                );
-                (component, Some(link))
-            }
-        })
-        .collect();
+    let breadcrumb_data = build_breadcrumb_data(breadcrumb_components, depth, ref_name);
 
     let file_size = format_file_size(file_size_bytes);
     let title = format!("{}/{}: {}", repo_name, ref_name, file_path);

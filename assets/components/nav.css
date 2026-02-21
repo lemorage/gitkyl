@@ -57,16 +57,13 @@
     font-weight: 500;
 }
 
-.ref-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    margin-left: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--accent);
-    background: var(--bg-accent-subtle);
-    border-radius: 100px;
+.breadcrumb-item {
+    color: var(--text-secondary);
+}
+
+.breadcrumb-item-active {
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 /* Responsive */

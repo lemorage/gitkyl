@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::components::file_list::{file_row, file_table};
 use crate::components::layout::page_wrapper;
-use crate::components::nav::breadcrumb;
+use crate::components::nav::{breadcrumb, build_breadcrumb_data};
 use crate::git::TreeItem;
 use crate::icons::{file_icon, parent_dir_icon};
 use crate::util::{calculate_depth, format_timestamp};
@@ -57,29 +57,7 @@ pub fn generate(
     let depth = calculate_depth(ref_name, tree_path);
     let index_path = "../".repeat(depth) + "index.html";
 
-    // Build breadcrumb data from path_components
-    let breadcrumb_data: Vec<(&str, Option<String>)> = if path_components.is_empty() {
-        vec![]
-    } else {
-        path_components
-            .iter()
-            .enumerate()
-            .map(|(idx, &component)| {
-                if idx == path_components.len() - 1 {
-                    (component, None) // Current directory, no link
-                } else {
-                    let partial_path = path_components[..=idx].join("/");
-                    let link = format!(
-                        "{}tree/{}/{}.html",
-                        "../".repeat(depth),
-                        ref_name,
-                        partial_path
-                    );
-                    (component, Some(link))
-                }
-            })
-            .collect()
-    };
+    let breadcrumb_data = build_breadcrumb_data(&path_components, depth, ref_name);
 
     let title = if tree_path.is_empty() {
         format!("{}/{}", repo_name, ref_name)
