@@ -41,12 +41,12 @@
 
     /* Status colors */
     --color-success: #a6e3a1;
-    --color-success-bg: rgba(166, 227, 161, 0.15);
+    --color-success-bg: rgba(166, 227, 161, 0.2);
     --color-success-border: rgba(166, 227, 161, 0.3);
     --color-warning: #f9e2af;
     --color-warning-bg: rgba(249, 226, 175, 0.2);
     --color-danger: #f38ba8;
-    --color-danger-bg: rgba(243, 139, 168, 0.1);
+    --color-danger-bg: rgba(243, 139, 168, 0.15);
 
     /* Misc */
     --transparency-grid: #45475a;

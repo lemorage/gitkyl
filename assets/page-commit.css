@@ -73,11 +73,11 @@
 .commit-hash code {
     font-family: var(--font-mono);
     font-size: 13px;
-    background: var(--bg-code);
+    color: var(--accent);
+    background: var(--bg-accent-subtle);
     padding: 4px 8px;
-    margin-left: -8px;
     border-radius: var(--radius-s);
-    color: var(--text-primary);
+    font-weight: 500;
 }
 
 .copy-hash-btn {
@@ -94,7 +94,9 @@
 }
 
 .copy-hash-btn:hover {
-    border-color: var(--border-subtle);
+    background: var(--bg-subtle);
+    border-color: var(--text-tertiary);
+    color: var(--text-primary);
 }
 
 .copy-hash-btn .ui-icon {
@@ -104,11 +106,20 @@
 
 .parent-link {
     text-decoration: none;
-    font-family: var(--font-mono);
 }
 
 .parent-link:hover {
     text-decoration: underline;
+}
+
+.parent-link code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--bg-accent-subtle);
+    padding: 4px 8px;
+    border-radius: var(--radius-s);
+    font-weight: 500;
 }
 
 /* Files Changed Section */
@@ -175,6 +186,7 @@
 .file-link {
     flex: 1;
     min-width: 0;
+    color: var(--accent);
     text-decoration: none;
     font-family: var(--font-mono);
     font-size: 13px;
