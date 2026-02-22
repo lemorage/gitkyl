@@ -9,18 +9,8 @@
 
 /* Commit Header Card */
 .commit-header-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
     padding: 24px;
     margin-bottom: 24px;
-}
-
-@supports not (backdrop-filter: blur(12px)) {
-    .commit-header-card {
-        background: var(--bg-code);
-    }
 }
 
 /* Commit Message */
@@ -104,16 +94,15 @@
 }
 
 .copy-hash-btn:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-interactive);
+    border-color: var(--border-subtle);
 }
 
-.copy-hash-btn i {
-    font-size: 14px;
+.copy-hash-btn .ui-icon {
+    width: 14px;
+    height: 14px;
 }
 
 .parent-link {
-    color: var(--text-link);
     text-decoration: none;
     font-family: var(--font-mono);
 }
@@ -124,23 +113,14 @@
 
 /* Files Changed Section */
 .files-changed-section {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
-    overflow: hidden;
     margin-bottom: 24px;
 }
 
+/* Glassmorphism base from card-header.css */
 .files-changed-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-subtle);
 }
 
 .files-changed-header h2 {
@@ -196,7 +176,6 @@
     flex: 1;
     min-width: 0;
     text-decoration: none;
-    color: var(--text-link);
     font-family: var(--font-mono);
     font-size: 13px;
 }
@@ -247,24 +226,11 @@
     gap: 24px;
 }
 
-/* File Diff */
-.file-diff {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
-    overflow: hidden;
-}
-
+/* File Diff Header (glassmorphism base from card-header.css) */
 .diff-file-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-subtle);
 }
 
 .diff-file-path {
@@ -371,10 +337,6 @@
 
 /* No Changes State */
 .no-changes {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
     padding: 48px 24px;
     text-align: center;
     color: var(--text-secondary);

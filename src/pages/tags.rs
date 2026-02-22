@@ -50,9 +50,9 @@ pub fn generate_list(repo_name: &str, tags: &[TagInfo]) -> Markup {
                         p { "No tags found in this repository." }
                     }
                 } @else {
-                    div.file-table {
+                    div.tag-list {
                         @for tag in tags {
-                            a.file-row href=(format!("{}.html", tag.name)) {
+                            a.tag-row href=(format!("{}.html", tag.name)) {
                                 div.cell-name {
                                     (tag_icon())
                                     span.name-text { (tag.name) }
@@ -229,8 +229,8 @@ mod tests {
         assert!(html_str.contains("abc12"), "Should contain short OID");
         assert!(html_str.contains("First release"), "Should contain message");
         assert!(
-            html_str.contains("file-table"),
-            "Should use file-table structure"
+            html_str.contains("tag-list"),
+            "Should use tag-list structure"
         );
         assert!(html_str.contains("ui-icon"), "Should have tag icon");
     }

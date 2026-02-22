@@ -1,0 +1,39 @@
+/* Card Header Component */
+
+/* Glassmorphic card header base */
+.repo-controls,
+.readme-header,
+.blob-header,
+.files-changed-header,
+.diff-file-header {
+    padding: 16px 20px;
+    background: var(--bg-overlay);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: var(--radius-l) var(--radius-l) 0 0;
+}
+
+@supports not (backdrop-filter: blur(12px)) {
+    .repo-controls,
+    .readme-header,
+    .blob-header,
+    .files-changed-header,
+    .diff-file-header {
+        background: var(--bg-code);
+    }
+}
+
+.repo-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.control-left {
+    flex-shrink: 0;
+}

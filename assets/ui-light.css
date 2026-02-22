@@ -48,12 +48,6 @@
     --color-danger: #d20f39;
     --color-danger-bg: rgba(210, 15, 57, 0.1);
 
-    /* Icons */
-    --icon-folder: #1e66f5;
-    --icon-rust: #fe640b;
-    --icon-readme: #1e66f5;
-    --icon-config: #6c6f85;
-
     /* Misc */
     --transparency-grid: #dce0e8;
     --scrollbar-thumb: rgba(76, 79, 105, 0.2);

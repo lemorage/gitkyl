@@ -183,6 +183,11 @@ code[data-full]:hover::after {
     overflow: hidden;
 }
 
+/* Header Section */
+header {
+    margin-bottom: 2rem;
+}
+
 /* Empty State */
 .empty-state {
     padding: 2rem;

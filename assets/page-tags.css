@@ -1,40 +1,5 @@
 /* Tags Page Styles */
 
-/* Header spacing */
-header {
-    margin-bottom: 24px;
-}
-
-/* Card container */
-.repo-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
-    overflow: hidden;
-}
-
-/* Card header with glassmorphism */
-.repo-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-subtle);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-@supports not (backdrop-filter: blur(12px)) {
-    .repo-controls {
-        background: var(--bg-code);
-    }
-}
-
 /* Page title */
 .page-title {
     font-size: 20px;
@@ -46,18 +11,9 @@ header {
     color: var(--text-primary);
 }
 
-.page-title i {
-    font-size: 20px;
-    color: var(--text-secondary);
-}
-
-.section-title {
-    font-size: 13px;
-    font-weight: 600;
-    margin: 0;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.page-title .ui-icon {
+    width: 20px;
+    height: 20px;
 }
 
 /* Badge pill */
@@ -73,17 +29,19 @@ header {
     font-weight: 500;
 }
 
-.badge i {
-    font-size: 14px;
+.badge .ui-icon {
+    width: 14px;
+    height: 14px;
 }
 
-/* Tag List Table */
-.file-table {
+/* Tag list */
+.tag-list {
+    width: 100%;
     display: flex;
     flex-direction: column;
 }
 
-.file-row {
+.tag-row {
     display: flex;
     align-items: center;
     padding: 12px 20px;
@@ -94,11 +52,11 @@ header {
     gap: 16px;
 }
 
-.file-row:last-child {
+.tag-row:last-child {
     border-bottom: none;
 }
 
-.file-row:hover {
+.tag-row:hover {
     background-color: var(--bg-body);
 }
 
@@ -111,9 +69,9 @@ header {
     color: var(--text-primary);
 }
 
-.cell-name i {
-    color: var(--accent);
-    font-size: 18px;
+.cell-name .ui-icon {
+    width: 18px;
+    height: 18px;
 }
 
 .cell-message {
@@ -278,12 +236,11 @@ header {
     color: var(--text-primary);
 }
 
-.browse-link:hover i {
+.browse-link:hover .ui-icon {
     transform: translateX(2px);
 }
 
-.browse-link i {
-    font-size: 16px;
+.browse-link .ui-icon {
     transition: transform 0.15s ease;
 }
 
@@ -294,7 +251,7 @@ header {
 
 /* Responsive */
 @media (max-width: 768px) {
-    .file-row {
+    .tag-row {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;

@@ -36,67 +36,25 @@
     text-decoration: none;
     padding: 4px 10px;
     border-radius: var(--radius-m);
-    background: var(--bg-secondary);
     transition: all 0.15s ease;
     position: relative;
     top: -2px;
 }
 
 .repo-tags-link:hover {
-    background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
-.repo-tags-link i {
-    font-size: 14px;
+.repo-tags-link .ui-icon {
+    width: 14px;
+    height: 14px;
 }
 
-/* Card Containers */
-.repo-card,
-.readme-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
-}
-
-/* Card Headers with Backdrop */
-.repo-controls,
-.readme-header {
-    padding: 16px 20px;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.repo-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    border-radius: var(--radius-l) var(--radius-l) 0 0;
-}
-
-.control-left {
-    flex-shrink: 0;
-}
-
+/* README header extends card-header component */
 .readme-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    border-radius: var(--radius-l) var(--radius-l) 0 0;
-}
-
-@supports not (backdrop-filter: blur(20px)) {
-    .repo-controls,
-    .readme-header {
-        background: var(--bg-code);
-    }
 }
 
 /* Branch Selector */
@@ -130,8 +88,7 @@
     background: var(--bg-subtle-hover);
 }
 
-.branch-button .ph-git-branch {
-    font-size: 16px;
+.branch-button .ui-icon {
     opacity: 0.6;
 }
 
@@ -141,16 +98,6 @@
 
 .branch-active {
     font-weight: 500;
-}
-
-.branch-caret {
-    font-size: 12px;
-    opacity: 0.5;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.branch-selector:hover .branch-caret {
-    transform: rotate(180deg);
 }
 
 /* Dropdown Menu */
@@ -208,13 +155,9 @@
     line-height: 1;
 }
 
-.branch-item i {
-    font-size: 16px;
+.branch-item .ui-icon {
     width: 16px;
     height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .branch-current {
@@ -226,7 +169,7 @@
     background: var(--bg-row-alt);
 }
 
-.branch-current i {
+.branch-current .ui-icon {
     color: var(--accent);
 }
 
@@ -297,12 +240,11 @@
     color: var(--text-primary);
 }
 
-.history-link:hover i {
+.history-link:hover .ui-icon {
     transform: translateX(2px);
 }
 
-.history-link i {
-    font-size: 14px;
+.history-link .ui-icon {
     transition: transform 0.15s ease;
 }
 
@@ -316,9 +258,9 @@
     margin-top: 32px;
 }
 
-.readme-header i {
-    color: var(--icon-readme);
-    font-size: 18px;
+.readme-header .file-icon {
+    width: 18px;
+    height: 18px;
 }
 
 .readme-title {

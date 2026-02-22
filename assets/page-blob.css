@@ -1,38 +1,14 @@
 /* Blob Page Specific Styles */
 
-/* Header Section */
-header {
-    margin-bottom: 2rem;
-}
-
-/* Blob Card Container */
-.blob-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow-card);
-    border: 1px solid var(--glass-border);
-    overflow: hidden;
-}
-
-/* Blob Header */
+/* Blob Header (extends card-header component) */
 .blob-header {
     display: flex;
     align-items: center;
     padding: 12px 16px;
-    background: var(--bg-overlay);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border-subtle);
     gap: 12px;
     position: sticky;
     top: 0;
     z-index: 10;
-}
-
-@supports not (backdrop-filter: blur(12px)) {
-    .blob-header {
-        background: var(--bg-code);
-    }
 }
 
 .blob-header-left {
@@ -41,12 +17,6 @@ header {
     gap: 8px;
     min-width: 0;
     flex: 1;
-}
-
-.blob-header-left > i {
-    font-size: 16px;
-    color: var(--text-secondary);
-    flex-shrink: 0;
 }
 
 .blob-filename {
@@ -104,13 +74,12 @@ header {
     transform: scale(0.95);
 }
 
-.action-btn i {
-    font-size: 15px;
+.action-btn .ui-icon {
     color: var(--text-secondary);
     transition: color 0.15s ease;
 }
 
-.action-btn:hover i {
+.action-btn:hover .ui-icon {
     color: var(--text-primary);
 }
 
@@ -124,7 +93,7 @@ header {
     border-color: var(--color-success-border);
 }
 
-.action-btn.copied i {
+.action-btn.copied .ui-icon {
     color: var(--color-success);
 }
 
@@ -163,8 +132,9 @@ header {
     box-shadow: 0 1px 2px var(--shadow-subtle);
 }
 
-.view-tab i {
-    font-size: 13px;
+.view-tab .ui-icon {
+    width: 13px;
+    height: 13px;
 }
 
 /* Table layout for code display */
@@ -234,8 +204,6 @@ td.line-content {
     color: var(--text-code);
     vertical-align: top;
 }
-
-
 
 /* Image Display */
 .image-display {
@@ -419,7 +387,7 @@ td.blame-info .avatar {
 }
 
 td.blame-info:hover .blame-hash {
-    color: var(--text-link);
+    color: var(--text-primary);
 }
 
 /* Tooltip */

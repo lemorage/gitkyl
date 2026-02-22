@@ -61,22 +61,6 @@
     text-overflow: ellipsis;
 }
 
-.file-link {
-    color: var(--text-primary);
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-}
-
-.file-link .dir-path {
-    color: var(--text-secondary);
-    font-weight: 400;
-}
-
 .commit-message {
     color: var(--text-secondary);
     font-size: 13px;

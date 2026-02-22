@@ -11,9 +11,9 @@ const BASE: &str = include_str!("../assets/base.css");
 const LAYOUT: &str = include_str!("../assets/components/layout.css");
 const NAV: &str = include_str!("../assets/components/nav.css");
 const FILE_LIST: &str = include_str!("../assets/components/file-list.css");
+const CARD_HEADER: &str = include_str!("../assets/components/card-header.css");
 
 const INDEX_PAGE: &str = include_str!("../assets/page-index.css");
-const TREE_PAGE: &str = include_str!("../assets/page-tree.css");
 const BLOB_PAGE: &str = include_str!("../assets/page-blob.css");
 const COMMITS_PAGE: &str = include_str!("../assets/page-commits.css");
 const COMMIT_PAGE: &str = include_str!("../assets/page-commit.css");
@@ -30,17 +30,17 @@ pub fn write_css_assets(assets_dir: &Path, ui_mode: UiMode) -> Result<()> {
     write_bundled(
         assets_dir,
         "index.css",
-        &[ui_css, BASE, LAYOUT, FILE_LIST, INDEX_PAGE],
+        &[ui_css, BASE, LAYOUT, CARD_HEADER, FILE_LIST, INDEX_PAGE],
     )?;
     write_bundled(
         assets_dir,
         "tree.css",
-        &[ui_css, BASE, LAYOUT, NAV, FILE_LIST, TREE_PAGE],
+        &[ui_css, BASE, LAYOUT, NAV, FILE_LIST],
     )?;
     write_bundled(
         assets_dir,
         "blob.css",
-        &[ui_css, BASE, LAYOUT, NAV, BLOB_PAGE],
+        &[ui_css, BASE, LAYOUT, NAV, CARD_HEADER, BLOB_PAGE],
     )?;
     write_bundled(
         assets_dir,
@@ -50,12 +50,12 @@ pub fn write_css_assets(assets_dir: &Path, ui_mode: UiMode) -> Result<()> {
     write_bundled(
         assets_dir,
         "commit.css",
-        &[ui_css, BASE, LAYOUT, NAV, COMMIT_PAGE],
+        &[ui_css, BASE, LAYOUT, NAV, CARD_HEADER, COMMIT_PAGE],
     )?;
     write_bundled(
         assets_dir,
         "tags.css",
-        &[ui_css, BASE, LAYOUT, NAV, TAGS_PAGE],
+        &[ui_css, BASE, LAYOUT, NAV, CARD_HEADER, TAGS_PAGE],
     )?;
     write_bundled(assets_dir, "markdown.css", &[MARKDOWN])?;
     Ok(())
